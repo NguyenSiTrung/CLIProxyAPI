@@ -30,6 +30,16 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+func matchProvider(provider string, targets []string) (string, bool) {
+	p := strings.ToLower(strings.TrimSpace(provider))
+	for _, t := range targets {
+		if strings.EqualFold(p, strings.TrimSpace(t)) {
+			return p, true
+		}
+	}
+	return p, false
+}
+
 // storePersister captures persistence-capable token store methods used by the watcher.
 type storePersister interface {
 	PersistConfig(ctx context.Context) error
@@ -169,7 +179,7 @@ func (w *Watcher) Start(ctx context.Context) error {
 	go w.processEvents(ctx)
 
 	// Perform an initial full reload based on current config and auth dir
-	w.reloadClients(true)
+	w.reloadClients(true, nil)
 	return nil
 }
 
@@ -472,6 +482,80 @@ func computeModelBlacklistHash(blacklist []string) string {
 	return hex.EncodeToString(sum[:])
 }
 
+type modelBlacklistSummary struct {
+	hash  string
+	count int
+}
+
+func summarizeModelBlacklist(list []string) modelBlacklistSummary {
+	if len(list) == 0 {
+		return modelBlacklistSummary{}
+	}
+	seen := make(map[string]struct{}, len(list))
+	normalized := make([]string, 0, len(list))
+	for _, entry := range list {
+		if trimmed := strings.ToLower(strings.TrimSpace(entry)); trimmed != "" {
+			if _, exists := seen[trimmed]; exists {
+				continue
+			}
+			seen[trimmed] = struct{}{}
+			normalized = append(normalized, trimmed)
+		}
+	}
+	sort.Strings(normalized)
+	return modelBlacklistSummary{
+		hash:  computeModelBlacklistHash(normalized),
+		count: len(normalized),
+	}
+}
+
+func summarizeOAuthBlacklistMap(entries map[string][]string) map[string]modelBlacklistSummary {
+	if len(entries) == 0 {
+		return nil
+	}
+	out := make(map[string]modelBlacklistSummary, len(entries))
+	for k, v := range entries {
+		key := strings.ToLower(strings.TrimSpace(k))
+		if key == "" {
+			continue
+		}
+		out[key] = summarizeModelBlacklist(v)
+	}
+	return out
+}
+
+func diffOAuthBlacklistChanges(oldMap, newMap map[string][]string) ([]string, []string) {
+	oldSummary := summarizeOAuthBlacklistMap(oldMap)
+	newSummary := summarizeOAuthBlacklistMap(newMap)
+	keys := make(map[string]struct{}, len(oldSummary)+len(newSummary))
+	for k := range oldSummary {
+		keys[k] = struct{}{}
+	}
+	for k := range newSummary {
+		keys[k] = struct{}{}
+	}
+	changes := make([]string, 0, len(keys))
+	affected := make([]string, 0, len(keys))
+	for key := range keys {
+		oldInfo, okOld := oldSummary[key]
+		newInfo, okNew := newSummary[key]
+		switch {
+		case okOld && !okNew:
+			changes = append(changes, fmt.Sprintf("oauth-model-blacklist[%s]: removed", key))
+			affected = append(affected, key)
+		case !okOld && okNew:
+			changes = append(changes, fmt.Sprintf("oauth-model-blacklist[%s]: added (%d entries)", key, newInfo.count))
+			affected = append(affected, key)
+		case okOld && okNew && oldInfo.hash != newInfo.hash:
+			changes = append(changes, fmt.Sprintf("oauth-model-blacklist[%s]: updated (%d -> %d entries)", key, oldInfo.count, newInfo.count))
+			affected = append(affected, key)
+		}
+	}
+	sort.Strings(changes)
+	sort.Strings(affected)
+	return changes, affected
+}
+
 func applyAuthModelBlacklistMeta(auth *coreauth.Auth, cfg *config.Config, perKey []string, authKind string) {
 	if auth == nil || cfg == nil {
 		return
@@ -696,6 +780,11 @@ func (w *Watcher) reloadConfig() bool {
 	w.config = newConfig
 	w.clientsMutex.Unlock()
 
+	var affectedOAuthProviders []string
+	if oldConfig != nil {
+		_, affectedOAuthProviders = diffOAuthBlacklistChanges(oldConfig.OAuthModelBlacklist, newConfig.OAuthModelBlacklist)
+	}
+
 	// Always apply the current log level based on the latest config.
 	// This ensures logrus reflects the desired level even if change detection misses.
 	util.SetLogLevel(newConfig)
@@ -721,12 +810,12 @@ func (w *Watcher) reloadConfig() bool {
 
 	log.Infof("config successfully reloaded, triggering client reload")
 	// Reload clients with new config
-	w.reloadClients(authDirChanged)
+	w.reloadClients(authDirChanged, affectedOAuthProviders)
 	return true
 }
 
 // reloadClients performs a full scan and reload of all clients.
-func (w *Watcher) reloadClients(rescanAuth bool) {
+func (w *Watcher) reloadClients(rescanAuth bool, affectedOAuthProviders []string) {
 	log.Debugf("starting full client load process")
 
 	w.clientsMutex.RLock()
@@ -736,6 +825,28 @@ func (w *Watcher) reloadClients(rescanAuth bool) {
 	if cfg == nil {
 		log.Error("config is nil, cannot reload clients")
 		return
+	}
+
+	if len(affectedOAuthProviders) > 0 {
+		w.clientsMutex.Lock()
+		if w.currentAuths != nil {
+			filtered := make(map[string]*coreauth.Auth, len(w.currentAuths))
+			for id, auth := range w.currentAuths {
+				if auth == nil {
+					continue
+				}
+				provider := strings.ToLower(strings.TrimSpace(auth.Provider))
+				if _, match := matchProvider(provider, affectedOAuthProviders); match {
+					continue
+				}
+				filtered[id] = auth
+			}
+			w.currentAuths = filtered
+			log.Debugf("forcing auth refresh for %d oauth providers due to oauth-model-blacklist change", len(affectedOAuthProviders))
+		} else {
+			w.currentAuths = nil
+		}
+		w.clientsMutex.Unlock()
 	}
 
 	// Unregister all old API key clients before creating new ones
@@ -1533,6 +1644,11 @@ func buildConfigChangeDetails(oldCfg, newCfg *config.Config) []string {
 			if !equalStringMap(o.Headers, n.Headers) {
 				changes = append(changes, fmt.Sprintf("gemini[%d].headers: updated", i))
 			}
+			oldBL := summarizeModelBlacklist(o.ModelBlacklist)
+			newBL := summarizeModelBlacklist(n.ModelBlacklist)
+			if oldBL.hash != newBL.hash {
+				changes = append(changes, fmt.Sprintf("gemini[%d].model-blacklist: updated (%d -> %d entries)", i, oldBL.count, newBL.count))
+			}
 		}
 		if !reflect.DeepEqual(trimStrings(oldCfg.GlAPIKey), trimStrings(newCfg.GlAPIKey)) {
 			changes = append(changes, "generative-language-api-key: values updated (legacy view, redacted)")
@@ -1561,6 +1677,11 @@ func buildConfigChangeDetails(oldCfg, newCfg *config.Config) []string {
 			if !equalStringMap(o.Headers, n.Headers) {
 				changes = append(changes, fmt.Sprintf("claude[%d].headers: updated", i))
 			}
+			oldBL := summarizeModelBlacklist(o.ModelBlacklist)
+			newBL := summarizeModelBlacklist(n.ModelBlacklist)
+			if oldBL.hash != newBL.hash {
+				changes = append(changes, fmt.Sprintf("claude[%d].model-blacklist: updated (%d -> %d entries)", i, oldBL.count, newBL.count))
+			}
 		}
 	}
 
@@ -1586,7 +1707,16 @@ func buildConfigChangeDetails(oldCfg, newCfg *config.Config) []string {
 			if !equalStringMap(o.Headers, n.Headers) {
 				changes = append(changes, fmt.Sprintf("codex[%d].headers: updated", i))
 			}
+			oldBL := summarizeModelBlacklist(o.ModelBlacklist)
+			newBL := summarizeModelBlacklist(n.ModelBlacklist)
+			if oldBL.hash != newBL.hash {
+				changes = append(changes, fmt.Sprintf("codex[%d].model-blacklist: updated (%d -> %d entries)", i, oldBL.count, newBL.count))
+			}
 		}
+	}
+
+	if entries, _ := diffOAuthBlacklistChanges(oldCfg.OAuthModelBlacklist, newCfg.OAuthModelBlacklist); len(entries) > 0 {
+		changes = append(changes, entries...)
 	}
 
 	// Remote management (never print the key)
