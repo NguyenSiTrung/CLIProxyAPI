@@ -494,6 +494,8 @@ func (s *Service) Run(ctx context.Context) error {
 		s.cfg = newCfg
 		s.cfgMu.Unlock()
 		s.rebindExecutors()
+		// Ensure AI Studio providers observe updated OAuth model blacklist.
+		s.refreshModelsForProvider("aistudio")
 	}
 
 	watcherWrapper, err = s.watcherFactory(s.configPath, s.cfg.AuthDir, reloadCallback)
@@ -883,6 +885,28 @@ func (s *Service) oauthBlacklist(provider, authKind string) []string {
 		return nil
 	}
 	return cfg.OAuthModelBlacklist[providerKey]
+}
+
+// refreshModelsForProvider re-applies model registration for all auth entries
+// of a given provider using the current configuration and blacklist rules.
+func (s *Service) refreshModelsForProvider(provider string) {
+	if s == nil || s.coreManager == nil {
+		return
+	}
+	providerKey := strings.ToLower(strings.TrimSpace(provider))
+	if providerKey == "" {
+		return
+	}
+	auths := s.coreManager.List()
+	for _, auth := range auths {
+		if auth == nil {
+			continue
+		}
+		if strings.ToLower(strings.TrimSpace(auth.Provider)) != providerKey {
+			continue
+		}
+		s.registerModelsForAuth(auth)
+	}
 }
 
 func applyModelBlacklist(models []*ModelInfo, blacklist []string) []*ModelInfo {
