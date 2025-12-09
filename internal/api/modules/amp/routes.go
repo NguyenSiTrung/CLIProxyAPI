@@ -213,6 +213,48 @@ func (m *AmpModule) registerProviderAliases(engine *gin.Engine, baseHandler *han
 
 	// Provider-specific routes under /api/provider/:provider
 	ampProviders := engine.Group("/api/provider")
+
+	// Amp composite key middleware - parses "access-key|upstream-key|amp" format
+	// This runs BEFORE auth middleware to:
+	// 1. Detect Amp CLI requests (key ends with |amp)
+	// 2. Extract access-api-key for proxy authentication
+	// 3. Store upstream-api-key in context for fallback calls
+	ampProviders.Use(func(c *gin.Context) {
+		xApiKey := c.GetHeader("X-Api-Key")
+		userAgent := c.GetHeader("User-Agent")
+
+		log.Debugf("[amp-auth] >>> Request: %s %s, User-Agent: %s", c.Request.Method, c.Request.URL.Path, userAgent)
+
+		// Check for composite key format: access-key|upstream-key|amp
+		if strings.HasSuffix(xApiKey, "|amp") {
+			// Parse composite format
+			parts := strings.Split(xApiKey, "|")
+			if len(parts) == 3 && parts[2] == "amp" {
+				accessKey := parts[0]
+				upstreamKey := parts[1]
+
+				log.Debugf("[amp-auth] Detected Amp composite key format")
+
+				// Store upstream key in gin context for fallback handler
+				c.Set("amp_upstream_key", upstreamKey)
+
+				// Replace X-Api-Key header with just the access key for auth middleware
+				c.Request.Header.Set("X-Api-Key", accessKey)
+
+				log.Debugf("[amp-auth] Replaced X-Api-Key header with access key for auth")
+			} else {
+				log.Debugf("[amp-auth] Invalid composite format, expected 3 parts (access|upstream|amp), got %d", len(parts))
+			}
+		} else {
+			log.Debugf("[amp-auth] Standard X-Api-Key detected")
+		}
+
+		c.Next()
+
+		// Log result after auth middleware runs
+		log.Debugf("[amp-auth] <<< Response status: %d", c.Writer.Status())
+	})
+
 	if auth != nil {
 		ampProviders.Use(auth)
 	}
@@ -265,3 +307,4 @@ func (m *AmpModule) registerProviderAliases(engine *gin.Engine, baseHandler *han
 		v1betaAmp.GET("/models/:action", geminiHandlers.GeminiGetHandler)
 	}
 }
+
