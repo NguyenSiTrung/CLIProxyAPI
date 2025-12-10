@@ -129,6 +129,21 @@ func (m *AmpModule) registerManagementRoutes(engine *gin.Engine, baseHandler *ha
 			c.JSON(503, gin.H{"error": "amp upstream proxy not available"})
 			return
 		}
+
+		// Handle composite key format for management routes
+		// Amp CLI may send "access-key|upstream-key|amp" format
+		// We need to extract and use only the upstream key for ampcode.com
+		xApiKey := c.GetHeader("X-Api-Key")
+		if strings.HasSuffix(xApiKey, "|amp") {
+			parts := strings.Split(xApiKey, "|")
+			if len(parts) == 3 && parts[2] == "amp" {
+				upstreamKey := parts[1]
+				log.Debugf("[amp-management] Detected composite key format, using upstream key for ampcode.com")
+				c.Request.Header.Set("X-Api-Key", upstreamKey)
+				c.Request.Header.Set("Authorization", "Bearer "+upstreamKey)
+			}
+		}
+
 		proxy.ServeHTTP(c.Writer, c.Request)
 	}
 
