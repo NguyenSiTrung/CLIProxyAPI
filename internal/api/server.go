@@ -282,6 +282,12 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 		log.Errorf("Failed to register Amp module: %v", err)
 	}
 
+	// Configure hot-reload callback for management handler
+	s.mgmt.OnConfigChange = func(newCfg *config.Config) {
+		log.Info("Configuration updated via management API, applying changes...")
+		s.UpdateClients(newCfg)
+	}
+
 	// Apply additional router configurators from options
 	if optionState.routerConfigurator != nil {
 		optionState.routerConfigurator(engine, s.handlers, cfg)

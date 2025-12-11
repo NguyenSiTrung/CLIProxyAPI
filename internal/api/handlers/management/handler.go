@@ -40,6 +40,9 @@ type Handler struct {
 	allowRemoteOverride bool
 	envSecret           string
 	logDir              string
+
+	// OnConfigChange is called when the configuration is updated via the management API.
+	OnConfigChange func(*config.Config)
 }
 
 // NewHandler creates a new management handler instance.
@@ -230,6 +233,11 @@ func (h *Handler) persist(c *gin.Context) bool {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to save config: %v", err)})
 		return false
 	}
+
+	if h.OnConfigChange != nil {
+		h.OnConfigChange(h.cfg)
+	}
+
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	return true
 }
