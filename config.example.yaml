@@ -25,6 +25,15 @@ remote-management:
   # Disable the bundled management control panel asset download and HTTP route when true.
   disable-control-panel: false
 
+  # Use custom management panel instead of upstream auto-updated version.
+  # When true, serves static/custom-management.html (or custom path below).
+  # Allows customizing the admin panel without conflicts from upstream updates.
+  use-custom-management-panel: false
+
+  # Path to custom management panel HTML file. Relative paths use config directory as base.
+  # Default: static/custom-management.html
+  # custom-management-panel-path: "static/custom-management.html"
+
 # Authentication directory (supports ~ for home directory)
 auth-dir: "~/.cli-proxy-api"
 
@@ -58,7 +67,6 @@ quota-exceeded:
 
 # When true, enable authentication for the WebSocket API (/v1/ws).
 ws-auth: false
-
 # Gemini API keys
 # gemini-api-key:
 #   - api-key: "AIzaSy...01"

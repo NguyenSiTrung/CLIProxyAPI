@@ -104,6 +104,10 @@ type RemoteManagement struct {
 	SecretKey string `yaml:"secret-key"`
 	// DisableControlPanel skips serving and syncing the bundled management UI when true.
 	DisableControlPanel bool `yaml:"disable-control-panel"`
+	// UseCustomManagementPanel enables serving a custom management.html instead of the upstream auto-updated version.
+	UseCustomManagementPanel bool `yaml:"use-custom-management-panel"`
+	// CustomManagementPanelPath specifies the path to custom management.html (default: static/custom-management.html).
+	CustomManagementPanelPath string `yaml:"custom-management-panel-path"`
 }
 
 // QuotaExceeded defines the behavior when API quota limits are exceeded.

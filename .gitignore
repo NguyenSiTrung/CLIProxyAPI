@@ -15,6 +15,7 @@ pgstore/*
 gitstore/*
 objectstore/*
 static/*
+!static/custom-management.html
 refs/*
 
 # Authentication data

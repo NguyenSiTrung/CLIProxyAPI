@@ -600,6 +600,26 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
 		c.AbortWithStatus(http.StatusNotFound)
 		return
 	}
+
+	// Check if custom management panel is enabled
+	if cfg.RemoteManagement.UseCustomManagementPanel {
+		customPath := cfg.RemoteManagement.CustomManagementPanelPath
+		if customPath == "" {
+			customPath = "static/custom-management.html"
+		}
+		// Resolve relative paths against config directory
+		if !filepath.IsAbs(customPath) {
+			customPath = filepath.Join(filepath.Dir(s.configFilePath), customPath)
+		}
+		if _, err := os.Stat(customPath); err == nil {
+			c.File(customPath)
+			return
+		}
+		// If custom file doesn't exist, fall back to upstream
+		log.Warnf("Custom management panel not found at %s, falling back to upstream", customPath)
+	}
+
+	// Original upstream logic
 	filePath := managementasset.FilePath(s.configFilePath)
 	if strings.TrimSpace(filePath) == "" {
 		c.AbortWithStatus(http.StatusNotFound)
