@@ -160,6 +160,11 @@ func (h *Handler) PutConfigYAML(c *gin.Context) {
 		return
 	}
 	h.cfg = newCfg
+
+	if h.OnConfigChange != nil {
+		h.OnConfigChange(h.cfg)
+	}
+
 	c.JSON(http.StatusOK, gin.H{"ok": true, "changed": []string{"config"}})
 }
 
