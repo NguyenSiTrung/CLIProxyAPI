@@ -204,14 +204,12 @@ func (m *AmpModule) OnConfigUpdated(cfg *config.Config) error {
 		}
 	}
 
-	// Check model mappings change
-	modelMappingsChanged := m.hasModelMappingsChanged(oldSettings, &newSettings)
-	if modelMappingsChanged {
-		if m.modelMapper != nil {
-			m.modelMapper.UpdateMappings(newSettings.ModelMappings)
-		} else if m.enabled {
-			log.Warnf("amp model mapper not initialized, skipping model mapping update")
-		}
+	// Always update model mappings to ensure reliability during hot-reload.
+	// The cost of map recreation is negligible compared to the risk of stale mappings.
+	if m.modelMapper != nil {
+		m.modelMapper.UpdateMappings(newSettings.ModelMappings)
+	} else if m.enabled {
+		log.Warnf("amp model mapper not initialized, skipping model mapping update")
 	}
 
 	if m.enabled {
