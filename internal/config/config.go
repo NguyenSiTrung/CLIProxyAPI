@@ -133,6 +133,10 @@ type RemoteManagement struct {
 	// PanelGitHubRepository overrides the GitHub repository used to fetch the management panel asset.
 	// Accepts either a repository URL (https://github.com/org/repo) or an API releases endpoint.
 	PanelGitHubRepository string `yaml:"panel-github-repository"`
+	// UseCustomManagementPanel enables serving a custom management.html instead of the upstream auto-updated version.
+	UseCustomManagementPanel bool `yaml:"use-custom-management-panel"`
+	// CustomManagementPanelPath specifies the path to custom management.html (default: static/custom-management.html).
+	CustomManagementPanelPath string `yaml:"custom-management-panel-path"`
 }
 
 // QuotaExceeded defines the behavior when API quota limits are exceeded.
