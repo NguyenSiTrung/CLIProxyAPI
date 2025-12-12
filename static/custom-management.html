@@ -718,6 +718,11 @@
       border-color: rgba(96, 165, 250, 0.3);
     }
 
+    .log-filter-btn.active.filter-debug {
+      color: var(--accent-green);
+      border-color: rgba(34, 211, 160, 0.3);
+    }
+
     .log-search-container {
       flex: 1;
       position: relative;
@@ -912,6 +917,31 @@
       color: var(--text-secondary);
       gap: 12px;
       opacity: 0.7;
+    }
+
+    .log-entry {
+      cursor: pointer;
+    }
+
+    .log-count-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 10px;
+      margin-left: 4px;
+      min-width: 18px;
+      text-align: center;
+    }
+
+    .log-count-badge.error {
+      background: rgba(248, 113, 113, 0.2);
+      color: var(--accent-red);
+    }
+
+    .log-count-badge.warn {
+      background: rgba(251, 191, 36, 0.2);
+      color: var(--accent-yellow);
     }
 
     @keyframes pulse {
@@ -2618,7 +2648,8 @@
 
           <div class="log-filter-group">
             <button class="log-filter-btn active" onclick="setLogFilter('ALL')" id="filter-ALL">ALL</button>
-            <button class="log-filter-btn" onclick="setLogFilter('INFO')" id="filter-INFO">INFO</button>
+            <button class="log-filter-btn filter-debug" onclick="setLogFilter('DEBUG')" id="filter-DEBUG">DEBUG</button>
+            <button class="log-filter-btn filter-info" onclick="setLogFilter('INFO')" id="filter-INFO">INFO</button>
             <button class="log-filter-btn filter-warn" onclick="setLogFilter('WARN')" id="filter-WARN">WARN</button>
             <button class="log-filter-btn filter-error" onclick="setLogFilter('ERROR')" id="filter-ERROR">ERROR</button>
           </div>
@@ -2641,6 +2672,24 @@
               <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
             </svg>
             Refresh
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="exportLogs()" title="Download logs as text file">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Export
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="jumpToNextError()" title="Jump to errors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="8" x2="12" y2="12"></line>
+              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+            </svg>
+            Errors
           </button>
           <button class="btn btn-danger btn-sm" onclick="clearLogs()">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
@@ -2665,6 +2714,14 @@
             </div>
             <div class="terminal-status">
               <span id="logCount" style="color:var(--text-secondary);margin-right:8px">0 lines</span>
+              <button onclick="scrollLogsToBottom()" title="Scroll to bottom"
+                style="background:none; border:none; cursor:pointer; padding:2px 6px; color:var(--text-secondary); margin-right:8px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="7 13 12 18 17 13"></polyline>
+                  <polyline points="7 6 12 11 17 6"></polyline>
+                </svg>
+              </button>
               <div id="liveStatusDot" class="status-dot"></div>
               <span id="liveStatusText" style="color:var(--text-muted)">Offline</span>
             </div>
@@ -2772,6 +2829,12 @@
         const page = item.dataset.page;
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.getElementById(`page-${page}`).classList.add('active');
+
+        // Stop log auto-refresh when navigating away from logs tab
+        if (page !== 'logs') {
+          stopLogAutoRefresh();
+        }
+
         if (page === 'dashboard') loadDashboard();
         if (page === 'models') loadModels();
         if (page === 'auth') loadAuthFiles();
@@ -4593,7 +4656,11 @@
       allLogs: [],
       filter: 'ALL',
       search: '',
-      autoRefreshInterval: null
+      autoRefreshInterval: null,
+      latestTimestamp: 0,
+      searchDebounceTimer: null,
+      errorCount: 0,
+      warnCount: 0
     };
 
     function escapeHtml(text) {
@@ -4611,7 +4678,7 @@
       let message = line; // Default to full line
 
       // Parse bracket-style log format: [2025-12-12 18:35:19] [level] [source:line] message
-      const bracketMatch = line.match(/^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]\s*\[(\w+)\]\s*(?:\[[^\]]+\]\s*)?(.*)/);
+      const bracketMatch = line.match(/^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]\s*\[(\w+)\]\s*(?:\[[^\]]+\]\s*)?(.*)$/);
 
       if (bracketMatch) {
         time = bracketMatch[1];
@@ -4648,26 +4715,72 @@
       }
 
       try {
-        const d = await api('GET', '/logs?limit=500');
-        const lines = d.lines || [];
+        // Use incremental loading if we have a latest timestamp
+        let url = '/logs?limit=500';
+        if (isAuto && logState.latestTimestamp > 0) {
+          url += '&after=' + logState.latestTimestamp;
+        }
 
-        logState.allLogs = lines
+        const d = await api('GET', url);
+        const lines = d.lines || [];
+        const newLogs = lines
           .filter(l => !l.includes('/v0/management/logs'))
           .map(parseLogLine);
+
+        if (isAuto && logState.latestTimestamp > 0 && newLogs.length > 0) {
+          // Incremental update - append new logs
+          logState.allLogs = [...logState.allLogs, ...newLogs].slice(-1000);
+        } else {
+          // Full refresh
+          logState.allLogs = newLogs;
+        }
+
+        // Update latest timestamp for incremental loading
+        if (d['latest-timestamp']) {
+          logState.latestTimestamp = d['latest-timestamp'];
+        }
+
+        // Update error/warn counts
+        logState.errorCount = logState.allLogs.filter(l => l.level === 'ERROR').length;
+        logState.warnCount = logState.allLogs.filter(l => l.level === 'WARN').length;
+
         renderLogs();
 
         // Update live status UI
-        const statusText = document.getElementById('liveStatusText');
-        if (logState.autoRefreshInterval) {
-          statusText.innerText = 'Live';
-          statusText.style.color = 'var(--accent-green)';
-        } else {
-          statusText.innerText = 'Last updated: ' + new Date().toLocaleTimeString();
-          statusText.style.color = 'var(--text-muted)';
-        }
+        updateLogStatusUI();
 
       } catch (e) {
         if (!isAuto) toast('Failed to load logs: ' + e.message, 'error');
+      }
+    }
+
+    function updateLogStatusUI() {
+      const statusText = document.getElementById('liveStatusText');
+      if (logState.autoRefreshInterval) {
+        statusText.innerText = 'Live';
+        statusText.style.color = 'var(--accent-green)';
+      } else {
+        statusText.innerText = 'Last updated: ' + new Date().toLocaleTimeString();
+        statusText.style.color = 'var(--text-muted)';
+      }
+
+      // Update error count badge on ERROR filter button
+      const errorBtn = document.getElementById('filter-ERROR');
+      if (errorBtn) {
+        if (logState.errorCount > 0) {
+          errorBtn.innerHTML = `ERROR <span class="log-count-badge error">${logState.errorCount}</span>`;
+        } else {
+          errorBtn.textContent = 'ERROR';
+        }
+      }
+
+      const warnBtn = document.getElementById('filter-WARN');
+      if (warnBtn) {
+        if (logState.warnCount > 0) {
+          warnBtn.innerHTML = `WARN <span class="log-count-badge warn">${logState.warnCount}</span>`;
+        } else {
+          warnBtn.textContent = 'WARN';
+        }
       }
     }
 
@@ -4700,13 +4813,13 @@
       // We only render the last 500 filtered items to prevent DOM overload if array is huge
       const linesToRender = filtered.slice(-500);
 
-      const html = linesToRender.map(l => {
+      const html = linesToRender.map((l, idx) => {
         let lvlClass = l.level.toLowerCase();
         // Use the extracted message (without timestamp/level prefix) for cleaner display
         let displayTime = l.time ? (l.time.length > 15 ? l.time.substring(11, 19) : l.time) : '--:--:--';
 
         return `
-           <div class="log-entry ${lvlClass}">
+           <div class="log-entry ${lvlClass}" data-log-idx="${idx}" onclick="copyLogEntry(this)" title="Click to copy">
              <div class="log-time" title="${escapeHtml(l.time)}">${escapeHtml(displayTime)}</div>
              <div class="log-lvl ${lvlClass}">${l.level}</div>
              <div class="log-msg">${escapeHtml(l.message)}</div> 
@@ -4724,6 +4837,25 @@
       }
     }
 
+    function copyLogEntry(element) {
+      const timeEl = element.querySelector('.log-time');
+      const levelEl = element.querySelector('.log-lvl');
+      const msgEl = element.querySelector('.log-msg');
+
+      const logText = `[${timeEl?.getAttribute('title') || timeEl?.textContent || ''}] [${levelEl?.textContent || ''}] ${msgEl?.textContent || ''}`;
+
+      navigator.clipboard.writeText(logText).then(() => {
+        // Visual feedback - brief highlight
+        element.style.background = 'rgba(0, 229, 255, 0.15)';
+        setTimeout(() => {
+          element.style.background = '';
+        }, 300);
+        toast('Log entry copied to clipboard', 'success');
+      }).catch(() => {
+        toast('Failed to copy log entry', 'error');
+      });
+    }
+
     function setLogFilter(filter) {
       logState.filter = filter;
       document.querySelectorAll('.log-filter-btn').forEach(b => {
@@ -4733,8 +4865,14 @@
     }
 
     function filterLogs() {
-      logState.search = document.getElementById('logSearch').value;
-      renderLogs();
+      // Debounce search to avoid excessive re-renders
+      if (logState.searchDebounceTimer) {
+        clearTimeout(logState.searchDebounceTimer);
+      }
+      logState.searchDebounceTimer = setTimeout(() => {
+        logState.search = document.getElementById('logSearch').value;
+        renderLogs();
+      }, 150);
     }
 
     function toggleAutoRefresh(enabled) {
@@ -4748,9 +4886,73 @@
         loadLogs(true);
         logState.autoRefreshInterval = setInterval(() => loadLogs(true), 2000);
       } else {
-        renderLogs(); // Update status text
+        updateLogStatusUI(); // Update status text properly when toggled off
       }
     }
+
+    function stopLogAutoRefresh() {
+      // Called when navigating away from logs tab
+      if (logState.autoRefreshInterval) {
+        clearInterval(logState.autoRefreshInterval);
+        logState.autoRefreshInterval = null;
+        const toggle = document.getElementById('autoRefreshToggle');
+        if (toggle) toggle.checked = false;
+        const dot = document.getElementById('liveStatusDot');
+        if (dot) dot.classList.remove('active');
+      }
+    }
+
+    function scrollLogsToBottom() {
+      const v = document.getElementById('logViewer');
+      if (v) {
+        v.scrollTop = v.scrollHeight;
+      }
+    }
+
+    function exportLogs() {
+      if (logState.allLogs.length === 0) {
+        toast('No logs to export', 'info');
+        return;
+      }
+
+      const logText = logState.allLogs.map(l => `[${l.time || ''}] [${l.level}] ${l.message}`).join('\n');
+      const blob = new Blob([logText], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cliproxy-logs-${new Date().toISOString().slice(0, 10)}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast('Logs exported successfully', 'success');
+    }
+
+    function jumpToNextError() {
+      const errorLogs = logState.allLogs.filter(l => l.level === 'ERROR');
+      if (errorLogs.length === 0) {
+        toast('No errors found', 'info');
+        return;
+      }
+      setLogFilter('ERROR');
+      scrollLogsToBottom();
+    }
+
+    // Add keyboard shortcuts for logs
+    document.addEventListener('keydown', (e) => {
+      // Only when logs tab is active
+      const logsPage = document.getElementById('page-logs');
+      if (!logsPage || !logsPage.classList.contains('active')) return;
+
+      if (e.key === 'Escape') {
+        // Clear search on Escape
+        const searchInput = document.getElementById('logSearch');
+        if (searchInput && searchInput.value) {
+          searchInput.value = '';
+          filterLogs();
+        }
+      }
+    });
 
     function clearLogs(confirmed = false) {
       if (!confirmed) {
@@ -4781,6 +4983,11 @@
       api('DELETE', '/logs')
         .then(() => {
           toast('Logs cleared successfully', 'success');
+          // Reset log state for fresh start
+          logState.latestTimestamp = 0;
+          logState.allLogs = [];
+          logState.errorCount = 0;
+          logState.warnCount = 0;
           loadLogs();
         })
         .catch(e => {
