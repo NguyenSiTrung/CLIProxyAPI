@@ -4608,23 +4608,37 @@
     function parseLogLine(line) {
       let level = 'INFO';
       let time = '';
+      let message = line; // Default to full line
 
-      // Heuristic for log level
-      if (line.includes('level=error') || line.includes('ERROR') || line.includes('[ERRO')) level = 'ERROR';
-      else if (line.includes('level=warn') || line.includes('WARN') || line.includes('[WARN')) level = 'WARN';
-      else if (line.includes('level=debug') || line.includes('DEBUG') || line.includes('[DEBU')) level = 'DEBUG';
+      // Parse bracket-style log format: [2025-12-12 18:35:19] [level] [source:line] message
+      const bracketMatch = line.match(/^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\]\s*\[(\w+)\]\s*(?:\[[^\]]+\]\s*)?(.*)/);
 
-      // Heuristic for timestamp
-      // Match ISO strings like 2024-12-11T... or Go default format
-      const timeMatch = line.match(/time="([^"]+)"/) ||
-        line.match(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})/) ||
-        line.match(/(\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2})/);
+      if (bracketMatch) {
+        time = bracketMatch[1];
+        const levelStr = bracketMatch[2].toLowerCase();
+        if (levelStr === 'error' || levelStr === 'erro') level = 'ERROR';
+        else if (levelStr === 'warn' || levelStr === 'warning') level = 'WARN';
+        else if (levelStr === 'debug' || levelStr === 'debu') level = 'DEBUG';
+        else if (levelStr === 'info') level = 'INFO';
+        message = bracketMatch[3] || '';
+      } else {
+        // Fallback: Heuristic for log level
+        if (line.includes('level=error') || line.includes('ERROR') || line.includes('[ERRO')) level = 'ERROR';
+        else if (line.includes('level=warn') || line.includes('WARN') || line.includes('[WARN')) level = 'WARN';
+        else if (line.includes('level=debug') || line.includes('DEBUG') || line.includes('[DEBU')) level = 'DEBUG';
 
-      if (timeMatch) {
-        time = timeMatch[1] || timeMatch[0];
+        // Fallback: Heuristic for timestamp
+        // Match ISO strings like 2024-12-11T... or Go default format
+        const timeMatch = line.match(/time="([^"]+)"/) ||
+          line.match(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})/) ||
+          line.match(/(\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2})/);
+
+        if (timeMatch) {
+          time = timeMatch[1] || timeMatch[0];
+        }
       }
 
-      return { raw: line, time, level };
+      return { raw: line, time, level, message };
     }
 
     async function loadLogs(isAuto = false) {
@@ -4688,17 +4702,14 @@
 
       const html = linesToRender.map(l => {
         let lvlClass = l.level.toLowerCase();
-        // Attempt to nicely format the message by stripping known prefixes if desired, 
-        // but for now keeping raw log is safer for debugging.
-        // We can highlight the timestamp portion in the raw string if we found it.
-
+        // Use the extracted message (without timestamp/level prefix) for cleaner display
         let displayTime = l.time ? (l.time.length > 15 ? l.time.substring(11, 19) : l.time) : '--:--:--';
 
         return `
            <div class="log-entry ${lvlClass}">
              <div class="log-time" title="${escapeHtml(l.time)}">${escapeHtml(displayTime)}</div>
              <div class="log-lvl ${lvlClass}">${l.level}</div>
-             <div class="log-msg">${escapeHtml(l.raw)}</div> 
+             <div class="log-msg">${escapeHtml(l.message)}</div> 
            </div>
          `;
       }).join('');
