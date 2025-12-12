@@ -18,6 +18,9 @@ type Record struct {
 	Source      string
 	RequestedAt time.Time
 	Failed      bool
+	ErrorCode   string // HTTP status code or error code
+	ErrorMsg    string // Error message or response body excerpt
+	HTTPStatus  int    // HTTP response status code
 	Detail      Detail
 }
 
