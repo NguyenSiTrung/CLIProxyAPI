@@ -417,6 +417,55 @@
       border: 1px solid rgba(167, 139, 250, 0.3);
     }
 
+    .badge-blue {
+      background: rgba(96, 165, 250, 0.2);
+      color: var(--accent-blue);
+      border: 1px solid rgba(96, 165, 250, 0.3);
+    }
+
+    .date-range-btn {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .date-range-btn:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .date-range-btn.active {
+      background: var(--accent-cyan);
+      color: #0d0d1a;
+    }
+
+    .chart-view-btn {
+      padding: 4px 10px;
+      border: none;
+      border-radius: 4px;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .chart-view-btn:hover {
+      color: var(--text-primary);
+    }
+
+    .chart-view-btn.active {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-primary);
+    }
+
     .toggle {
       position: relative;
       width: 48px;
@@ -2134,13 +2183,29 @@
         </div>
         <div class="card">
           <div class="card-header">
-            <h3 class="card-title">Overview</h3><button class="btn btn-secondary btn-sm" onclick="loadUsageStats()"
-              style="display:flex;align-items:center;gap:6px"><svg xmlns="http://www.w3.org/2000/svg" width="14"
-                height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M23 4v6h-6" />
-                <path d="M1 20v-6h6" />
-                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-              </svg>Refresh </button>
+            <h3 class="card-title">Overview</h3>
+            <div style="display:flex;gap:8px;align-items:center">
+              <div class="date-range-selector" style="display:flex;gap:4px;background:rgba(20,20,40,0.6);padding:4px;border-radius:8px">
+                <button class="date-range-btn active" data-range="all" onclick="setUsageDateRange('all')">All</button>
+                <button class="date-range-btn" data-range="30d" onclick="setUsageDateRange('30d')">30d</button>
+                <button class="date-range-btn" data-range="7d" onclick="setUsageDateRange('7d')">7d</button>
+                <button class="date-range-btn" data-range="today" onclick="setUsageDateRange('today')">Today</button>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="exportUsageData()" title="Export usage data"
+                style="display:flex;align-items:center;gap:6px"><svg xmlns="http://www.w3.org/2000/svg" width="14"
+                  height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>Export</button>
+              <button class="btn btn-secondary btn-sm" onclick="loadUsageStats()"
+                style="display:flex;align-items:center;gap:6px"><svg xmlns="http://www.w3.org/2000/svg" width="14"
+                  height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M23 4v6h-6" />
+                  <path d="M1 20v-6h6" />
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+                </svg>Refresh</button>
+            </div>
           </div>
           <div class="stats-grid" style="margin-bottom:0">
             <div class="stat-card cyan">
@@ -2170,12 +2235,18 @@
                 <h3 class="card-title" style="font-size:15px; color:var(--text-secondary)">Request Trends</h3>
                 <div class="stat-value" id="trendRequestTotal" style="font-size:24px; margin-top:4px">-</div>
               </div>
-              <div style="padding:6px; background:rgba(0, 229, 255, 0.1); border-radius:8px; color:var(--accent-cyan)">
+              <div style="display:flex;align-items:center;gap:8px">
+                <div class="chart-view-toggle" style="display:flex;gap:2px;background:rgba(20,20,40,0.8);padding:3px;border-radius:6px">
+                  <button class="chart-view-btn active" data-view="daily" onclick="setChartView('daily')">Daily</button>
+                  <button class="chart-view-btn" data-view="hourly" onclick="setChartView('hourly')">Hourly</button>
+                </div>
+                <div style="padding:6px; background:rgba(0, 229, 255, 0.1); border-radius:8px; color:var(--accent-cyan)">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
                   stroke="currentColor" stroke-width="2">
                   <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
                   <polyline points="17 18 23 18 23 12"></polyline>
                 </svg>
+              </div>
               </div>
             </div>
             <div style="height:240px; width:100%; position:relative; padding-top:16px">
@@ -2219,6 +2290,20 @@
               </div>
             </div>
             <div class="config-settings-list">
+              <div class="config-setting-item" style="background:rgba(0,229,255,0.05);border-radius:8px;margin-bottom:8px">
+                <div class="config-setting-info">
+                  <div class="config-setting-icon" style="background:rgba(0,229,255,0.15)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                      fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                      <path d="M2 17l10 5 10-5"></path>
+                      <path d="M2 12l10 5 10-5"></path>
+                    </svg></div>
+                  <div class="config-setting-text">
+                    <h4 style="color:var(--accent-cyan)">Total Tokens</h4>
+                    <p>All tokens consumed</p>
+                  </div>
+                </div><span class="badge badge-cyan" style="font-size:14px;padding:6px 12px" id="usageTotalTokens">-</span>
+              </div>
               <div class="config-setting-item">
                 <div class="config-setting-info">
                   <div class="config-setting-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
@@ -2244,6 +2329,20 @@
                     <p>Received from AI providers</p>
                   </div>
                 </div><span class="badge badge-purple" id="usageOutputTokens">-</span>
+              </div>
+              <div class="config-setting-item">
+                <div class="config-setting-info">
+                  <div class="config-setting-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                      fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <path d="M12 16v-4"></path>
+                      <path d="M12 8h.01"></path>
+                    </svg></div>
+                  <div class="config-setting-text">
+                    <h4>Reasoning Tokens</h4>
+                    <p>Used for chain-of-thought reasoning</p>
+                  </div>
+                </div><span class="badge badge-blue" id="usageReasoningTokens">-</span>
               </div>
               <div class="config-setting-item">
                 <div class="config-setting-info">
@@ -3061,6 +3160,7 @@
         // Deep aggregation
         let totalInput = 0;
         let totalOutput = 0;
+        let totalReasoning = 0;
         let totalCacheRead = 0;
         let totalCacheWrite = 0;
 
@@ -3111,15 +3211,18 @@
                 ;
               totalInput += (t.input_tokens || 0);
               totalOutput += (t.output_tokens || 0);
+              totalReasoning += (t.reasoning_tokens || 0);
               totalCacheRead += (t.cached_tokens || 0);
             }
           }
         }
 
+        document.getElementById('usageTotalTokens').textContent = (totalInput + totalOutput + totalReasoning).toLocaleString();
         document.getElementById('usageInputTokens').textContent = totalInput.toLocaleString();
         document.getElementById('usageOutputTokens').textContent = totalOutput.toLocaleString();
+        document.getElementById('usageReasoningTokens').textContent = totalReasoning.toLocaleString();
         document.getElementById('usageCacheRead').textContent = totalCacheRead.toLocaleString();
-        document.getElementById('usageCacheWrite').textContent = '-';
+        document.getElementById('usageCacheWrite').textContent = totalCacheWrite > 0 ? totalCacheWrite.toLocaleString() : '-';
 
         // Render Providers
         const providerContainer = document.getElementById('providerStats');
@@ -3130,7 +3233,7 @@
         }
 
         else {
-          providerContainer.innerHTML = '<div class="config-settings-list">' + pEntries.map(([name, stats]) => ` <div class="config-setting-item" style="padding:12px 24px" > <div class="config-setting-info" > <div class="config-setting-text" > <h4 style="font-family:monospace;font-size:13px" >${name.length > 25 ? name.slice(0, 22) + '...' : name
+          providerContainer.innerHTML = '<div class="config-settings-list">' + pEntries.map(([name, stats]) => ` <div class="config-setting-item" style="padding:12px 24px" > <div class="config-setting-info" > <div class="config-setting-text" > <h4 style="font-family:monospace;font-size:13px" title="${name}">${name.length > 25 ? name.slice(0, 22) + '...' : name
             }</h4> <p>${stats.tokens.toLocaleString()
             } tokens</p> </div> </div> <span class="badge badge-purple" >${stats.requests
             }</span> </div> `).join('') + '</div>';
@@ -3153,6 +3256,7 @@
         }
 
         renderUsageCharts(u);
+        usageState.rawData = u;
 
       }
 
@@ -3255,6 +3359,203 @@
           }
         }
       });
+    }
+
+    // Usage stats state
+    let usageState = {
+      dateRange: 'all',
+      chartView: 'daily',
+      rawData: null
+    };
+
+    function setUsageDateRange(range) {
+      usageState.dateRange = range;
+      document.querySelectorAll('.date-range-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.range === range);
+      });
+      if (usageState.rawData) {
+        renderFilteredUsageData(usageState.rawData);
+      }
+    }
+
+    function setChartView(view) {
+      usageState.chartView = view;
+      document.querySelectorAll('.chart-view-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.view === view);
+      });
+      if (usageState.rawData) {
+        renderUsageChartsWithView(usageState.rawData);
+      }
+    }
+
+    function filterDataByDateRange(data, range) {
+      if (range === 'all') return data;
+      
+      const now = new Date();
+      let cutoff;
+      
+      if (range === 'today') {
+        cutoff = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      } else if (range === '7d') {
+        cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      } else if (range === '30d') {
+        cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      }
+      
+      const filtered = {};
+      for (const [key, value] of Object.entries(data)) {
+        const date = new Date(key);
+        if (date >= cutoff) {
+          filtered[key] = value;
+        }
+      }
+      return filtered;
+    }
+
+    function renderFilteredUsageData(usageData) {
+      const range = usageState.dateRange;
+      
+      // Filter requests_by_day and tokens_by_day
+      const reqByDay = filterDataByDateRange(usageData.requests_by_day || {}, range);
+      const tokByDay = filterDataByDateRange(usageData.tokens_by_day || {}, range);
+      
+      // Recalculate totals based on filtered data
+      const filteredReqTotal = Object.values(reqByDay).reduce((a, b) => a + b, 0);
+      const filteredTokTotal = Object.values(tokByDay).reduce((a, b) => a + b, 0);
+      
+      // Update trend displays
+      if (document.getElementById('trendRequestTotal'))
+        document.getElementById('trendRequestTotal').innerText = filteredReqTotal.toLocaleString();
+      if (document.getElementById('trendTokenTotal'))
+        document.getElementById('trendTokenTotal').innerText = (filteredTokTotal < 1000000 ? (filteredTokTotal / 1000).toFixed(1) + 'k' : (filteredTokTotal / 1000000).toFixed(2) + 'M');
+      
+      renderUsageChartsWithView(usageData);
+    }
+
+    function renderUsageChartsWithView(usageData) {
+      const view = usageState.chartView;
+      const range = usageState.dateRange;
+      
+      let reqData, tokData, labelFormatter;
+      
+      if (view === 'hourly') {
+        reqData = usageData.requests_by_hour || {};
+        tokData = usageData.tokens_by_hour || {};
+        labelFormatter = (h) => `${h}:00`;
+      } else {
+        reqData = filterDataByDateRange(usageData.requests_by_day || {}, range);
+        tokData = filterDataByDateRange(usageData.tokens_by_day || {}, range);
+        labelFormatter = (d) => d.slice(5);
+      }
+      
+      const keys = [...new Set([...Object.keys(reqData), ...Object.keys(tokData)])].sort();
+      const reqValues = keys.map(k => reqData[k] || 0);
+      const tokValues = keys.map(k => tokData[k] || 0);
+      
+      // Chart styling
+      Chart.defaults.color = '#8888aa';
+      Chart.defaults.font.family = "'Inter', sans-serif";
+      Chart.defaults.scale.grid.color = 'rgba(255, 255, 255, 0.05)';
+      
+      const ctxReq = document.getElementById('requestsChart').getContext('2d');
+      const gradReq = ctxReq.createLinearGradient(0, 0, 0, 240);
+      gradReq.addColorStop(0, 'rgba(0, 229, 255, 0.2)');
+      gradReq.addColorStop(1, 'rgba(0, 229, 255, 0)');
+      
+      if (requestsChartInstance) requestsChartInstance.destroy();
+      requestsChartInstance = new Chart(ctxReq, {
+        type: 'line',
+        data: {
+          labels: keys.map(labelFormatter),
+          datasets: [{
+            label: 'Requests',
+            data: reqValues,
+            borderColor: '#00e5ff',
+            backgroundColor: gradReq,
+            borderWidth: 2,
+            tension: 0.4,
+            fill: true,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            pointBackgroundColor: '#0d0d1a',
+            pointBorderColor: '#00e5ff',
+            pointBorderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, backgroundColor: 'rgba(20, 20, 35, 0.9)', titleColor: '#fff', bodyColor: '#ccc', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 } },
+          scales: {
+            x: { grid: { display: false } },
+            y: { beginAtZero: true, border: { display: false } }
+          }
+        }
+      });
+      
+      const ctxTok = document.getElementById('tokensChart').getContext('2d');
+      const gradTok = ctxTok.createLinearGradient(0, 0, 0, 240);
+      gradTok.addColorStop(0, '#a78bfa');
+      gradTok.addColorStop(1, 'rgba(167, 139, 250, 0.1)');
+      
+      if (tokensChartInstance) tokensChartInstance.destroy();
+      tokensChartInstance = new Chart(ctxTok, {
+        type: 'bar',
+        data: {
+          labels: keys.map(labelFormatter),
+          datasets: [{
+            label: 'Tokens',
+            data: tokValues,
+            backgroundColor: gradTok,
+            borderRadius: 4,
+            borderSkipped: false,
+            barThickness: 'flex',
+            maxBarThickness: 30,
+            hoverBackgroundColor: '#8b5cf6'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, backgroundColor: 'rgba(20, 20, 35, 0.9)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' } },
+          scales: {
+            x: { grid: { display: false } },
+            y: { beginAtZero: true, border: { display: false }, ticks: { callback: function (value) { return value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value; } } }
+          }
+        }
+      });
+    }
+
+    function exportUsageData() {
+      if (!usageState.rawData) {
+        toast('No usage data available to export', 'info');
+        return;
+      }
+      
+      const data = usageState.rawData;
+      const exportObj = {
+        exported_at: new Date().toISOString(),
+        summary: {
+          total_requests: data.total_requests || 0,
+          success_count: data.success_count || 0,
+          failure_count: data.failure_count || 0,
+          total_tokens: data.total_tokens || 0
+        },
+        requests_by_day: data.requests_by_day || {},
+        tokens_by_day: data.tokens_by_day || {},
+        apis: data.apis || {}
+      };
+      
+      const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `cliproxy-usage-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast('Usage data exported successfully', 'success');
     }
 
     // Analytics page state
