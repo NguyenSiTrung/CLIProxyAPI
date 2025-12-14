@@ -4224,11 +4224,10 @@
       if (!v) return;
 
       try {
-        const ep = {
+        const epMap = {
           access: '/api-keys', gemini: '/gemini-api-key', claude: '/claude-api-key', codex: '/codex-api-key'
-        }
-
-        [type];
+        };
+        const ep = epMap[type];
 
         await api('PATCH', ep, {
           new: v
@@ -4247,11 +4246,10 @@
       if (!confirm('Delete?')) return;
 
       try {
-        const ep = {
+        const epMap = {
           access: '/api-keys', gemini: '/gemini-api-key', claude: '/claude-api-key', codex: '/codex-api-key'
-        }
-
-        [type];
+        };
+        const ep = epMap[type];
         await api('DELETE', `${ep}?index=${idx}`);
         toast('Deleted', 'success');
         loadKeys();
