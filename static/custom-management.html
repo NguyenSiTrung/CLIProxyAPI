@@ -39,12 +39,17 @@
       box-sizing: border-box;
     }
 
+    html {
+      background: var(--bg-primary);
+    }
+
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
       color: var(--text-primary);
       min-height: 100vh;
       overflow-x: hidden;
+      overscroll-behavior: none;
     }
 
     .login-screen {
