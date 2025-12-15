@@ -4383,10 +4383,28 @@
 
         if (countEl) countEl.textContent = m.length;
 
+        // Helper to parse reasoning effort from target
+        function parseTarget(to) {
+          const match = to.match(/:reasoning=(\w+)$/);
+          if (match) {
+            return { model: to.replace(/:reasoning=\w+$/, ''), reasoning: match[1] };
+          }
+          return { model: to, reasoning: null };
+        }
+
+        // Helper to format reasoning effort badge
+        function reasoningBadge(effort) {
+          if (!effort) return '';
+          const colors = { low: 'yellow', medium: 'blue', high: 'purple' };
+          return `<span class="badge badge-${colors[effort] || 'cyan'}" style="margin-left:8px;font-size:10px;">🧠 ${effort}</span>`;
+        }
+
         if (m.length === 0) {
           c.innerHTML = ` <div class="empty-state"><svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:16px;opacity:0.5;color:var(--text-secondary)"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg><h4>No Model Mappings</h4><p>Configure model aliases to map incoming model names to upstream models.</p></div>`;
         } else {
-          c.innerHTML = m.map(item => `
+          c.innerHTML = m.map(item => {
+            const parsed = parseTarget(item.to);
+            return `
             <div class="mapping-card">
               <div class="mapping-flow">
                 <div class="mapping-source">${item.from}</div>
@@ -4394,7 +4412,7 @@
                   <line x1="5" y1="12" x2="19" y2="12"></line>
                   <polyline points="12 5 19 12 12 19"></polyline>
                 </svg>
-                <div class="mapping-target">${item.to}</div>
+                <div class="mapping-target">${parsed.model}${reasoningBadge(parsed.reasoning)}</div>
               </div>
               <div class="mapping-actions">
                 <button class="mapping-action-btn edit" onclick="openEditMappingModal('${item.from}', '${item.to}')" title="Edit mapping">
@@ -4411,7 +4429,7 @@
                 </button>
               </div>
             </div>
-          `).join('');
+          `}).join('');
         }
 
         // Render combos side panel
@@ -4456,7 +4474,7 @@
       }
     }
 
-    async function openAddMappingModal(oldFrom = null, oldTo = null) {
+    async function openAddMappingModal(oldFrom = null, oldTo = null, oldReasoningEffort = null) {
       document.getElementById('modalTitle').textContent = 'Add Model Mapping';
 
       // Always try to fetch fresh models if list is empty
@@ -4472,8 +4490,6 @@
         }
       }
 
-
-
       const presets = getPresets();
       const presetOptions = presets.map(p => `<option value="${p.value}">${p.label}</option>`).join('');
 
@@ -4488,6 +4504,13 @@
         });
       }
 
+      // Models that support reasoning effort
+      const reasoningModels = [
+        'o1', 'o1-preview', 'o1-mini', 'o3', 'o3-mini', 'o4-mini',
+        'claude-3-7-sonnet', 'claude-sonnet-4',
+        'gemini-2.0-flash-thinking', 'gemini-2.5-pro', 'gemini-2.5-flash'
+      ];
+
       document.getElementById('modalContent').innerHTML = `
         <style>
           .model-selector { position: relative; }
@@ -4498,6 +4521,14 @@
           .model-option { padding: 8px 12px; cursor: pointer; transition: background 0.2s; }
           .model-option:hover { background: rgba(255,255,255,0.1); }
           .model-option.selected { background: var(--accent-purple); color: white; }
+          .input-mode-toggle { display: flex; gap: 8px; margin-bottom: 8px; }
+          .input-mode-btn { padding: 6px 12px; border: 1px solid var(--border-color); background: transparent; color: var(--text-secondary); border-radius: 4px; cursor: pointer; font-size: 12px; transition: all 0.2s; }
+          .input-mode-btn.active { background: var(--accent-cyan); color: #0d0d1a; border-color: var(--accent-cyan); }
+          .input-mode-btn:hover:not(.active) { border-color: var(--accent-cyan); color: var(--text-primary); }
+          .reasoning-effort-group { margin-top: 12px; padding: 12px; background: rgba(167, 139, 250, 0.1); border: 1px solid rgba(167, 139, 250, 0.3); border-radius: 8px; display: none; }
+          .reasoning-effort-group.visible { display: block; }
+          .reasoning-effort-group label { color: var(--accent-purple); font-size: 13px; margin-bottom: 8px; display: block; }
+          .reasoning-effort-hint { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
         </style>
         <div class="form-group">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
@@ -4517,10 +4548,32 @@
         </div>
         <div class="form-group">
           <label>Target Model (To)</label>
-          <div class="model-selector">
+          <div class="input-mode-toggle">
+            <button type="button" class="input-mode-btn active" onclick="setTargetInputMode('select')">Select from list</button>
+            <button type="button" class="input-mode-btn" onclick="setTargetInputMode('manual')">Manual input</button>
+          </div>
+          <div id="targetSelectMode" class="model-selector">
             <input type="text" id="modelSearchInput" class="model-search" placeholder="Search and select model..." autocomplete="off">
-            <input type="hidden" id="mappingTo">
             <div id="modelListDropdown" class="model-list"></div>
+          </div>
+          <div id="targetManualMode" style="display:none;">
+            <input type="text" id="mappingToManual" class="form-input" placeholder="Enter model ID (e.g. gpt-4o, claude-sonnet-4)" oninput="updateReasoningEffortVisibility(this.value)">
+          </div>
+          <input type="hidden" id="mappingTo">
+          <div id="reasoningEffortGroup" class="reasoning-effort-group">
+            <label>
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 4px;"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+              Reasoning Effort (Extended Thinking)
+            </label>
+            <select id="reasoningEffort" class="form-input">
+              <option value="">Default (model decides)</option>
+              <option value="low">Low - Faster responses</option>
+              <option value="medium">Medium - Balanced</option>
+              <option value="high">High - More thorough reasoning</option>
+            </select>
+            <div class="reasoning-effort-hint">
+              Controls how much time the model spends on extended thinking. Higher effort = more thorough but slower.
+            </div>
           </div>
         </div>
       `;
@@ -4563,6 +4616,9 @@
       searchInput.addEventListener('input', (e) => {
         listContainer.classList.add('active');
         renderList(e.target.value);
+        // Update hidden input for manual typing in search
+        hiddenInput.value = e.target.value;
+        updateReasoningEffortVisibility(e.target.value);
       });
 
       // Close dropdown when clicking outside
@@ -4570,16 +4626,54 @@
         document.addEventListener('click', function closeList(e) {
           if (!e.target.closest('.model-selector')) {
             listContainer.classList.remove('active');
-            // Don't remove listener to keep it working for repeated opens
           }
         });
       }, 0);
+
+      // Check if a model supports reasoning effort
+      window.modelSupportsReasoning = function(modelId) {
+        if (!modelId) return false;
+        const m = modelId.toLowerCase();
+        return reasoningModels.some(rm => m.includes(rm.toLowerCase()));
+      };
+
+      window.updateReasoningEffortVisibility = function(modelId) {
+        const group = document.getElementById('reasoningEffortGroup');
+        if (modelSupportsReasoning(modelId)) {
+          group.classList.add('visible');
+        } else {
+          group.classList.remove('visible');
+        }
+      };
+
+      window.setTargetInputMode = function(mode) {
+        const btns = document.querySelectorAll('.input-mode-toggle .input-mode-btn');
+        btns.forEach(b => b.classList.remove('active'));
+        if (mode === 'select') {
+          btns[0].classList.add('active');
+          document.getElementById('targetSelectMode').style.display = 'block';
+          document.getElementById('targetManualMode').style.display = 'none';
+          // Sync value
+          hiddenInput.value = searchInput.value;
+          updateReasoningEffortVisibility(searchInput.value);
+        } else {
+          btns[1].classList.add('active');
+          document.getElementById('targetSelectMode').style.display = 'none';
+          document.getElementById('targetManualMode').style.display = 'block';
+          // Sync value
+          const manualInput = document.getElementById('mappingToManual');
+          hiddenInput.value = manualInput.value;
+          updateReasoningEffortVisibility(manualInput.value);
+        }
+      };
 
       window.selectModel = function (id) {
         hiddenInput.value = id;
         searchInput.value = id;
         listContainer.classList.remove('active');
+        updateReasoningEffortVisibility(id);
       };
+
       document.getElementById('modalFooter').innerHTML = `
         <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
         <button class="btn btn-primary" onclick="saveAmpMapping('${oldFrom || ''}')">${oldFrom ? 'Save Changes' : 'Add Mapping'}</button>
@@ -4590,12 +4684,27 @@
       if (oldFrom) {
         document.getElementById('mappingFrom').value = oldFrom;
         // Trigger search/select logic for target
-        if (oldTo) selectModel(oldTo);
+        if (oldTo) {
+          selectModel(oldTo);
+          document.getElementById('mappingToManual').value = oldTo;
+        }
+      }
+      // Pre-fill reasoning effort
+      if (oldReasoningEffort) {
+        document.getElementById('reasoningEffort').value = oldReasoningEffort;
       }
     }
 
     async function openEditMappingModal(from, to) {
-      openAddMappingModal(from, to);
+      // Parse reasoning effort from target if present
+      let reasoningEffort = '';
+      let cleanTo = to;
+      const reasoningMatch = to.match(/:reasoning=(\w+)$/);
+      if (reasoningMatch) {
+        reasoningEffort = reasoningMatch[1];
+        cleanTo = to.replace(/:reasoning=\w+$/, '');
+      }
+      await openAddMappingModal(from, cleanTo, reasoningEffort);
       document.getElementById('modalTitle').textContent = 'Edit Model Mapping';
     }
 
@@ -4715,11 +4824,29 @@
     // -------------------------
 
     async function saveAmpMapping(oldFromKey) {
-      const from = document.getElementById('mappingFrom').value;
-      const to = document.getElementById('mappingTo').value;
+      const from = document.getElementById('mappingFrom').value.trim();
+      // Get target value from hidden input (synced by both modes) or fallback to manual input
+      let to = document.getElementById('mappingTo').value.trim();
+      const manualInput = document.getElementById('mappingToManual');
+      if (!to && manualInput) {
+        to = manualInput.value.trim();
+      }
+      // Get reasoning effort if set
+      const reasoningEffortEl = document.getElementById('reasoningEffort');
+      const reasoningEffort = reasoningEffortEl ? reasoningEffortEl.value : '';
+
       if (!from || !to) {
         toast('Both fields are required', 'error');
         return;
+      }
+
+      // Append reasoning effort to target if specified
+      let finalTo = to;
+      if (reasoningEffort) {
+        // Format: model_id:reasoning=effort (e.g., o3-mini:reasoning=high)
+        // Remove any existing reasoning suffix first
+        finalTo = to.replace(/:reasoning=\w+$/, '');
+        finalTo = `${finalTo}:reasoning=${reasoningEffort}`;
       }
 
       try {
@@ -4742,7 +4869,7 @@
         }
 
         await api('PATCH', '/ampcode/model-mappings', {
-          value: [{ from, to }]
+          value: [{ from, to: finalTo }]
         });
         closeModal();
         toast('Mapping saved', 'success');
