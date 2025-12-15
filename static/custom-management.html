@@ -4283,6 +4283,7 @@
         const ep = epMap[type];
 
         await api('PATCH', ep, {
+          old: '',
           new: v
         });
         closeModal();
