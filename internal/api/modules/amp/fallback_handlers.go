@@ -203,16 +203,6 @@ func (fh *FallbackHandler) WrapHandler(handler gin.HandlerFunc) gin.HandlerFunc 
 				// Restore body again for the proxy
 				c.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
 
-				// Check if amp_upstream_key was extracted from composite key format
-				// If present, inject it into the request headers for ampcode.com authentication
-				if upstreamKey, exists := c.Get("amp_upstream_key"); exists {
-					if keyStr, ok := upstreamKey.(string); ok && keyStr != "" {
-						log.Debugf("[amp-auth] Using upstream key from composite format for ampcode.com request")
-						c.Request.Header.Set("X-Api-Key", keyStr)
-						c.Request.Header.Set("Authorization", "Bearer "+keyStr)
-					}
-				}
-
 				// Forward to ampcode.com
 				proxy.ServeHTTP(c.Writer, c.Request)
 				return
