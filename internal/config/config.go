@@ -83,7 +83,22 @@ type Config struct {
 	// Payload defines default and override rules for provider payload parameters.
 	Payload PayloadConfig `yaml:"payload" json:"payload"`
 
+	// Telegram configures the Telegram bot for server monitoring.
+	Telegram TelegramConfig `yaml:"telegram" json:"telegram"`
+
 	legacyMigrationPending bool `yaml:"-" json:"-"`
+}
+
+// TelegramConfig holds the Telegram bot configuration.
+type TelegramConfig struct {
+	// Enabled controls whether the Telegram bot is active.
+	Enabled bool `yaml:"enabled" json:"enabled"`
+	// Token is the Telegram bot token from @BotFather.
+	Token string `yaml:"token" json:"token"`
+	// AllowedChatIDs restricts bot access to specific chat IDs (empty = allow all).
+	AllowedChatIDs []int64 `yaml:"allowed-chat-ids" json:"allowed-chat-ids"`
+	// ServerURL is the public URL of your proxy server (for docs links).
+	ServerURL string `yaml:"server-url" json:"server-url"`
 }
 
 // TLSConfig holds HTTPS server settings.

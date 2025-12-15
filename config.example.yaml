@@ -196,3 +196,15 @@ ws-auth: false
 #           protocol: "codex" # restricts the rule to a specific protocol, options: openai, gemini, claude, codex
 #       params: # JSON path (gjson/sjson syntax) -> value
 #         "reasoning.effort": "high"
+
+# Telegram Bot Configuration
+# telegram:
+#   # Enable Telegram bot for server monitoring
+#   enabled: false
+#   # Bot token from @BotFather (https://t.me/BotFather)
+#   token: ""
+#   # Restrict bot access to specific chat IDs (leave empty to allow all)
+#   # Get your chat ID by messaging @userinfobot on Telegram
+#   allowed-chat-ids: []
+#   # Your server's public URL (used in /docs command for integration examples)
+#   server-url: "https://your-server.com"
