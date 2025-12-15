@@ -249,7 +249,7 @@ func (m *AmpModule) registerProviderAliases(engine *gin.Engine, baseHandler *han
 				accessKey := parts[0]
 				upstreamKey := parts[1]
 
-				log.Debugf("[amp-auth] Detected Amp composite key format")
+				log.Debugf("[amp-auth] Detected Amp composite key format in X-Api-Key")
 
 				// Store upstream key in gin context for fallback handler
 				c.Set("amp_upstream_key", upstreamKey)
@@ -259,10 +259,35 @@ func (m *AmpModule) registerProviderAliases(engine *gin.Engine, baseHandler *han
 
 				log.Debugf("[amp-auth] Replaced X-Api-Key header with access key for auth")
 			} else {
-				log.Debugf("[amp-auth] Invalid composite format, expected 3 parts (access|upstream|amp), got %d", len(parts))
+				log.Debugf("[amp-auth] Invalid composite format in X-Api-Key, expected 3 parts (access|upstream|amp), got %d", len(parts))
 			}
-		} else {
-			log.Debugf("[amp-auth] Standard X-Api-Key detected")
+		}
+
+		// Check for composite key format in Authorization header (Bearer token)
+		authHeader := c.GetHeader("Authorization")
+		if strings.HasPrefix(authHeader, "Bearer ") {
+			token := strings.TrimPrefix(authHeader, "Bearer ")
+			if strings.HasSuffix(token, "|amp") {
+				parts := strings.Split(token, "|")
+				if len(parts) == 3 && parts[2] == "amp" {
+					accessKey := parts[0]
+					upstreamKey := parts[1]
+
+					log.Debugf("[amp-auth] Detected Amp composite key format in Authorization header")
+
+					// Store upstream key in gin context for fallback handler
+					c.Set("amp_upstream_key", upstreamKey)
+
+					// Replace Authorization header with just the access key for auth middleware
+					c.Request.Header.Set("Authorization", "Bearer "+accessKey)
+
+					log.Debugf("[amp-auth] Replaced Authorization header with access key for auth")
+				}
+			}
+		}
+
+		if !strings.HasSuffix(xApiKey, "|amp") && !strings.Contains(authHeader, "|amp") {
+			log.Debugf("[amp-auth] Standard key detected")
 		}
 
 		c.Next()
