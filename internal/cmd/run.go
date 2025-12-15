@@ -12,6 +12,7 @@ import (
 
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/api"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/telegram"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy"
 	log "github.com/sirupsen/logrus"
 )
@@ -47,6 +48,14 @@ func StartService(cfg *config.Config, configPath string, localPassword string) {
 	if err != nil {
 		log.Errorf("failed to build proxy service: %v", err)
 		return
+	}
+
+	// Start Telegram bot if configured
+	var telegramBot *telegram.Bot
+	if cfg.Telegram.Enabled && cfg.Telegram.Token != "" {
+		telegramBot = telegram.NewBot(cfg.Telegram)
+		telegramBot.Start()
+		defer telegramBot.Stop()
 	}
 
 	err = service.Run(runCtx)
