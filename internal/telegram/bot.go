@@ -442,16 +442,14 @@ func (b *Bot) handleDocs() string {
 1. Open Settings → Search "amp:url"
 2. Set URL: <code>%s</code>
 3. Choose "Advanced Settings"
-4. Set API Key: <code>YOUR_API_KEY|xxx|amp</code>
-
-<i>Note: |xxx|amp suffix is required.</i>
+4. Set API Key: <code>YOUR_API_KEY</code>
 
 🔧 <b>Amp CLI</b>
 Configure in <code>~/.config/amp/settings.json</code>:
 <pre>
 {
   "amp.url": "%s",
-  "amp.apiKey": "YOUR_API_KEY|xxx|amp"
+  "amp.apiKey": "YOUR_API_KEY"
 }
 </pre>
 
