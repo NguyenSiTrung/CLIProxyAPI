@@ -707,6 +707,365 @@
       color: var(--text-primary);
     }
 
+    /* ========== Usage Stats Page Styles ========== */
+    .usage-page-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .usage-header-left {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .usage-header-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .usage-header-title svg {
+      color: var(--accent-cyan);
+    }
+
+    .usage-header-title h1 {
+      font-size: 24px;
+      font-weight: 600;
+      margin: 0;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .usage-header-subtitle {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin: 0;
+    }
+
+    .usage-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .usage-last-updated {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 8px 12px;
+      background: rgba(20, 20, 40, 0.6);
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+    }
+
+    .usage-last-updated svg {
+      opacity: 0.7;
+    }
+
+    .date-range-selector {
+      display: flex;
+      gap: 4px;
+      background: rgba(20, 20, 40, 0.6);
+      padding: 4px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+    }
+
+    .chart-view-toggle {
+      display: flex;
+      gap: 2px;
+      background: rgba(20, 20, 40, 0.8);
+      padding: 3px;
+      border-radius: 6px;
+    }
+
+    /* Usage Stats Grid */
+    .usage-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .usage-stat-card {
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .usage-stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      opacity: 0.06;
+      transform: translate(40%, -40%);
+      transition: all 0.3s;
+    }
+
+    .usage-stat-card:hover {
+      border-color: var(--border-glow);
+      transform: translateY(-3px);
+      box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .usage-stat-card:hover::before {
+      opacity: 0.1;
+      transform: translate(35%, -35%) scale(1.1);
+    }
+
+    .usage-stat-card.cyan::before { background: var(--accent-cyan); }
+    .usage-stat-card.cyan .usage-stat-value { color: var(--accent-cyan); }
+    .usage-stat-card.cyan .usage-stat-icon { background: rgba(0, 229, 255, 0.12); color: var(--accent-cyan); }
+
+    .usage-stat-card.green::before { background: var(--accent-green); }
+    .usage-stat-card.green .usage-stat-value { color: var(--accent-green); }
+    .usage-stat-card.green .usage-stat-icon { background: rgba(34, 211, 160, 0.12); color: var(--accent-green); }
+
+    .usage-stat-card.red::before { background: var(--accent-red); }
+    .usage-stat-card.red .usage-stat-value { color: var(--accent-red); }
+    .usage-stat-card.red .usage-stat-icon { background: rgba(248, 113, 113, 0.12); color: var(--accent-red); }
+
+    .usage-stat-card.purple::before { background: var(--accent-purple); }
+    .usage-stat-card.purple .usage-stat-value { color: var(--accent-purple); }
+    .usage-stat-card.purple .usage-stat-icon { background: rgba(167, 139, 250, 0.12); color: var(--accent-purple); }
+
+    .usage-stat-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+    }
+
+    .usage-stat-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .usage-stat-icon svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .usage-stat-badge {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 4px 8px;
+      border-radius: 12px;
+      background: rgba(0, 229, 255, 0.1);
+      color: var(--accent-cyan);
+    }
+
+    .usage-rate-indicator {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: rgba(34, 211, 160, 0.15);
+      color: var(--accent-green);
+    }
+
+    .usage-rate-indicator.down {
+      background: rgba(248, 113, 113, 0.15);
+      color: var(--accent-red);
+      transform: rotate(180deg);
+    }
+
+    .usage-stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 4px;
+    }
+
+    .usage-stat-label {
+      color: var(--text-secondary);
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .usage-stat-sublabel {
+      color: var(--text-muted);
+      font-size: 12px;
+      margin-top: 4px;
+    }
+
+    /* Usage Charts Grid */
+    .usage-charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .usage-chart-card {
+      background: linear-gradient(145deg, rgba(20, 20, 40, 0.7) 0%, rgba(10, 10, 25, 0.85) 100%);
+      backdrop-filter: blur(20px);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      transition: all 0.3s;
+    }
+
+    .usage-chart-card:hover {
+      border-color: var(--border-glow);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+    }
+
+    .usage-chart-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      gap: 12px;
+    }
+
+    .usage-chart-info {
+      flex: 1;
+    }
+
+    .usage-chart-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    .usage-chart-title svg {
+      color: var(--accent-cyan);
+    }
+
+    .usage-chart-value {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--accent-cyan);
+      line-height: 1.2;
+    }
+
+    .usage-chart-value.purple {
+      color: var(--accent-purple);
+    }
+
+    .usage-chart-sublabel {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .usage-chart-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .usage-chart-icon {
+      padding: 8px;
+      background: rgba(0, 229, 255, 0.1);
+      border-radius: 8px;
+      color: var(--accent-cyan);
+    }
+
+    .usage-chart-icon.purple {
+      background: rgba(167, 139, 250, 0.1);
+      color: var(--accent-purple);
+    }
+
+    .usage-chart-container {
+      height: 220px;
+      width: 100%;
+      position: relative;
+    }
+
+    .usage-chart-empty {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      text-align: center;
+      background: rgba(10, 10, 25, 0.5);
+      border-radius: 8px;
+      z-index: 10;
+    }
+
+    .usage-chart-empty svg {
+      margin-bottom: 12px;
+      opacity: 0.5;
+    }
+
+    .usage-chart-empty p {
+      font-size: 13px;
+      margin: 0;
+    }
+
+    /* Responsive adjustments for Usage Stats */
+    @media (max-width: 768px) {
+      .usage-page-header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .usage-header-actions {
+        justify-content: flex-start;
+      }
+
+      .usage-stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .usage-charts-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .usage-stat-value {
+        font-size: 26px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .usage-stats-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .usage-header-actions {
+        flex-wrap: wrap;
+      }
+
+      .date-range-selector {
+        order: -1;
+        width: 100%;
+        justify-content: space-between;
+      }
+    }
+
     .toggle {
       position: relative;
       width: 48px;
@@ -5604,107 +5963,173 @@
         </div>
       </div>
       <div id="page-usage" class="page">
-        <div class="config-page-header">
-          <div class="page-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2">
-              <path d="M18 20V10m-6 10V4M6 20v-6" />
-            </svg>
-            <h1 class="page-title" style="margin:0">Usage Statistics</h1>
+        <div class="usage-page-header">
+          <div class="usage-header-left">
+            <div class="usage-header-title">
+              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 20V10m-6 10V4M6 20v-6" />
+              </svg>
+              <h1>Usage Statistics</h1>
+            </div>
+            <p class="usage-header-subtitle">Monitor your API usage, token consumption, and performance metrics</p>
           </div>
-          <p class="page-subtitle">Detailed request and usage analytics</p>
-        </div>
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">Overview</h3>
-            <div style="display:flex;gap:8px;align-items:center">
-              <div class="date-range-selector" style="display:flex;gap:4px;background:rgba(20,20,40,0.6);padding:4px;border-radius:8px">
-                <button class="date-range-btn active" data-range="all" onclick="setUsageDateRange('all')">All</button>
-                <button class="date-range-btn" data-range="30d" onclick="setUsageDateRange('30d')">30d</button>
-                <button class="date-range-btn" data-range="7d" onclick="setUsageDateRange('7d')">7d</button>
-                <button class="date-range-btn" data-range="today" onclick="setUsageDateRange('today')">Today</button>
-              </div>
-              <button class="btn btn-secondary btn-sm" onclick="exportUsageData()" title="Export usage data"
-                style="display:flex;align-items:center;gap:6px"><svg xmlns="http://www.w3.org/2000/svg" width="14"
-                  height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>Export</button>
-              <button class="btn btn-secondary btn-sm" onclick="loadUsageStats()"
-                style="display:flex;align-items:center;gap:6px"><svg xmlns="http://www.w3.org/2000/svg" width="14"
-                  height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M23 4v6h-6" />
-                  <path d="M1 20v-6h6" />
-                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-                </svg>Refresh</button>
+          <div class="usage-header-actions">
+            <span id="usageLastUpdated" class="usage-last-updated">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+              <span id="usageUpdateTime">--</span>
+            </span>
+            <div class="date-range-selector" role="group" aria-label="Date range filter">
+              <button class="date-range-btn active" data-range="all" onclick="setUsageDateRange('all')" aria-pressed="true">All</button>
+              <button class="date-range-btn" data-range="30d" onclick="setUsageDateRange('30d')" aria-pressed="false">30d</button>
+              <button class="date-range-btn" data-range="7d" onclick="setUsageDateRange('7d')" aria-pressed="false">7d</button>
+              <button class="date-range-btn" data-range="today" onclick="setUsageDateRange('today')" aria-pressed="false">Today</button>
             </div>
-          </div>
-          <div class="stats-grid" style="margin-bottom:0">
-            <div class="stat-card cyan">
-              <div class="stat-value" id="usageTotalRequests">-</div>
-              <div class="stat-label">Total Requests</div>
-            </div>
-            <div class="stat-card green">
-              <div class="stat-value" id="usageSuccessful">-</div>
-              <div class="stat-label">Successful</div>
-            </div>
-            <div class="stat-card" style="--stat-color: var(--accent-red)">
-              <div class="stat-value" style="color: var(--accent-red)" id="usageFailed">-</div>
-              <div class="stat-label">Failed</div>
-            </div>
-            <div class="stat-card purple">
-              <div class="stat-value" id="usageSuccessRate">-</div>
-              <div class="stat-label">Success Rate</div>
-            </div>
+            <button class="btn btn-secondary btn-sm" onclick="exportUsageData()" title="Export usage data">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              Export
+            </button>
+            <button class="btn btn-secondary btn-sm" onclick="loadUsageStats()" id="usageRefreshBtn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 4v6h-6" />
+                <path d="M1 20v-6h6" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+              Refresh
+            </button>
           </div>
         </div>
-        <div class="metrics-grid"
-          style="display:grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap:20px; margin-bottom:24px;">
-          <div class="card"
-            style="margin:0; background: linear-gradient(145deg, rgba(20, 20, 40, 0.6) 0%, rgba(10, 10, 25, 0.8) 100%);">
-            <div class="card-header" style="border-bottom:none; padding-bottom:0">
-              <div>
-                <h3 class="card-title" style="font-size:15px; color:var(--text-secondary)">Request Trends</h3>
-                <div class="stat-value" id="trendRequestTotal" style="font-size:24px; margin-top:4px">-</div>
-              </div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <div class="chart-view-toggle" style="display:flex;gap:2px;background:rgba(20,20,40,0.8);padding:3px;border-radius:6px">
-                  <button class="chart-view-btn active" data-view="daily" onclick="setChartView('daily')">Daily</button>
-                  <button class="chart-view-btn" data-view="hourly" onclick="setChartView('hourly')">Hourly</button>
-                </div>
-                <div style="padding:6px; background:rgba(0, 229, 255, 0.1); border-radius:8px; color:var(--accent-cyan)">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" stroke-width="2">
-                  <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
-                  <polyline points="17 18 23 18 23 12"></polyline>
+
+        <!-- Enhanced Stats Grid -->
+        <div class="usage-stats-grid">
+          <div class="usage-stat-card cyan">
+            <div class="usage-stat-header">
+              <div class="usage-stat-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
                 </svg>
               </div>
+              <div class="usage-stat-badge" id="usageReqTrend"></div>
+            </div>
+            <div class="usage-stat-value" id="usageTotalRequests">-</div>
+            <div class="usage-stat-label">Total Requests</div>
+            <div class="usage-stat-sublabel" id="usageReqPeriod">All time</div>
+          </div>
+
+          <div class="usage-stat-card green">
+            <div class="usage-stat-header">
+              <div class="usage-stat-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
               </div>
             </div>
-            <div style="height:240px; width:100%; position:relative; padding-top:16px">
-              <canvas id="requestsChart"></canvas>
+            <div class="usage-stat-value" id="usageSuccessful">-</div>
+            <div class="usage-stat-label">Successful</div>
+            <div class="usage-stat-sublabel" id="usageSuccessPeriod">All time</div>
+          </div>
+
+          <div class="usage-stat-card red">
+            <div class="usage-stat-header">
+              <div class="usage-stat-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="15" y1="9" x2="9" y2="15"></line>
+                  <line x1="9" y1="9" x2="15" y2="15"></line>
+                </svg>
+              </div>
+            </div>
+            <div class="usage-stat-value" id="usageFailed">-</div>
+            <div class="usage-stat-label">Failed</div>
+            <div class="usage-stat-sublabel" id="usageFailedPeriod">All time</div>
+          </div>
+
+          <div class="usage-stat-card purple">
+            <div class="usage-stat-header">
+              <div class="usage-stat-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83"></path>
+                </svg>
+              </div>
+              <div class="usage-rate-indicator" id="usageRateIndicator">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="18 15 12 9 6 15"></polyline>
+                </svg>
+              </div>
+            </div>
+            <div class="usage-stat-value" id="usageSuccessRate">-</div>
+            <div class="usage-stat-label">Success Rate</div>
+            <div class="usage-stat-sublabel" id="usageRatePeriod">All time</div>
+          </div>
+        </div>
+
+        <!-- Charts Section -->
+        <div class="usage-charts-grid">
+          <div class="usage-chart-card">
+            <div class="usage-chart-header">
+              <div class="usage-chart-info">
+                <div class="usage-chart-title">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 18 13.5 8.5 8.5 13.5 1 6"></polyline>
+                    <polyline points="17 18 23 18 23 12"></polyline>
+                  </svg>
+                  Request Trends
+                </div>
+                <div class="usage-chart-value" id="trendRequestTotal">-</div>
+                <div class="usage-chart-sublabel" id="requestChartPeriod">Daily requests • All time</div>
+              </div>
+              <div class="usage-chart-controls">
+                <div class="chart-view-toggle" role="group" aria-label="Chart view toggle">
+                  <button class="chart-view-btn active" data-view="daily" onclick="setChartView('daily')" aria-pressed="true">Daily</button>
+                  <button class="chart-view-btn" data-view="hourly" onclick="setChartView('hourly')" aria-pressed="false">Hourly</button>
+                </div>
+              </div>
+            </div>
+            <div class="usage-chart-container" id="requestsChartContainer">
+              <div class="usage-chart-empty" id="requestsChartEmpty" style="display:none">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M18 20V10m-6 10V4M6 20v-6" />
+                </svg>
+                <p>No request data available for this period</p>
+              </div>
+              <canvas id="requestsChart" role="img" aria-label="Request trends chart showing API request volume over time"></canvas>
             </div>
           </div>
 
-          <div class="card"
-            style="margin:0; background: linear-gradient(145deg, rgba(20, 20, 40, 0.6) 0%, rgba(10, 10, 25, 0.8) 100%);">
-            <div class="card-header" style="border-bottom:none; padding-bottom:0">
-              <div>
-                <h3 class="card-title" style="font-size:15px; color:var(--text-secondary)">Token Usage</h3>
-                <div class="stat-value" id="trendTokenTotal" style="font-size:24px; margin-top:4px">-</div>
+          <div class="usage-chart-card">
+            <div class="usage-chart-header">
+              <div class="usage-chart-info">
+                <div class="usage-chart-title">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                  </svg>
+                  Token Usage
+                </div>
+                <div class="usage-chart-value purple" id="trendTokenTotal">-</div>
+                <div class="usage-chart-sublabel" id="tokenChartPeriod">Daily tokens • All time</div>
               </div>
-              <div
-                style="padding:6px; background:rgba(167, 139, 250, 0.1); border-radius:8px; color:var(--accent-purple)">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                  stroke="currentColor" stroke-width="2">
-                  <path
-                    d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z">
-                  </path>
+              <div class="usage-chart-icon purple">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
                 </svg>
               </div>
             </div>
-            <div style="height:240px; width:100%; position:relative; padding-top:16px">
-              <canvas id="tokensChart"></canvas>
+            <div class="usage-chart-container" id="tokensChartContainer">
+              <div class="usage-chart-empty" id="tokensChartEmpty" style="display:none">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                </svg>
+                <p>No token data available for this period</p>
+              </div>
+              <canvas id="tokensChart" role="img" aria-label="Token usage chart showing token consumption over time"></canvas>
             </div>
           </div>
         </div>
@@ -6973,227 +7398,489 @@
       }
     }
 
+    // XSS protection helper
+    function escapeHtml(str) {
+      if (!str) return '';
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    // Format numbers with appropriate suffixes
+    function formatNumber(num, decimals = 1) {
+      if (num >= 1000000) return (num / 1000000).toFixed(decimals) + 'M';
+      if (num >= 1000) return (num / 1000).toFixed(decimals) + 'k';
+      return num.toLocaleString();
+    }
+
+    // Get period label for date range
+    function getPeriodLabel(range) {
+      switch (range) {
+        case 'today': return 'Today';
+        case '7d': return 'Last 7 days';
+        case '30d': return 'Last 30 days';
+        default: return 'All time';
+      }
+    }
+
     async function loadUsageStats() {
+      const refreshBtn = document.getElementById('usageRefreshBtn');
+      if (refreshBtn) refreshBtn.disabled = true;
+
       try {
         const d = await api('GET', '/usage');
+        const u = d.usage || {};
 
-        const u = d.usage || {}
+        // Store raw data for filtering
+        usageState.rawData = u;
 
-          ;
+        // Update last updated timestamp
+        const updateTimeEl = document.getElementById('usageUpdateTime');
+        if (updateTimeEl) {
+          updateTimeEl.textContent = 'Updated ' + new Date().toLocaleTimeString();
+        }
 
-        // Top level stats
-        const total = u.total_requests || 0;
-        const success = u.success_count || 0;
-        const failed = u.failure_count || 0;
-        const rate = total > 0 ? ((success / total) * 100).toFixed(1) : '100';
+        // Render with current date range filter
+        renderUsageData(u);
+      } catch (e) {
+        toast('Failed to load usage stats: ' + e.message, 'error');
+        console.error(e);
+      } finally {
+        if (refreshBtn) refreshBtn.disabled = false;
+      }
+    }
 
-        document.getElementById('usageTotalRequests').textContent = total.toLocaleString();
-        document.getElementById('usageSuccessful').textContent = success.toLocaleString();
-        document.getElementById('usageFailed').textContent = failed.toLocaleString();
-        document.getElementById('usageSuccessRate').textContent = rate + '%';
+    function renderUsageData(usageData) {
+      if (!usageData) return;
 
-        // Deep aggregation
-        let totalInput = 0;
-        let totalOutput = 0;
-        let totalReasoning = 0;
-        let totalCacheRead = 0;
-        let totalCacheWrite = 0;
+      const range = usageState.dateRange;
+      const periodLabel = getPeriodLabel(range);
 
-        const providerUsage = {}
+      // Calculate filtered totals based on date range
+      const reqByDay = usageData.requests_by_day || {};
+      const filteredReqByDay = filterDataByDateRange(reqByDay, range);
+      const filteredTotal = Object.values(filteredReqByDay).reduce((a, b) => a + b, 0);
 
-          ;
+      // Get all-time totals
+      const allTimeTotal = usageData.total_requests || 0;
+      const allTimeSuccess = usageData.success_count || 0;
+      const allTimeFailed = usageData.failure_count || 0;
 
-        const modelUsage = {}
+      // Calculate values for the selected period
+      let total, success, failed;
+      if (range === 'all') {
+        total = allTimeTotal;
+        success = allTimeSuccess;
+        failed = allTimeFailed;
+      } else {
+        total = filteredTotal;
+        const failRatio = allTimeTotal > 0 ? allTimeFailed / allTimeTotal : 0;
+        failed = Math.round(total * failRatio);
+        success = total - failed;
+      }
 
-          ;
+      // Fix: Show '-' or '0%' when no requests instead of 100%
+      const rate = total > 0 ? ((success / total) * 100).toFixed(1) : '-';
 
-        const apis = u.apis || {}
+      // Update stat cards
+      document.getElementById('usageTotalRequests').textContent = total.toLocaleString();
+      document.getElementById('usageSuccessful').textContent = success.toLocaleString();
+      document.getElementById('usageFailed').textContent = failed.toLocaleString();
+      document.getElementById('usageSuccessRate').textContent = rate === '-' ? '-' : rate + '%';
 
-          ;
+      // Update period labels
+      const periodElements = ['usageReqPeriod', 'usageSuccessPeriod', 'usageFailedPeriod', 'usageRatePeriod'];
+      periodElements.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = periodLabel;
+      });
 
+      // Update success rate indicator
+      const rateIndicator = document.getElementById('usageRateIndicator');
+      if (rateIndicator) {
+        if (rate === '-' || parseFloat(rate) >= 95) {
+          rateIndicator.classList.remove('down');
+        } else {
+          rateIndicator.classList.add('down');
+        }
+      }
+
+      // Deep aggregation for tokens
+      let totalInput = 0;
+      let totalOutput = 0;
+      let totalReasoning = 0;
+      let totalCacheRead = 0;
+      let totalCacheWrite = 0;
+
+      const providerUsage = {};
+      const modelUsage = {};
+      const apis = usageData.apis || {};
+
+      if (typeof apis === 'object') {
         for (const [apiKey, apiStats] of Object.entries(apis)) {
-          // Provider stats
+          if (!apiStats || typeof apiStats !== 'object') continue;
+
           const pKey = apiKey || 'unknown';
-
-          if (!providerUsage[pKey]) providerUsage[pKey] = {
-            requests: 0, tokens: 0
-          }
-
-            ;
+          if (!providerUsage[pKey]) providerUsage[pKey] = { requests: 0, tokens: 0 };
           providerUsage[pKey].requests += (apiStats.total_requests || 0);
           providerUsage[pKey].tokens += (apiStats.total_tokens || 0);
 
-          // Models inside this API
-          const models = apiStats.models || {}
-
-            ;
-
+          const models = apiStats.models || {};
           for (const [modelName, modelStats] of Object.entries(models)) {
-            if (!modelUsage[modelName]) modelUsage[modelName] = {
-              requests: 0, tokens: 0
-            }
+            if (!modelStats || typeof modelStats !== 'object') continue;
 
-              ;
+            if (!modelUsage[modelName]) modelUsage[modelName] = { requests: 0, tokens: 0 };
             modelUsage[modelName].requests += (modelStats.total_requests || 0);
             modelUsage[modelName].tokens += (modelStats.total_tokens || 0);
 
-            // Details for token breakdown
             const details = modelStats.details || [];
-
             for (const detail of details) {
-              const t = detail.tokens || {}
-
-                ;
+              const t = detail.tokens || {};
               totalInput += (t.input_tokens || 0);
               totalOutput += (t.output_tokens || 0);
               totalReasoning += (t.reasoning_tokens || 0);
               totalCacheRead += (t.cached_tokens || 0);
+              // Fix: Also count cache write tokens
+              totalCacheWrite += (t.cache_creation_input_tokens || t.cache_write_tokens || 0);
             }
           }
         }
-
-        document.getElementById('usageTotalTokens').textContent = (totalInput + totalOutput + totalReasoning).toLocaleString();
-        document.getElementById('usageInputTokens').textContent = totalInput.toLocaleString();
-        document.getElementById('usageOutputTokens').textContent = totalOutput.toLocaleString();
-        document.getElementById('usageReasoningTokens').textContent = totalReasoning.toLocaleString();
-        document.getElementById('usageCacheRead').textContent = totalCacheRead.toLocaleString();
-        document.getElementById('usageCacheWrite').textContent = totalCacheWrite > 0 ? totalCacheWrite.toLocaleString() : '-';
-
-        // Render Providers
-        const providerContainer = document.getElementById('providerStats');
-        const pEntries = Object.entries(providerUsage).sort((a, b) => b[1].requests - a[1].requests);
-
-        if (pEntries.length === 0) {
-          providerContainer.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-secondary)">No data available</div>';
-        }
-
-        else {
-          providerContainer.innerHTML = '<div class="config-settings-list">' + pEntries.map(([name, stats]) => ` <div class="config-setting-item" style="padding:12px 24px" > <div class="config-setting-info" > <div class="config-setting-text" > <h4 style="font-family:monospace;font-size:13px" title="${name}">${name.length > 25 ? name.slice(0, 22) + '...' : name
-            }</h4> <p>${stats.tokens.toLocaleString()
-            } tokens</p> </div> </div> <span class="badge badge-purple" >${stats.requests
-            }</span> </div> `).join('') + '</div>';
-        }
-
-        // Render Models
-        const modelContainer = document.getElementById('modelStats');
-        const mEntries = Object.entries(modelUsage).sort((a, b) => b[1].requests - a[1].requests);
-
-        if (mEntries.length === 0) {
-          modelContainer.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-secondary)">No data available</div>';
-        }
-
-        else {
-          modelContainer.innerHTML = ` <table><thead><tr><th>Model Name</th><th>Requests</th><th>Total Tokens</th></tr></thead><tbody>${mEntries.map(([name, stats]) => ` <tr> <td><span style="color:var(--accent-cyan);font-weight:500" >${name
-            }</span></td> <td>${stats.requests.toLocaleString()
-            }</td> <td style="font-family:monospace" >${stats.tokens.toLocaleString()
-            }</td> </tr> `).join('')
-            }</tbody></table>`;
-        }
-
-        renderUsageCharts(u);
-        usageState.rawData = u;
-
       }
 
-      catch (e) {
-        toast('Failed to load usage stats: ' + e.message, 'error');
-        console.error(e);
+      document.getElementById('usageTotalTokens').textContent = formatNumber(totalInput + totalOutput + totalReasoning);
+      document.getElementById('usageInputTokens').textContent = formatNumber(totalInput);
+      document.getElementById('usageOutputTokens').textContent = formatNumber(totalOutput);
+      document.getElementById('usageReasoningTokens').textContent = totalReasoning > 0 ? formatNumber(totalReasoning) : '-';
+      document.getElementById('usageCacheRead').textContent = totalCacheRead > 0 ? formatNumber(totalCacheRead) : '-';
+      document.getElementById('usageCacheWrite').textContent = totalCacheWrite > 0 ? formatNumber(totalCacheWrite) : '-';
+
+      // Render Providers with XSS protection
+      renderProviderStats(providerUsage);
+
+      // Render Models with sortable table
+      renderModelStats(modelUsage);
+
+      // Render Charts
+      renderUsageChartsUnified(usageData);
+    }
+
+    function renderProviderStats(providerUsage) {
+      const providerContainer = document.getElementById('providerStats');
+      if (!providerContainer) return;
+
+      const pEntries = Object.entries(providerUsage).sort((a, b) => b[1].requests - a[1].requests);
+
+      if (pEntries.length === 0) {
+        providerContainer.innerHTML = `
+          <div style="padding:32px;text-align:center;color:var(--text-secondary)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:0.5;margin-bottom:12px">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            <p style="margin:0;font-size:14px">No provider data yet</p>
+          </div>`;
+        return;
       }
+
+      providerContainer.innerHTML = '<div class="config-settings-list">' + pEntries.map(([name, stats]) => `
+        <div class="config-setting-item" style="padding:12px 16px;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='rgba(255,255,255,0.03)'" onmouseout="this.style.background='transparent'">
+          <div class="config-setting-info">
+            <div class="config-setting-text">
+              <h4 style="font-family:monospace;font-size:13px" title="${escapeHtml(name)}">${escapeHtml(name.length > 25 ? name.slice(0, 22) + '...' : name)}</h4>
+              <p>${formatNumber(stats.tokens)} tokens</p>
+            </div>
+          </div>
+          <span class="badge badge-purple">${stats.requests.toLocaleString()}</span>
+        </div>
+      `).join('') + '</div>';
+    }
+
+    // Model stats sorting state
+    let modelSortColumn = 'requests';
+    let modelSortDir = 'desc';
+
+    function sortModelStats(column) {
+      if (modelSortColumn === column) {
+        modelSortDir = modelSortDir === 'desc' ? 'asc' : 'desc';
+      } else {
+        modelSortColumn = column;
+        modelSortDir = 'desc';
+      }
+      if (usageState.rawData) {
+        renderUsageData(usageState.rawData);
+      }
+    }
+
+    function renderModelStats(modelUsage) {
+      const modelContainer = document.getElementById('modelStats');
+      if (!modelContainer) return;
+
+      const mEntries = Object.entries(modelUsage);
+
+      if (mEntries.length === 0) {
+        modelContainer.innerHTML = `
+          <div style="padding:32px;text-align:center;color:var(--text-secondary)">
+            <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity:0.5;margin-bottom:12px">
+              <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
+              <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
+            </svg>
+            <p style="margin:0;font-size:14px">No model usage data yet</p>
+          </div>`;
+        return;
+      }
+
+      // Sort entries
+      mEntries.sort((a, b) => {
+        let aVal, bVal;
+        switch (modelSortColumn) {
+          case 'name':
+            aVal = a[0].toLowerCase();
+            bVal = b[0].toLowerCase();
+            break;
+          case 'tokens':
+            aVal = a[1].tokens;
+            bVal = b[1].tokens;
+            break;
+          default:
+            aVal = a[1].requests;
+            bVal = b[1].requests;
+        }
+        if (aVal < bVal) return modelSortDir === 'asc' ? -1 : 1;
+        if (aVal > bVal) return modelSortDir === 'asc' ? 1 : -1;
+        return 0;
+      });
+
+      const getSortIcon = (col) => {
+        if (modelSortColumn !== col) return '<span style="opacity:0.3">↕</span>';
+        return modelSortDir === 'desc' ? '↓' : '↑';
+      };
+
+      modelContainer.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th onclick="sortModelStats('name')" style="cursor:pointer;user-select:none">
+                Model Name ${getSortIcon('name')}
+              </th>
+              <th onclick="sortModelStats('requests')" style="cursor:pointer;user-select:none;text-align:right">
+                Requests ${getSortIcon('requests')}
+              </th>
+              <th onclick="sortModelStats('tokens')" style="cursor:pointer;user-select:none;text-align:right">
+                Tokens ${getSortIcon('tokens')}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            ${mEntries.map(([name, stats]) => `
+              <tr>
+                <td><span style="color:var(--accent-cyan);font-weight:500">${escapeHtml(name)}</span></td>
+                <td style="text-align:right">${stats.requests.toLocaleString()}</td>
+                <td style="font-family:monospace;text-align:right">${formatNumber(stats.tokens)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>`;
     }
 
     let requestsChartInstance = null;
     let tokensChartInstance = null;
 
-    function renderUsageCharts(usageData) {
-      const reqData = usageData.requests_by_day || {};
-      const tokData = usageData.tokens_by_day || {};
+    function renderUsageChartsUnified(usageData) {
+      const view = usageState.chartView;
+      const range = usageState.dateRange;
 
-      const dates = [...new Set([...Object.keys(reqData), ...Object.keys(tokData)])].sort();
+      let reqData, tokData, labelFormatter;
 
-      const reqValues = dates.map(d => reqData[d] || 0);
-      const tokValues = dates.map(d => tokData[d] || 0);
+      if (view === 'hourly') {
+        reqData = usageData.requests_by_hour || {};
+        tokData = usageData.tokens_by_hour || {};
+        // Fix: Sort hourly keys numerically
+        labelFormatter = (h) => {
+          const hour = parseInt(h, 10);
+          return isNaN(hour) ? h : `${hour}:00`;
+        };
+      } else {
+        reqData = filterDataByDateRange(usageData.requests_by_day || {}, range);
+        tokData = filterDataByDateRange(usageData.tokens_by_day || {}, range);
+        labelFormatter = (d) => {
+          // Better date formatting
+          try {
+            const date = new Date(d);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          } catch {
+            return d.slice(5);
+          }
+        };
+      }
 
-      // Update totals in UI headers
+      // Fix: Sort keys properly (numerically for hours, lexicographically for dates)
+      let keys = [...new Set([...Object.keys(reqData), ...Object.keys(tokData)])];
+      if (view === 'hourly') {
+        keys = keys.sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
+      } else {
+        keys = keys.sort();
+      }
+
+      const reqValues = keys.map(k => reqData[k] || 0);
+      const tokValues = keys.map(k => tokData[k] || 0);
+
+      // Update chart period labels
+      const viewLabel = view === 'hourly' ? 'Hourly' : 'Daily';
+      const periodLabel = getPeriodLabel(range);
+      const reqPeriodEl = document.getElementById('requestChartPeriod');
+      const tokPeriodEl = document.getElementById('tokenChartPeriod');
+      if (reqPeriodEl) reqPeriodEl.textContent = `${viewLabel} requests • ${periodLabel}`;
+      if (tokPeriodEl) tokPeriodEl.textContent = `${viewLabel} tokens • ${periodLabel}`;
+
+      // Update totals
       const totalReq = reqValues.reduce((a, b) => a + b, 0);
       const totalTok = tokValues.reduce((a, b) => a + b, 0);
-      if (document.getElementById('trendRequestTotal'))
-        document.getElementById('trendRequestTotal').innerText = totalReq.toLocaleString();
-      if (document.getElementById('trendTokenTotal'))
-        document.getElementById('trendTokenTotal').innerText = (totalTok < 1000000 ? (totalTok / 1000).toFixed(1) + 'k' : (totalTok / 1000000).toFixed(2) + 'M');
+
+      const trendReqEl = document.getElementById('trendRequestTotal');
+      const trendTokEl = document.getElementById('trendTokenTotal');
+      if (trendReqEl) trendReqEl.textContent = totalReq.toLocaleString();
+      if (trendTokEl) trendTokEl.textContent = formatNumber(totalTok);
+
+      // Show/hide empty state
+      const reqEmptyEl = document.getElementById('requestsChartEmpty');
+      const tokEmptyEl = document.getElementById('tokensChartEmpty');
+      const hasReqData = reqValues.some(v => v > 0);
+      const hasTokData = tokValues.some(v => v > 0);
+
+      if (reqEmptyEl) reqEmptyEl.style.display = hasReqData ? 'none' : 'flex';
+      if (tokEmptyEl) tokEmptyEl.style.display = hasTokData ? 'none' : 'flex';
 
       // Chart styling
       Chart.defaults.color = '#8888aa';
       Chart.defaults.font.family = "'Inter', sans-serif";
       Chart.defaults.scale.grid.color = 'rgba(255, 255, 255, 0.05)';
 
-      const ctxReq = document.getElementById('requestsChart').getContext('2d');
-      const gradReq = ctxReq.createLinearGradient(0, 0, 0, 240);
-      gradReq.addColorStop(0, 'rgba(0, 229, 255, 0.2)');
-      gradReq.addColorStop(1, 'rgba(0, 229, 255, 0)');
+      // Requests Chart
+      const ctxReq = document.getElementById('requestsChart')?.getContext('2d');
+      if (ctxReq) {
+        const gradReq = ctxReq.createLinearGradient(0, 0, 0, 200);
+        gradReq.addColorStop(0, 'rgba(0, 229, 255, 0.25)');
+        gradReq.addColorStop(1, 'rgba(0, 229, 255, 0)');
 
-      if (requestsChartInstance) requestsChartInstance.destroy();
-      requestsChartInstance = new Chart(ctxReq, {
-        type: 'line',
-        data: {
-          labels: dates.map(d => d.slice(5)), // Show MM-DD
-          datasets: [{
-            label: 'Requests',
-            data: reqValues,
-            borderColor: '#00e5ff',
-            backgroundColor: gradReq,
-            borderWidth: 2,
-            tension: 0.4,
-            fill: true,
-            pointRadius: 0,
-            pointHoverRadius: 4,
-            pointBackgroundColor: '#0d0d1a',
-            pointBorderColor: '#00e5ff',
-            pointBorderWidth: 2
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, backgroundColor: 'rgba(20, 20, 35, 0.9)', titleColor: '#fff', bodyColor: '#ccc', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 } },
-          scales: {
-            x: { grid: { display: false } },
-            y: { beginAtZero: true, border: { display: false } }
+        if (requestsChartInstance) requestsChartInstance.destroy();
+        requestsChartInstance = new Chart(ctxReq, {
+          type: 'line',
+          data: {
+            labels: keys.map(labelFormatter),
+            datasets: [{
+              label: 'Requests',
+              data: reqValues,
+              borderColor: '#00e5ff',
+              backgroundColor: gradReq,
+              borderWidth: 2,
+              tension: 0.4,
+              fill: true,
+              pointRadius: 0,
+              pointHoverRadius: 5,
+              pointBackgroundColor: '#0d0d1a',
+              pointBorderColor: '#00e5ff',
+              pointBorderWidth: 2
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                mode: 'index',
+                intersect: false,
+                backgroundColor: 'rgba(20, 20, 35, 0.95)',
+                titleColor: '#fff',
+                bodyColor: '#ccc',
+                borderColor: 'rgba(0, 229, 255, 0.3)',
+                borderWidth: 1,
+                padding: 12,
+                cornerRadius: 8,
+                displayColors: false,
+                callbacks: {
+                  title: function(items) {
+                    return items[0]?.label || '';
+                  },
+                  label: function(context) {
+                    return `${context.parsed.y.toLocaleString()} requests`;
+                  }
+                }
+              }
+            },
+            scales: {
+              x: { grid: { display: false }, ticks: { maxRotation: 0 } },
+              y: { beginAtZero: true, border: { display: false } }
+            }
           }
-        }
-      });
+        });
+      }
 
-      const ctxTok = document.getElementById('tokensChart').getContext('2d');
-      // Bar gradient
-      const gradTok = ctxTok.createLinearGradient(0, 0, 0, 240);
-      gradTok.addColorStop(0, '#a78bfa');
-      gradTok.addColorStop(1, 'rgba(167, 139, 250, 0.1)');
+      // Tokens Chart
+      const ctxTok = document.getElementById('tokensChart')?.getContext('2d');
+      if (ctxTok) {
+        const gradTok = ctxTok.createLinearGradient(0, 0, 0, 200);
+        gradTok.addColorStop(0, '#a78bfa');
+        gradTok.addColorStop(1, 'rgba(167, 139, 250, 0.1)');
 
-      if (tokensChartInstance) tokensChartInstance.destroy();
-      tokensChartInstance = new Chart(ctxTok, {
-        type: 'bar',
-        data: {
-          labels: dates.map(d => d.slice(5)),
-          datasets: [{
-            label: 'Tokens',
-            data: tokValues,
-            backgroundColor: gradTok,
-            borderRadius: 4,
-            borderSkipped: false,
-            barThickness: 'flex',
-            maxBarThickness: 30,
-            hoverBackgroundColor: '#8b5cf6'
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, backgroundColor: 'rgba(20, 20, 35, 0.9)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' } },
-          scales: {
-            x: { grid: { display: false } },
-            y: { beginAtZero: true, border: { display: false }, ticks: { callback: function (value) { return value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value; } } }
+        if (tokensChartInstance) tokensChartInstance.destroy();
+        tokensChartInstance = new Chart(ctxTok, {
+          type: 'bar',
+          data: {
+            labels: keys.map(labelFormatter),
+            datasets: [{
+              label: 'Tokens',
+              data: tokValues,
+              backgroundColor: gradTok,
+              borderRadius: 4,
+              borderSkipped: false,
+              barThickness: 'flex',
+              maxBarThickness: 32,
+              hoverBackgroundColor: '#8b5cf6'
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                mode: 'index',
+                intersect: false,
+                backgroundColor: 'rgba(20, 20, 35, 0.95)',
+                titleColor: '#fff',
+                bodyColor: '#ccc',
+                borderColor: 'rgba(167, 139, 250, 0.3)',
+                borderWidth: 1,
+                padding: 12,
+                cornerRadius: 8,
+                displayColors: false,
+                callbacks: {
+                  label: function(context) {
+                    return `${formatNumber(context.parsed.y)} tokens`;
+                  }
+                }
+              }
+            },
+            scales: {
+              x: { grid: { display: false }, ticks: { maxRotation: 0 } },
+              y: { 
+                beginAtZero: true, 
+                border: { display: false }, 
+                ticks: { 
+                  callback: function(value) { 
+                    return formatNumber(value); 
+                  } 
+                } 
+              }
+            }
           }
-        }
-      });
+        });
+      }
     }
 
     // Usage stats state
@@ -7205,26 +7892,38 @@
 
     function setUsageDateRange(range) {
       usageState.dateRange = range;
+      
+      // Update button states and ARIA
       document.querySelectorAll('.date-range-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.range === range);
+        const isActive = btn.dataset.range === range;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
       });
+      
+      // Re-render with new date range
       if (usageState.rawData) {
-        renderFilteredUsageData(usageState.rawData);
+        renderUsageData(usageState.rawData);
       }
     }
 
     function setChartView(view) {
       usageState.chartView = view;
+      
+      // Update button states and ARIA
       document.querySelectorAll('.chart-view-btn').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.view === view);
+        const isActive = btn.dataset.view === view;
+        btn.classList.toggle('active', isActive);
+        btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
       });
+      
+      // Re-render charts with new view
       if (usageState.rawData) {
-        renderUsageChartsWithView(usageState.rawData);
+        renderUsageChartsUnified(usageState.rawData);
       }
     }
 
     function filterDataByDateRange(data, range) {
-      if (range === 'all') return data;
+      if (range === 'all' || !data) return data;
       
       const now = new Date();
       let cutoff;
@@ -7235,130 +7934,22 @@
         cutoff = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       } else if (range === '30d') {
         cutoff = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      } else {
+        return data;
       }
       
       const filtered = {};
       for (const [key, value] of Object.entries(data)) {
-        const date = new Date(key);
-        if (date >= cutoff) {
-          filtered[key] = value;
+        try {
+          const date = new Date(key);
+          if (!isNaN(date.getTime()) && date >= cutoff) {
+            filtered[key] = value;
+          }
+        } catch {
+          // Skip invalid date keys
         }
       }
       return filtered;
-    }
-
-    function renderFilteredUsageData(usageData) {
-      const range = usageState.dateRange;
-      
-      // Filter requests_by_day and tokens_by_day
-      const reqByDay = filterDataByDateRange(usageData.requests_by_day || {}, range);
-      const tokByDay = filterDataByDateRange(usageData.tokens_by_day || {}, range);
-      
-      // Recalculate totals based on filtered data
-      const filteredReqTotal = Object.values(reqByDay).reduce((a, b) => a + b, 0);
-      const filteredTokTotal = Object.values(tokByDay).reduce((a, b) => a + b, 0);
-      
-      // Update trend displays
-      if (document.getElementById('trendRequestTotal'))
-        document.getElementById('trendRequestTotal').innerText = filteredReqTotal.toLocaleString();
-      if (document.getElementById('trendTokenTotal'))
-        document.getElementById('trendTokenTotal').innerText = (filteredTokTotal < 1000000 ? (filteredTokTotal / 1000).toFixed(1) + 'k' : (filteredTokTotal / 1000000).toFixed(2) + 'M');
-      
-      renderUsageChartsWithView(usageData);
-    }
-
-    function renderUsageChartsWithView(usageData) {
-      const view = usageState.chartView;
-      const range = usageState.dateRange;
-      
-      let reqData, tokData, labelFormatter;
-      
-      if (view === 'hourly') {
-        reqData = usageData.requests_by_hour || {};
-        tokData = usageData.tokens_by_hour || {};
-        labelFormatter = (h) => `${h}:00`;
-      } else {
-        reqData = filterDataByDateRange(usageData.requests_by_day || {}, range);
-        tokData = filterDataByDateRange(usageData.tokens_by_day || {}, range);
-        labelFormatter = (d) => d.slice(5);
-      }
-      
-      const keys = [...new Set([...Object.keys(reqData), ...Object.keys(tokData)])].sort();
-      const reqValues = keys.map(k => reqData[k] || 0);
-      const tokValues = keys.map(k => tokData[k] || 0);
-      
-      // Chart styling
-      Chart.defaults.color = '#8888aa';
-      Chart.defaults.font.family = "'Inter', sans-serif";
-      Chart.defaults.scale.grid.color = 'rgba(255, 255, 255, 0.05)';
-      
-      const ctxReq = document.getElementById('requestsChart').getContext('2d');
-      const gradReq = ctxReq.createLinearGradient(0, 0, 0, 240);
-      gradReq.addColorStop(0, 'rgba(0, 229, 255, 0.2)');
-      gradReq.addColorStop(1, 'rgba(0, 229, 255, 0)');
-      
-      if (requestsChartInstance) requestsChartInstance.destroy();
-      requestsChartInstance = new Chart(ctxReq, {
-        type: 'line',
-        data: {
-          labels: keys.map(labelFormatter),
-          datasets: [{
-            label: 'Requests',
-            data: reqValues,
-            borderColor: '#00e5ff',
-            backgroundColor: gradReq,
-            borderWidth: 2,
-            tension: 0.4,
-            fill: true,
-            pointRadius: 0,
-            pointHoverRadius: 4,
-            pointBackgroundColor: '#0d0d1a',
-            pointBorderColor: '#00e5ff',
-            pointBorderWidth: 2
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, backgroundColor: 'rgba(20, 20, 35, 0.9)', titleColor: '#fff', bodyColor: '#ccc', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 } },
-          scales: {
-            x: { grid: { display: false } },
-            y: { beginAtZero: true, border: { display: false } }
-          }
-        }
-      });
-      
-      const ctxTok = document.getElementById('tokensChart').getContext('2d');
-      const gradTok = ctxTok.createLinearGradient(0, 0, 0, 240);
-      gradTok.addColorStop(0, '#a78bfa');
-      gradTok.addColorStop(1, 'rgba(167, 139, 250, 0.1)');
-      
-      if (tokensChartInstance) tokensChartInstance.destroy();
-      tokensChartInstance = new Chart(ctxTok, {
-        type: 'bar',
-        data: {
-          labels: keys.map(labelFormatter),
-          datasets: [{
-            label: 'Tokens',
-            data: tokValues,
-            backgroundColor: gradTok,
-            borderRadius: 4,
-            borderSkipped: false,
-            barThickness: 'flex',
-            maxBarThickness: 30,
-            hoverBackgroundColor: '#8b5cf6'
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, backgroundColor: 'rgba(20, 20, 35, 0.9)', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' } },
-          scales: {
-            x: { grid: { display: false } },
-            y: { beginAtZero: true, border: { display: false }, ticks: { callback: function (value) { return value >= 1000 ? (value / 1000).toFixed(0) + 'k' : value; } } }
-          }
-        }
-      });
     }
 
     function exportUsageData() {
@@ -7367,17 +7958,24 @@
         return;
       }
       
+      const range = usageState.dateRange;
       const data = usageState.rawData;
+      
+      // Export filtered data based on current range
+      const filteredReqByDay = filterDataByDateRange(data.requests_by_day || {}, range);
+      const filteredTokByDay = filterDataByDateRange(data.tokens_by_day || {}, range);
+      
       const exportObj = {
         exported_at: new Date().toISOString(),
+        date_range: getPeriodLabel(range),
         summary: {
           total_requests: data.total_requests || 0,
           success_count: data.success_count || 0,
           failure_count: data.failure_count || 0,
           total_tokens: data.total_tokens || 0
         },
-        requests_by_day: data.requests_by_day || {},
-        tokens_by_day: data.tokens_by_day || {},
+        requests_by_day: filteredReqByDay,
+        tokens_by_day: filteredTokByDay,
         apis: data.apis || {}
       };
       
