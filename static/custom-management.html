@@ -2313,15 +2313,6 @@
       min-width: 0;
     }
 
-    .key-value {
-      font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
-      font-size: 14px;
-      color: var(--text-primary);
-      font-weight: 500;
-      letter-spacing: 0.5px;
-      margin-bottom: 4px;
-    }
-
     .key-meta {
       font-size: 12px;
       color: var(--text-muted);
@@ -2370,6 +2361,153 @@
     .key-action-btn svg {
       width: 14px;
       height: 14px;
+    }
+
+    .key-action-btn.reveal {
+      background: rgba(96, 165, 250, 0.15);
+      color: var(--accent-blue);
+      border-color: rgba(96, 165, 250, 0.3);
+    }
+
+    .key-action-btn.reveal:hover {
+      background: rgba(96, 165, 250, 0.25);
+      box-shadow: 0 0 12px rgba(96, 165, 250, 0.2);
+    }
+
+    .key-value-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .key-value {
+      font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+      font-size: 14px;
+      color: var(--text-primary);
+      font-weight: 500;
+      letter-spacing: 0.5px;
+      transition: all 0.2s ease;
+      margin-bottom: 4px;
+    }
+
+    .key-value.revealed {
+      color: var(--accent-green);
+    }
+
+    .key-index {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      background: rgba(0, 229, 255, 0.1);
+      border-radius: 50%;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent-cyan);
+      flex-shrink: 0;
+    }
+
+    .keys-tab .tab-badge {
+      background: rgba(0, 229, 255, 0.2);
+      color: var(--accent-cyan);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      margin-left: 6px;
+    }
+
+    .keys-tab.active .tab-badge {
+      background: rgba(255, 255, 255, 0.25);
+      color: white;
+    }
+
+    @keyframes keyCardEnter {
+      from {
+        opacity: 0;
+        transform: translateX(-10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .key-card {
+      animation: keyCardEnter 0.3s ease forwards;
+    }
+
+    .key-card:nth-child(1) { animation-delay: 0ms; }
+    .key-card:nth-child(2) { animation-delay: 50ms; }
+    .key-card:nth-child(3) { animation-delay: 100ms; }
+    .key-card:nth-child(4) { animation-delay: 150ms; }
+    .key-card:nth-child(5) { animation-delay: 200ms; }
+
+    .keys-bulk-actions {
+      display: flex;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    .btn-bulk {
+      padding: 8px 14px;
+      background: rgba(30, 30, 60, 0.8);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-bulk:hover {
+      background: rgba(40, 40, 80, 0.9);
+      border-color: var(--accent-cyan);
+      color: var(--text-primary);
+    }
+
+    .btn-bulk.danger:hover {
+      border-color: var(--accent-red);
+      color: var(--accent-red);
+    }
+
+    .btn-bulk svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .key-format-hint {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      background: rgba(0, 229, 255, 0.08);
+      border: 1px solid rgba(0, 229, 255, 0.2);
+      border-radius: var(--radius-sm);
+      margin-bottom: 16px;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .key-format-hint svg {
+      width: 18px;
+      height: 18px;
+      color: var(--accent-cyan);
+      flex-shrink: 0;
+    }
+
+    .key-format-hint code {
+      background: rgba(0, 0, 0, 0.3);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 12px;
+      color: var(--accent-cyan);
     }
 
     .keys-empty-state {
@@ -3479,24 +3617,24 @@
               fill="none" stroke="currentColor" stroke-width="2">
               <path
                 d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
-            </svg>Access Keys </div>
+            </svg>Access Keys <span class="tab-badge" id="accessTabBadge">0</span></div>
           <div class="keys-tab" data-keytab="gemini"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
               fill="none" stroke="currentColor" stroke-width="2">
               <polygon
                 points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-            </svg>Gemini </div>
+            </svg>Gemini <span class="tab-badge" id="geminiTabBadge">0</span></div>
           <div class="keys-tab" data-keytab="claude"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
               fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10" />
               <path d="M8 14s1.5 2 4 2 4-2 4-2" />
               <line x1="9" y1="9" x2="9.01" y2="9" />
               <line x1="15" y1="9" x2="15.01" y2="9" />
-            </svg>Claude </div>
+            </svg>Claude <span class="tab-badge" id="claudeTabBadge">0</span></div>
           <div class="keys-tab" data-keytab="codex"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
               fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="16 18 22 12 16 6" />
               <polyline points="8 6 2 12 8 18" />
-            </svg>Codex </div>
+            </svg>Codex <span class="tab-badge" id="codexTabBadge">0</span></div>
         </div>
         <div id="keytab-access" class="keys-content active">
           <div class="card">
@@ -5876,16 +6014,18 @@
       }
     }
 
+    // Track revealed keys state
+    let revealedKeys = {};
+
     async function loadKeys() {
       try {
-
-        const [a,
-          g,
-          c,
-          x] = await Promise.all([api('GET', '/api-keys').catch(() => ({})),
+        const [a, g, c, x] = await Promise.all([
+          api('GET', '/api-keys').catch(() => ({})),
           api('GET', '/gemini-api-key').catch(() => ({})),
           api('GET', '/claude-api-key').catch(() => ({})),
-          api('GET', '/codex-api-key').catch(() => ({}))]);
+          api('GET', '/codex-api-key').catch(() => ({}))
+        ]);
+        
         const accessKeys = a['api-keys'] || [];
         const geminiKeys = g['gemini-api-key'] || [];
         const claudeKeys = c['claude-api-key'] || [];
@@ -5896,39 +6036,95 @@
         renderKeyList('claudeKeysList', claudeKeys, 'claude');
         renderKeyList('codexKeysList', codexKeys, 'codex');
 
-        // Update key counts
+        // Update key counts in section headers
         document.getElementById('accessKeyCount').textContent = `${accessKeys.length} key${accessKeys.length !== 1 ? 's' : ''}`;
-
         document.getElementById('geminiKeyCount').textContent = `${geminiKeys.length} key${geminiKeys.length !== 1 ? 's' : ''}`;
-
         document.getElementById('claudeKeyCount').textContent = `${claudeKeys.length} key${claudeKeys.length !== 1 ? 's' : ''}`;
-
         document.getElementById('codexKeyCount').textContent = `${codexKeys.length} key${codexKeys.length !== 1 ? 's' : ''}`;
-      }
 
-      catch (e) {
+        // Update tab badges
+        document.getElementById('accessTabBadge').textContent = accessKeys.length;
+        document.getElementById('geminiTabBadge').textContent = geminiKeys.length;
+        document.getElementById('claudeTabBadge').textContent = claudeKeys.length;
+        document.getElementById('codexTabBadge').textContent = codexKeys.length;
+      } catch (e) {
         toast('Failed: ' + e.message, 'error');
       }
     }
 
+    function getKeyTypeInfo(type) {
+      const info = {
+        access: { name: 'Access', hint: 'Used for authenticating API requests to this proxy', prefix: '' },
+        gemini: { name: 'Gemini', hint: 'Google AI Studio key starting with AIza...', prefix: 'AIza' },
+        claude: { name: 'Claude', hint: 'Anthropic key starting with sk-ant-...', prefix: 'sk-ant-' },
+        codex: { name: 'Codex', hint: 'OpenAI Codex key starting with sk-...', prefix: 'sk-' }
+      };
+      return info[type] || info.access;
+    }
+
     function renderKeyList(id, keys, type) {
       const container = document.getElementById(id);
+      const typeInfo = getKeyTypeInfo(type);
 
       if (!keys.length) {
-        container.innerHTML = ` <div class="keys-empty-state"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" /></svg><h4>No keys configured</h4><p>Add your first ${type === 'access' ? 'access' : type.charAt(0).toUpperCase() + type.slice(1)} API key to get started</p></div>`;
+        container.innerHTML = `
+          <div class="keys-empty-state">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
+            </svg>
+            <h4>No ${typeInfo.name} Keys</h4>
+            <p>Add your first API key to get started. Keys are stored securely and used for authentication.</p>
+            <button class="btn btn-secondary btn-sm" onclick="openAddKeyModal('${type}')" style="margin-top:16px">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              Add Key
+            </button>
+          </div>`;
         return;
       }
 
       container.innerHTML = keys.map((k, i) => {
         const fullKey = typeof k === 'string' ? k : (k.key || k.api_key || JSON.stringify(k));
         const maskedKey = fullKey.length > 12 ? fullKey.slice(0, 6) + '••••••••' + fullKey.slice(-4) : '••••••••';
-        const keyMeta = typeof k === 'object' ? (k.project || k.name || 'API Key') : 'API Key';
+        const keyMeta = typeof k === 'object' ? (k.project || k.name || typeInfo.name + ' Key') : typeInfo.name + ' Key #' + (i + 1);
+        const keyId = type + '-' + i;
+        const isRevealed = revealedKeys[keyId];
+        const displayKey = isRevealed ? fullKey : maskedKey;
+        const escapedKey = fullKey.replace(/'/g, "\\'").replace(/"/g, '\\"');
 
-        return ` <div class="key-card" > <div class="key-icon" > <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" > <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" /> </svg> </div> <div class="key-info" > <div class="key-value" >${maskedKey
-          }</div> <div class="key-meta" >${keyMeta
-          }</div> </div> <div class="key-actions" > <button class="key-action-btn copy" onclick="copyToClipboard('${fullKey.replace(/'/g, " \\'")}')">
- <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>Copy </button><button class="key-action-btn delete" onclick="deleteKey('${type}', ${i})"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>Delete </button></div></div>`;
+        return '<div class="key-card">' +
+            '<span class="key-index">' + (i + 1) + '</span>' +
+            '<div class="key-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" /></svg></div>' +
+            '<div class="key-info">' +
+              '<div class="key-value ' + (isRevealed ? 'revealed' : '') + '" id="key-display-' + keyId + '">' + displayKey + '</div>' +
+              '<div class="key-meta">' + keyMeta + '</div>' +
+            '</div>' +
+            '<div class="key-actions">' +
+              '<button class="key-action-btn reveal" onclick="toggleKeyReveal(\'' + keyId + '\', \'' + escapedKey + '\', \'' + maskedKey + '\')" title="' + (isRevealed ? 'Hide' : 'Reveal') + ' key">' +
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+                  (isRevealed ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>' : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>') +
+                '</svg>' +
+              '</button>' +
+              '<button class="key-action-btn copy" onclick="copyToClipboard(\'' + escapedKey + '\')">' +
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>Copy' +
+              '</button>' +
+              '<button class="key-action-btn delete" onclick="confirmDeleteKey(\'' + type + '\', ' + i + ')">' +
+                '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /></svg>Delete' +
+              '</button>' +
+            '</div>' +
+          '</div>';
       }).join('');
+    }
+
+    function toggleKeyReveal(keyId, fullKey, maskedKey) {
+      revealedKeys[keyId] = !revealedKeys[keyId];
+      const displayEl = document.getElementById('key-display-' + keyId);
+      if (displayEl) {
+        displayEl.textContent = revealedKeys[keyId] ? fullKey : maskedKey;
+        displayEl.classList.toggle('revealed', revealedKeys[keyId]);
+      }
+      loadKeys();
     }
 
     function copyToClipboard(text) {
@@ -5941,15 +6137,37 @@
     }
 
     function openAddKeyModal(type) {
-      document.getElementById('modalTitle').textContent = `Add ${type.charAt(0).toUpperCase() + type.slice(1)} Key`;
-      document.getElementById('modalContent').innerHTML = `<div class="form-group"><label>API Key</label><input type="text" id="newKeyValue" class="form-input" placeholder="Enter API key"></div>`;
-      document.getElementById('modalFooter').innerHTML = `<button class="btn btn-secondary" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="addKey('${type}')">Add</button>`;
+      const typeInfo = getKeyTypeInfo(type);
+      document.getElementById('modalTitle').textContent = `Add ${typeInfo.name} Key`;
+      document.getElementById('modalContent').innerHTML = `
+        <div class="key-format-hint">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+          </svg>
+          <span>${typeInfo.hint}</span>
+        </div>
+        <div class="form-group">
+          <label>API Key</label>
+          <input type="text" id="newKeyValue" class="form-input" placeholder="${typeInfo.prefix ? 'e.g. ' + typeInfo.prefix + '...' : 'Enter your API key'}" autocomplete="off" spellcheck="false">
+        </div>`;
+      document.getElementById('modalFooter').innerHTML = `
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="addKey('${type}')">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Add Key
+        </button>`;
       document.getElementById('modal').classList.add('active');
+      setTimeout(() => document.getElementById('newKeyValue')?.focus(), 100);
     }
 
     async function addKey(type) {
-      const v = document.getElementById('newKeyValue').value;
-      if (!v) return;
+      const v = document.getElementById('newKeyValue').value.trim();
+      if (!v) {
+        toast('Please enter an API key', 'error');
+        return;
+      }
 
       try {
         const epMap = {
@@ -5962,29 +6180,46 @@
           new: v
         });
         closeModal();
-        toast('Added', 'success');
+        toast('API key added successfully', 'success');
         loadKeys();
-      }
-
-      catch (e) {
+      } catch (e) {
         toast('Failed: ' + e.message, 'error');
       }
     }
 
-    async function deleteKey(type, idx) {
-      if (!confirm('Delete?')) return;
+    function confirmDeleteKey(type, idx) {
+      const typeInfo = getKeyTypeInfo(type);
+      document.getElementById('modalTitle').textContent = 'Delete API Key';
+      document.getElementById('modalContent').innerHTML = `
+        <div style="text-align:center; padding: 24px 0;">
+          <div style="width:64px; height:64px; background:rgba(248, 113, 113, 0.1); border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px auto;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              <line x1="10" y1="11" x2="10" y2="17"></line>
+              <line x1="14" y1="11" x2="14" y2="17"></line>
+            </svg>
+          </div>
+          <h4 style="margin-bottom:8px; font-size:18px;">Delete ${typeInfo.name} Key #${idx + 1}?</h4>
+          <p style="color:var(--text-secondary); font-size:14px; max-width:300px; margin:0 auto;">This action cannot be undone. The key will be permanently removed from your configuration.</p>
+        </div>`;
+      document.getElementById('modalFooter').innerHTML = `
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-danger" onclick="deleteKey('${type}', ${idx})">Yes, Delete</button>`;
+      document.getElementById('modal').classList.add('active');
+    }
 
+    async function deleteKey(type, idx) {
       try {
         const epMap = {
           access: '/api-keys', gemini: '/gemini-api-key', claude: '/claude-api-key', codex: '/codex-api-key'
         };
         const ep = epMap[type];
         await api('DELETE', `${ep}?index=${idx}`);
-        toast('Deleted', 'success');
+        closeModal();
+        toast('API key deleted successfully', 'success');
         loadKeys();
-      }
-
-      catch (e) {
+      } catch (e) {
         toast('Failed: ' + e.message, 'error');
       }
     }
