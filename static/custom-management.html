@@ -3748,7 +3748,80 @@
       font-size: 14px;
     }
 
-    @media (max-width: 768px) {
+    /* Mobile Header */
+    .mobile-header {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 56px;
+      background: var(--bg-card);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border-color);
+      padding: 0 16px;
+      align-items: center;
+      gap: 12px;
+      z-index: 101;
+    }
+
+    .hamburger-btn {
+      width: 40px;
+      height: 40px;
+      background: transparent;
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .hamburger-btn:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: var(--accent-cyan);
+    }
+
+    .hamburger-btn svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .mobile-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .mobile-logo .sidebar-logo-icon {
+      width: 32px;
+      height: 32px;
+      font-size: 13px;
+    }
+
+    /* Sidebar Overlay */
+    .sidebar-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 99;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .sidebar-overlay.active {
+      display: block;
+      opacity: 1;
+    }
+
+    /* Tablet breakpoint */
+    @media (max-width: 1024px) {
       .sidebar {
         width: var(--sidebar-collapsed);
       }
@@ -3762,8 +3835,63 @@
         margin-left: var(--sidebar-collapsed);
       }
 
+      .quick-actions-grid {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+
+    @media (max-width: 768px) {
+      /* Show mobile header, hide sidebar by default */
+      .mobile-header {
+        display: flex;
+      }
+
+      .sidebar {
+        width: 260px;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+      }
+
+      .sidebar.mobile-open {
+        transform: translateX(0);
+      }
+
+      .sidebar.mobile-open .sidebar-logo-text,
+      .sidebar.mobile-open .nav-item span {
+        display: inline;
+      }
+
+      .main {
+        margin-left: 0;
+        padding-top: 72px;
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+
       .stats-grid {
         grid-template-columns: 1fr 1fr;
+      }
+
+      .quick-actions-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .page-title {
+        font-size: 20px;
+      }
+
+      .card {
+        padding: 16px;
+      }
+
+      /* Dashboard header mobile */
+      #page-dashboard .page-header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+
+      .health-indicator {
+        align-self: flex-start;
       }
 
       /* Auth page mobile styles */
@@ -3807,9 +3935,72 @@
         flex-wrap: wrap;
         gap: 8px;
       }
+
+      /* Tables responsive */
+      table {
+        display: block;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      /* Modal responsive */
+      .modal-content {
+        width: 95%;
+        max-width: none;
+        margin: 10px;
+        max-height: 90vh;
+      }
+
+      /* Amp page mobile */
+      .amp-hero {
+        flex-direction: column;
+        padding: 24px;
+        text-align: center;
+      }
+
+      .amp-hero-content {
+        max-width: 100%;
+      }
+
+      .amp-grid {
+        grid-template-columns: 1fr;
+      }
+
+      /* Logs page mobile */
+      .log-entry {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+      }
     }
 
     @media (max-width: 480px) {
+      .main {
+        padding-left: 12px;
+        padding-right: 12px;
+      }
+
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .quick-actions-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .stat-card {
+        padding: 16px;
+      }
+
+      .stat-value {
+        font-size: 24px;
+      }
+
+      .stat-icon {
+        width: 40px;
+        height: 40px;
+      }
+
       .auth-oauth-grid {
         grid-template-columns: 1fr;
       }
@@ -3843,6 +4034,28 @@
       .auth-dropzone-btn {
         padding: 8px 16px;
         font-size: 12px;
+      }
+
+      .btn {
+        padding: 12px 16px;
+        font-size: 13px;
+      }
+
+      .page-title {
+        font-size: 18px;
+      }
+
+      .page-subtitle {
+        font-size: 13px;
+      }
+
+      /* Login card mobile */
+      .login-card {
+        padding: 32px 24px;
+      }
+
+      .login-card h1 {
+        font-size: 20px;
       }
     }
 
@@ -5200,6 +5413,22 @@
     </div>
   </div>
   <div id="app" class="app">
+    <!-- Mobile Header with Hamburger Menu -->
+    <div class="mobile-header">
+      <button class="hamburger-btn" onclick="toggleMobileSidebar()" aria-label="Toggle menu">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
+      <div class="mobile-logo">
+        <div class="sidebar-logo-icon">CP</div>
+        <span>CLI Proxy</span>
+      </div>
+    </div>
+    <!-- Mobile Overlay -->
+    <div class="sidebar-overlay" onclick="closeMobileSidebar()"></div>
     <nav class="sidebar">
       <div class="sidebar-logo">
         <div class="sidebar-logo-icon">CP</div><span class="sidebar-logo-text">CLI Proxy</span>
@@ -7039,6 +7268,34 @@
       localStorage.removeItem('managementKey');
       location.reload();
     }
+
+    // Mobile sidebar toggle functions
+    function toggleMobileSidebar() {
+      const sidebar = document.querySelector('.sidebar');
+      const overlay = document.querySelector('.sidebar-overlay');
+      sidebar.classList.toggle('mobile-open');
+      overlay.classList.toggle('active');
+      document.body.style.overflow = sidebar.classList.contains('mobile-open') ? 'hidden' : '';
+    }
+
+    function closeMobileSidebar() {
+      const sidebar = document.querySelector('.sidebar');
+      const overlay = document.querySelector('.sidebar-overlay');
+      sidebar.classList.remove('mobile-open');
+      overlay.classList.remove('active');
+      document.body.style.overflow = '';
+    }
+
+    // Close sidebar when clicking a nav item on mobile
+    document.addEventListener('DOMContentLoaded', function() {
+      document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', () => {
+          if (window.innerWidth <= 768) {
+            closeMobileSidebar();
+          }
+        });
+      });
+    });
 
     async function checkAuth() {
       if (apiKey) {
