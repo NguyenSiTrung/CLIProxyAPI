@@ -1248,6 +1248,398 @@
       }
     }
 
+    /* Models Page Styles */
+    .models-page-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .models-header-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .models-icon-box {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, rgba(0, 229, 255, 0.15), rgba(167, 139, 250, 0.15));
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px solid rgba(0, 229, 255, 0.3);
+    }
+
+    .models-icon-box svg {
+      width: 24px;
+      height: 24px;
+      color: var(--accent-cyan);
+    }
+
+    .models-header-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .models-total-count {
+      background: linear-gradient(135deg, rgba(0, 229, 255, 0.15), rgba(167, 139, 250, 0.15));
+      color: var(--accent-cyan);
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid rgba(0, 229, 255, 0.3);
+    }
+
+    .models-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+
+    .models-search-container {
+      position: relative;
+      flex: 1;
+      min-width: 280px;
+      max-width: 500px;
+    }
+
+    .models-search-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 18px;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .models-search-input {
+      width: 100%;
+      padding: 12px 44px 12px 44px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .models-search-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .models-search-input:focus {
+      outline: none;
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.1);
+      background: var(--bg-secondary);
+    }
+
+    .models-search-clear {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 28px;
+      height: 28px;
+      border: none;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 50%;
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .models-search-clear:hover {
+      background: rgba(248, 113, 113, 0.2);
+      color: var(--accent-red);
+    }
+
+    .models-search-clear svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .models-filter-pills {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .models-filter-pill {
+      padding: 8px 16px;
+      border: 1px solid var(--border-color);
+      border-radius: 20px;
+      background: transparent;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .models-filter-pill:hover {
+      border-color: var(--accent-cyan);
+      color: var(--text-primary);
+      background: rgba(0, 229, 255, 0.05);
+    }
+
+    .models-filter-pill.active {
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      color: white;
+      border-color: transparent;
+      box-shadow: 0 2px 10px rgba(0, 212, 255, 0.3);
+    }
+
+    .models-grid-container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .models-provider-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      transition: all 0.3s;
+    }
+
+    .models-provider-card:hover {
+      border-color: var(--border-glow);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+
+    .models-provider-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 20px;
+      background: rgba(0, 0, 0, 0.2);
+      border-bottom: 1px solid var(--border-color);
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .models-provider-header:hover {
+      background: rgba(0, 0, 0, 0.3);
+    }
+
+    .models-provider-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .models-provider-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .models-provider-icon.anthropic { background: rgba(255, 165, 0, 0.15); }
+    .models-provider-icon.google { background: rgba(66, 133, 244, 0.15); }
+    .models-provider-icon.openai { background: rgba(0, 166, 126, 0.15); }
+    .models-provider-icon.other { background: rgba(167, 139, 250, 0.15); }
+
+    .models-provider-name {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
+      text-transform: capitalize;
+    }
+
+    .models-provider-count {
+      background: rgba(255, 255, 255, 0.1);
+      color: var(--text-secondary);
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .models-provider-toggle {
+      color: var(--text-muted);
+      transition: transform 0.3s;
+    }
+
+    .models-provider-toggle svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .models-provider-card.collapsed .models-provider-toggle {
+      transform: rotate(-90deg);
+    }
+
+    .models-provider-card.collapsed .models-list {
+      display: none;
+    }
+
+    .models-list {
+      padding: 16px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .model-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      background: rgba(167, 139, 250, 0.1);
+      border: 1px solid rgba(167, 139, 250, 0.3);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+
+    .model-badge:hover {
+      background: rgba(167, 139, 250, 0.2);
+      border-color: var(--accent-purple);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(167, 139, 250, 0.2);
+    }
+
+    .model-badge:active {
+      transform: translateY(0);
+    }
+
+    .model-badge .copy-icon {
+      width: 14px;
+      height: 14px;
+      color: var(--text-muted);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .model-badge:hover .copy-icon {
+      opacity: 1;
+    }
+
+    .model-badge.copied {
+      background: rgba(34, 211, 160, 0.2) !important;
+      border-color: var(--accent-green) !important;
+    }
+
+    .model-badge.copied::after {
+      content: 'Copied!';
+      position: absolute;
+      top: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--accent-green);
+      color: white;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+      animation: fadeInUp 0.3s ease;
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(5px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+
+    .models-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      gap: 16px;
+    }
+
+    .models-loading-spinner {
+      width: 40px;
+      height: 40px;
+      border: 3px solid rgba(0, 229, 255, 0.2);
+      border-top-color: var(--accent-cyan);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .models-loading p {
+      color: var(--text-secondary);
+      font-size: 14px;
+    }
+
+    .models-empty {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 60px 20px;
+      gap: 12px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+    }
+
+    .models-empty-icon {
+      width: 64px;
+      height: 64px;
+      background: rgba(251, 191, 36, 0.1);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 8px;
+    }
+
+    .models-empty-icon svg {
+      width: 32px;
+      height: 32px;
+      color: var(--accent-yellow);
+    }
+
+    .models-empty h4 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .models-empty p {
+      color: var(--text-secondary);
+      font-size: 13px;
+      text-align: center;
+      max-width: 300px;
+    }
+
     /* API Keys Page Styles */
     .keys-page-header {
       display: flex;
@@ -2282,19 +2674,52 @@
         </div>
       </div>
       <div id="page-models" class="page">
-        <div class="page-header">
-          <h1 class="page-title">Available Models</h1>
-          <p class="page-subtitle">AI models accessible through the proxy</p>
-        </div>
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">Models List</h3><button class="btn btn-secondary btn-sm"
-              onclick="loadModels()">Refresh</button>
+        <div class="models-page-header">
+          <div class="models-header-left">
+            <div class="models-icon-box">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                <line x1="12" y1="22.08" x2="12" y2="12"/>
+              </svg>
+            </div>
+            <div>
+              <h1 class="page-title" style="margin:0">Available Models</h1>
+              <p class="page-subtitle">AI models accessible through the proxy</p>
+            </div>
           </div>
-          <div class="form-group" style="margin-bottom:16px"><input type="text" id="modelSearch" class="form-input"
-              placeholder="Search models..." oninput="filterModels()"></div>
-          <div id="modelsContainer">
-            <p style="color:var(--text-secondary)">Loading models...</p>
+          <div class="models-header-right">
+            <span class="models-total-count" id="modelsTotalCount">0 models</span>
+            <button class="btn btn-secondary btn-sm" onclick="loadModels()" style="display:flex;align-items:center;gap:6px">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>Refresh
+            </button>
+          </div>
+        </div>
+        
+        <div class="models-toolbar">
+          <div class="models-search-container">
+            <svg class="models-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input type="text" id="modelSearch" class="models-search-input" placeholder="Search models by name or provider..." oninput="filterModels()">
+            <button class="models-search-clear" id="modelSearchClear" onclick="clearModelSearch()" style="display:none">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+          <div class="models-filter-pills" id="modelsFilterPills">
+            <button class="models-filter-pill active" data-provider="all" onclick="filterModelsByProvider('all')">All</button>
+          </div>
+        </div>
+        
+        <div id="modelsContainer" class="models-grid-container">
+          <div class="models-loading">
+            <div class="models-loading-spinner"></div>
+            <p>Loading models...</p>
           </div>
         </div>
       </div>
@@ -3489,34 +3914,102 @@
     }
 
     async function loadModels() {
+      const container = document.getElementById('modelsContainer');
+      container.innerHTML = `
+        <div class="models-loading">
+          <div class="models-loading-spinner"></div>
+          <p>Loading models...</p>
+        </div>
+      `;
+      
       try {
-
-        // First try to get access keys from config
         const cfg = await api('GET', '/config').catch(() => ({}));
         accessApiKeys = cfg['api-keys'] || cfg.api_keys || [];
         const models = await fetchModels();
         allModels = models;
+        currentProviderFilter = 'all';
+        updateProviderFilters(models);
         renderModels(models);
+      } catch (e) {
+        container.innerHTML = `
+          <div class="models-empty">
+            <div class="models-empty-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+              </svg>
+            </div>
+            <h4>Could not load models</h4>
+            <p>The /v1/models endpoint requires API authentication. Add access keys in the <strong>API Keys</strong> tab or check your auth files.</p>
+          </div>
+        `;
       }
+    }
 
-      catch (e) {
-        document.getElementById('modelsContainer').innerHTML = ` <div style="text-align:center;padding:24px"><p style="color:var(--accent-yellow);margin-bottom:12px">⚠️ Could not load models</p><p style="color:var(--text-secondary);font-size:13px">The /v1/models endpoint requires API authentication.</p><p style="color:var(--text-secondary);font-size:13px;margin-top:8px">Add access keys in the <strong>API Keys</strong>tab or check your auth files.</p></div>`;
-      }
+    let currentProviderFilter = 'all';
+
+    function getProviderIcon(provider) {
+      const p = provider.toLowerCase();
+      if (p.includes('anthropic') || p.includes('claude')) return { icon: '🤖', class: 'anthropic' };
+      if (p.includes('google') || p.includes('gemini')) return { icon: '✨', class: 'google' };
+      if (p.includes('openai') || p.includes('gpt')) return { icon: '🧠', class: 'openai' };
+      if (p.includes('meta') || p.includes('llama')) return { icon: '🦙', class: 'other' };
+      if (p.includes('mistral')) return { icon: '🌀', class: 'other' };
+      if (p.includes('codex')) return { icon: '💻', class: 'other' };
+      return { icon: '📦', class: 'other' };
+    }
+
+    function updateProviderFilters(models) {
+      const providers = new Set();
+      models.forEach(m => {
+        const owner = m.owned_by || m.provider || 'other';
+        providers.add(owner);
+      });
+      
+      const pillsContainer = document.getElementById('modelsFilterPills');
+      let html = `<button class="models-filter-pill active" data-provider="all" onclick="filterModelsByProvider('all')">All</button>`;
+      
+      Array.from(providers).sort().forEach(provider => {
+        const count = models.filter(m => (m.owned_by || m.provider || 'other') === provider).length;
+        html += `<button class="models-filter-pill" data-provider="${provider}" onclick="filterModelsByProvider('${provider}')">${provider} <span style="opacity:0.7">(${count})</span></button>`;
+      });
+      
+      pillsContainer.innerHTML = html;
+    }
+
+    function filterModelsByProvider(provider) {
+      currentProviderFilter = provider;
+      
+      document.querySelectorAll('.models-filter-pill').forEach(pill => {
+        pill.classList.toggle('active', pill.dataset.provider === provider);
+      });
+      
+      filterModels();
     }
 
     function renderModels(models) {
       const container = document.getElementById('modelsContainer');
+      const countEl = document.getElementById('modelsTotalCount');
+      
+      countEl.textContent = `${models.length} model${models.length !== 1 ? 's' : ''}`;
 
       if (!models.length) {
-        container.innerHTML = '<p style="color:var(--text-secondary)">No models available</p>';
+        container.innerHTML = `
+          <div class="models-empty">
+            <div class="models-empty-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+              </svg>
+            </div>
+            <h4>No models found</h4>
+            <p>Try adjusting your search or filter criteria.</p>
+          </div>
+        `;
         return;
       }
 
-      // Group by provider/owner
-      const grouped = {}
-
-        ;
-
+      const grouped = {};
       models.forEach(m => {
         const id = m.id || m.name || 'unknown';
         const owner = m.owned_by || m.provider || 'other';
@@ -3524,25 +4017,82 @@
         grouped[owner].push(id);
       });
 
-      container.innerHTML = Object.entries(grouped).map(([owner, modelList]) => ` <div style="margin-bottom:20px" > <h4 style="color:var(--accent-cyan);margin-bottom:12px;text-transform:capitalize" >${owner
-        } (${modelList.length
-        })</h4> <div style="display:flex;flex-wrap:wrap;gap:8px" > ${modelList.map(id => `<span class="badge badge-purple" style="cursor:pointer" onclick="copyToClipboard('${id}')" title="Click to copy">${id}</span>`).join('')
-        } </div> </div> `).join('');
+      container.innerHTML = Object.entries(grouped).map(([owner, modelList]) => {
+        const { icon, class: iconClass } = getProviderIcon(owner);
+        return `
+          <div class="models-provider-card" data-provider="${owner}">
+            <div class="models-provider-header" onclick="toggleProviderCard(this.parentElement)">
+              <div class="models-provider-info">
+                <div class="models-provider-icon ${iconClass}">${icon}</div>
+                <span class="models-provider-name">${owner}</span>
+                <span class="models-provider-count">${modelList.length} model${modelList.length !== 1 ? 's' : ''}</span>
+              </div>
+              <div class="models-provider-toggle">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="6 9 12 15 18 9"/>
+                </svg>
+              </div>
+            </div>
+            <div class="models-list">
+              ${modelList.map(id => `
+                <div class="model-badge" onclick="copyModelId(this, '${id}')" title="Click to copy">
+                  <span>${id}</span>
+                  <svg class="copy-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  </svg>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function toggleProviderCard(card) {
+      card.classList.toggle('collapsed');
+    }
+
+    function copyModelId(element, id) {
+      navigator.clipboard.writeText(id).then(() => {
+        element.classList.add('copied');
+        setTimeout(() => {
+          element.classList.remove('copied');
+        }, 1500);
+      }).catch(() => {
+        toast('Failed to copy', 'error');
+      });
+    }
+
+    function clearModelSearch() {
+      document.getElementById('modelSearch').value = '';
+      document.getElementById('modelSearchClear').style.display = 'none';
+      filterModels();
     }
 
     function filterModels() {
       const search = document.getElementById('modelSearch').value.toLowerCase();
+      const clearBtn = document.getElementById('modelSearchClear');
+      
+      clearBtn.style.display = search ? 'flex' : 'none';
 
-      if (!search) {
-        renderModels(allModels);
-        return;
+      let filtered = allModels;
+      
+      if (currentProviderFilter !== 'all') {
+        filtered = filtered.filter(m => {
+          const owner = m.owned_by || m.provider || 'other';
+          return owner === currentProviderFilter;
+        });
       }
-
-      const filtered = allModels.filter(m => {
-        const id = (m.id || m.name || '').toLowerCase();
-        const owner = (m.owned_by || m.provider || '').toLowerCase();
-        return id.includes(search) || owner.includes(search);
-      });
+      
+      if (search) {
+        filtered = filtered.filter(m => {
+          const id = (m.id || m.name || '').toLowerCase();
+          const owner = (m.owned_by || m.provider || '').toLowerCase();
+          return id.includes(search) || owner.includes(search);
+        });
+      }
+      
       renderModels(filtered);
     }
 
