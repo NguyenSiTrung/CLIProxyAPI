@@ -3263,6 +3263,63 @@
       line-height: 1.6;
     }
 
+    /* Connection Status Indicator */
+    .amp-connection-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 16px;
+      transition: all 0.3s;
+    }
+
+    .amp-connection-status.connected {
+      background: rgba(34, 211, 160, 0.1);
+      border: 1px solid rgba(34, 211, 160, 0.3);
+      color: var(--accent-green);
+    }
+
+    .amp-connection-status.disconnected {
+      background: rgba(248, 113, 113, 0.1);
+      border: 1px solid rgba(248, 113, 113, 0.3);
+      color: var(--accent-red);
+    }
+
+    .amp-connection-status.checking {
+      background: rgba(251, 191, 36, 0.1);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      color: var(--accent-yellow);
+    }
+
+    .amp-connection-status.not-configured {
+      background: rgba(136, 136, 170, 0.1);
+      border: 1px solid rgba(136, 136, 170, 0.3);
+      color: var(--text-muted);
+    }
+
+    .amp-status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .amp-connection-status.connected .amp-status-dot {
+      animation: pulse 2s infinite;
+    }
+
+    .amp-connection-status.checking .amp-status-dot {
+      animation: blink 0.6s infinite;
+    }
+
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
     .input-with-icon {
       position: relative;
     }
@@ -3287,19 +3344,139 @@
       color: var(--accent-cyan);
     }
 
-    .btn-save-amp {
+    /* Password toggle button */
+    .password-toggle-btn {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: color 0.2s;
+      z-index: 2;
+    }
+
+    .password-toggle-btn:hover {
+      color: var(--accent-cyan);
+    }
+
+    .password-toggle-btn svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .input-with-icon.has-toggle .form-input {
+      padding-right: 44px;
+    }
+
+    /* Amp action buttons */
+    .amp-actions {
+      display: flex;
+      gap: 10px;
       margin-top: 16px;
-      width: 100%;
+    }
+
+    .btn-save-amp {
+      flex: 1;
       justify-content: center;
       background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
       box-shadow: 0 4px 15px rgba(0, 229, 255, 0.2);
       color: #fff;
       font-weight: 600;
+      transition: all 0.3s;
     }
 
-    .btn-save-amp:hover {
+    .btn-save-amp:hover:not(:disabled) {
       box-shadow: 0 6px 20px rgba(0, 229, 255, 0.3);
       transform: translateY(-2px);
+    }
+
+    .btn-save-amp:disabled {
+      opacity: 0.7;
+      cursor: not-allowed;
+    }
+
+    .btn-save-amp.saving {
+      pointer-events: none;
+    }
+
+    .btn-test-connection {
+      padding: 14px 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      color: var(--text-secondary);
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .btn-test-connection:hover:not(:disabled) {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--accent-cyan);
+      color: var(--text-primary);
+    }
+
+    .btn-test-connection:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-test-connection.testing {
+      pointer-events: none;
+    }
+
+    /* Mappings section */
+    .mappings-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-color);
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .mappings-search {
+      position: relative;
+      width: 220px;
+    }
+
+    .mappings-search input {
+      width: 100%;
+      padding: 8px 12px 8px 36px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+
+    .mappings-search input:focus {
+      outline: none;
+      border-color: var(--accent-cyan);
+      background: rgba(15, 15, 35, 0.8);
+    }
+
+    .mappings-search input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .mappings-search svg {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px;
+      height: 16px;
+      color: var(--text-muted);
+      pointer-events: none;
     }
 
     .mappings-list {
@@ -3324,11 +3501,16 @@
       background: rgba(30, 30, 60, 0.6);
     }
 
+    .mapping-card.hidden {
+      display: none;
+    }
+
     .mapping-flow {
       display: flex;
       align-items: center;
       gap: 12px;
       flex: 1;
+      min-width: 0;
     }
 
     .mapping-source,
@@ -3337,9 +3519,27 @@
       font-size: 13px;
       color: var(--text-primary);
       background: rgba(0, 0, 0, 0.3);
-      padding: 4px 10px;
+      padding: 6px 12px;
       border-radius: 4px;
       border: 1px solid rgba(255, 255, 255, 0.1);
+      cursor: pointer;
+      transition: all 0.2s;
+      max-width: 200px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .mapping-source:hover,
+    .mapping-target:hover {
+      background: rgba(0, 229, 255, 0.1);
+      border-color: var(--accent-cyan);
+    }
+
+    .mapping-source.copied,
+    .mapping-target.copied {
+      background: rgba(34, 211, 160, 0.2);
+      border-color: var(--accent-green);
     }
 
     .mapping-arrow {
@@ -3393,6 +3593,116 @@
     .mapping-action-btn.delete:hover {
       background: rgba(248, 113, 113, 0.15);
       border-color: var(--accent-red);
+    }
+
+    /* Setting tooltip styles */
+    .setting-info-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      margin-left: 6px;
+      color: var(--text-muted);
+      cursor: help;
+      position: relative;
+    }
+
+    .setting-info-icon svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .setting-info-icon:hover {
+      color: var(--accent-cyan);
+    }
+
+    .setting-info-tooltip {
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 10px 14px;
+      background: rgba(20, 20, 45, 0.98);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      width: 240px;
+      text-align: left;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.2s;
+      z-index: 100;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      pointer-events: none;
+    }
+
+    .setting-info-icon:hover .setting-info-tooltip {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    /* Combos panel enhanced */
+    .combos-panel {
+      background: linear-gradient(145deg, rgba(20, 20, 40, 0.4) 0%, rgba(30, 30, 60, 0.4) 100%);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    .combos-panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .combo-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: all 0.2s;
+      cursor: default;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .combo-item:hover {
+      border-color: var(--accent-purple);
+      box-shadow: 0 2px 8px rgba(167, 139, 250, 0.1);
+    }
+
+    .combo-item:hover .combo-apply-btn {
+      opacity: 1;
+      transform: translateX(0);
+    }
+
+    .combo-apply-btn {
+      opacity: 0;
+      transform: translateX(10px);
+      transition: all 0.2s;
+    }
+
+    /* No results state */
+    .mappings-no-results {
+      padding: 32px;
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 14px;
+      background: rgba(0, 0, 0, 0.1);
+      border: 1px dashed var(--border-color);
+      border-radius: 8px;
+      display: none;
+    }
+
+    .mappings-no-results.visible {
+      display: block;
     }
 
     @keyframes rotate {
@@ -4592,6 +4902,11 @@
                 <h3>Upstream Connection</h3>
               </div>
             </div>
+            <!-- Connection Status -->
+            <div id="ampConnectionStatus" class="amp-connection-status not-configured">
+              <div class="amp-status-dot"></div>
+              <span id="ampConnectionText">Not configured</span>
+            </div>
             <div class="form-group"><label>Upstream URL</label>
               <div class="input-with-icon"><input type="text" id="ampUpstreamUrl" class="form-input"
                   placeholder="https://api.ampcode.com"><svg class="input-icon" xmlns="http://www.w3.org/2000/svg"
@@ -4602,20 +4917,36 @@
                 </svg></div>
             </div>
             <div class="form-group"><label>Upstream API Key</label>
-              <div class="input-with-icon"><input type="password" id="ampUpstreamKey" class="form-input"
-                  placeholder="••••••••"><svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="24"
-                  height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                  stroke-linecap="round" stroke-linejoin="round">
+              <div class="input-with-icon has-toggle">
+                <input type="password" id="ampUpstreamKey" class="form-input" placeholder="••••••••">
+                <svg class="input-icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                   <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                </svg></div>
-            </div><button class="btn btn-save-amp" onclick="saveAmpSettings()"><svg xmlns="http://www.w3.org/2000/svg"
-                width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round">
-                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                <polyline points="7 3 7 8 15 8"></polyline>
-              </svg>Save Connection </button>
+                </svg>
+                <button type="button" class="password-toggle-btn" onclick="toggleAmpKeyVisibility()" title="Toggle visibility">
+                  <svg id="ampKeyEyeIcon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            <div class="amp-actions">
+              <button class="btn btn-test-connection" id="btnTestConnection" onclick="testAmpConnection()">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                </svg>
+                <span id="testConnectionText">Test</span>
+              </button>
+              <button class="btn btn-save-amp" id="btnSaveAmp" onclick="saveAmpSettings()">
+                <svg id="saveAmpIcon" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                  <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                  <polyline points="7 3 7 8 15 8"></polyline>
+                </svg>
+                <span id="saveAmpText">Save Connection</span>
+              </button>
+            </div>
           </div>
           <div class="card">
             <div class="card-header">
@@ -4635,7 +4966,16 @@
               <div class="config-setting-item" style="border-bottom: 1px solid var(--border-color)">
                 <div class="config-setting-info">
                   <div class="config-setting-text">
-                    <h4>Force Model Mappings</h4>
+                    <h4>Force Model Mappings
+                      <span class="setting-info-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                        <span class="setting-info-tooltip">When enabled, model mappings will be prioritized over your local API keys. Requests will be routed to the upstream service first.</span>
+                      </span>
+                    </h4>
                     <p>Prioritize mappings over local keys</p>
                   </div>
                 </div>
@@ -4648,7 +4988,16 @@
               <div class="config-setting-item">
                 <div class="config-setting-info">
                   <div class="config-setting-text">
-                    <h4>Restrict Management</h4>
+                    <h4>Restrict Management
+                      <span class="setting-info-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                          <circle cx="12" cy="12" r="10"></circle>
+                          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                        <span class="setting-info-tooltip">For security, enable this to only allow management API access from localhost (127.0.0.1). Remote connections will be blocked.</span>
+                      </span>
+                    </h4>
                     <p>Only allow localhost for management</p>
                   </div>
                 </div>
@@ -4682,16 +5031,31 @@
 
             <!-- Section 1: Mappings List -->
             <div>
-              <div
-                style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; padding-bottom:12px; border-bottom:1px solid var(--border-color)">
-                <h4 style="font-size:14px; color:var(--text-secondary); font-weight:600">Active Mappings (<span
-                    id="mappingCount">0</span>)</h4>
+              <div class="mappings-header">
+                <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap">
+                  <h4 style="font-size:14px; color:var(--text-secondary); font-weight:600; margin:0">Active Mappings (<span
+                      id="mappingCount">0</span>)</h4>
+                  <div class="mappings-search">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <circle cx="11" cy="11" r="8"></circle>
+                      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                    </svg>
+                    <input type="text" id="mappingSearchInput" placeholder="Search mappings..." oninput="filterMappings(this.value)">
+                  </div>
+                </div>
                 <button class="btn btn-secondary btn-sm" onclick="openAddMappingModal()">
                   <span style="margin-right:4px">+</span> Add Mapping
                 </button>
               </div>
               <div id="modelMappings" class="mappings-list"
-                style="display:grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap:12px"></div>
+                style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:12px"></div>
+              <div id="mappingsNoResults" class="mappings-no-results">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom:8px;opacity:0.5">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <div>No mappings found matching your search.</div>
+              </div>
             </div>
 
             <!-- Section 2: Combos -->
@@ -4702,7 +5066,7 @@
                   <div
                     style="width:32px; height:32px; background:rgba(167, 139, 250, 0.1); border-radius:8px; display:flex; align-items:center; justify-content:center; color:var(--accent-purple)">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none"
-                      stroke="currentColor" stroke-width="2"><img width="0" height="0" />
+                      stroke="currentColor" stroke-width="2">
                       <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
                     </svg>
                   </div>
@@ -6894,8 +7258,14 @@
       try {
         const res = await api('GET', '/ampcode');
         const d = res.ampcode || {};
-        document.getElementById('ampUpstreamUrl').value = d.upstream_url || d['upstream-url'] || '';
-        document.getElementById('ampUpstreamKey').value = d.upstream_api_key || d['upstream-api-key'] || '';
+        const upstreamUrl = d.upstream_url || d['upstream-url'] || '';
+        const upstreamKey = d.upstream_api_key || d['upstream-api-key'] || '';
+        
+        document.getElementById('ampUpstreamUrl').value = upstreamUrl;
+        document.getElementById('ampUpstreamKey').value = upstreamKey;
+
+        // Update connection status
+        updateAmpConnectionStatus(upstreamUrl, upstreamKey);
 
         // Toggles
         document.getElementById('ampForce').checked = d.force_model_mappings || d['force-model-mappings'] || false;
@@ -6906,6 +7276,16 @@
         const countEl = document.getElementById('mappingCount');
 
         if (countEl) countEl.textContent = m.length;
+
+        // Helper to escape HTML to prevent XSS
+        function escapeHtmlAttr(str) {
+          if (!str) return '';
+          return str.replace(/&/g, '&amp;')
+                    .replace(/'/g, '&#39;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;');
+        }
 
         // Helper to parse reasoning effort from target
         function parseTarget(to) {
@@ -6928,24 +7308,27 @@
         } else {
           c.innerHTML = m.map(item => {
             const parsed = parseTarget(item.to);
+            const escapedFrom = escapeHtmlAttr(item.from);
+            const escapedTo = escapeHtmlAttr(item.to);
+            const escapedModel = escapeHtmlAttr(parsed.model);
             return `
-            <div class="mapping-card">
+            <div class="mapping-card" data-from="${escapedFrom}" data-to="${escapedTo}">
               <div class="mapping-flow">
-                <div class="mapping-source">${item.from}</div>
+                <div class="mapping-source" onclick="copyMappingText(this, '${escapedFrom}')" title="Click to copy">${escapeHtmlAttr(item.from)}</div>
                 <svg class="mapping-arrow" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <line x1="5" y1="12" x2="19" y2="12"></line>
                   <polyline points="12 5 19 12 12 19"></polyline>
                 </svg>
-                <div class="mapping-target">${parsed.model}${reasoningBadge(parsed.reasoning)}</div>
+                <div class="mapping-target" onclick="copyMappingText(this, '${escapedModel}')" title="Click to copy">${escapedModel}${reasoningBadge(parsed.reasoning)}</div>
               </div>
               <div class="mapping-actions">
-                <button class="mapping-action-btn edit" onclick="openEditMappingModal('${item.from}', '${item.to}')" title="Edit mapping">
+                <button class="mapping-action-btn edit" onclick="openEditMappingModal('${escapedFrom}', '${escapedTo}')" title="Edit mapping">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                   </svg>
                 </button>
-                <button class="mapping-action-btn delete" onclick="deleteAmpMapping('${item.from}')" title="Delete mapping">
+                <button class="mapping-action-btn delete" onclick="deleteAmpMapping('${escapedFrom}')" title="Delete mapping">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="3 6 5 6 21 6"></polyline>
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -6956,6 +7339,14 @@
           `}).join('');
         }
 
+        // Clear search input
+        const searchInput = document.getElementById('mappingSearchInput');
+        if (searchInput) searchInput.value = '';
+        
+        // Hide no results message
+        const noResults = document.getElementById('mappingsNoResults');
+        if (noResults) noResults.classList.remove('visible');
+
         // Render combos side panel
         renderCombosSidePanel();
       }
@@ -6965,7 +7356,155 @@
       }
     }
 
+    // Copy mapping text to clipboard
+    function copyMappingText(el, text) {
+      navigator.clipboard.writeText(text).then(() => {
+        el.classList.add('copied');
+        setTimeout(() => el.classList.remove('copied'), 1000);
+        toast('Copied to clipboard', 'success');
+      }).catch(() => {
+        toast('Failed to copy', 'error');
+      });
+    }
+
+    // Filter mappings by search term
+    function filterMappings(searchTerm) {
+      const term = searchTerm.toLowerCase().trim();
+      const cards = document.querySelectorAll('#modelMappings .mapping-card');
+      const noResults = document.getElementById('mappingsNoResults');
+      let visibleCount = 0;
+
+      cards.forEach(card => {
+        const from = (card.dataset.from || '').toLowerCase();
+        const to = (card.dataset.to || '').toLowerCase();
+        
+        if (!term || from.includes(term) || to.includes(term)) {
+          card.classList.remove('hidden');
+          visibleCount++;
+        } else {
+          card.classList.add('hidden');
+        }
+      });
+
+      // Show/hide no results message
+      if (noResults) {
+        if (visibleCount === 0 && term && cards.length > 0) {
+          noResults.classList.add('visible');
+        } else {
+          noResults.classList.remove('visible');
+        }
+      }
+    }
+
+    // Update connection status indicator
+    function updateAmpConnectionStatus(url, key) {
+      const statusEl = document.getElementById('ampConnectionStatus');
+      const textEl = document.getElementById('ampConnectionText');
+      
+      if (!statusEl || !textEl) return;
+      
+      // Remove all status classes
+      statusEl.classList.remove('connected', 'disconnected', 'checking', 'not-configured');
+      
+      if (!url || !key) {
+        statusEl.classList.add('not-configured');
+        textEl.textContent = 'Not configured';
+      } else {
+        statusEl.classList.add('connected');
+        textEl.textContent = 'Configured';
+      }
+    }
+
+    // Toggle password visibility
+    function toggleAmpKeyVisibility() {
+      const input = document.getElementById('ampUpstreamKey');
+      const icon = document.getElementById('ampKeyEyeIcon');
+      
+      if (input.type === 'password') {
+        input.type = 'text';
+        icon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
+      } else {
+        input.type = 'password';
+        icon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>';
+      }
+    }
+
+    // Test upstream connection
+    async function testAmpConnection() {
+      const url = document.getElementById('ampUpstreamUrl').value.trim();
+      const key = document.getElementById('ampUpstreamKey').value.trim();
+      const btn = document.getElementById('btnTestConnection');
+      const textEl = document.getElementById('testConnectionText');
+      const statusEl = document.getElementById('ampConnectionStatus');
+      const statusTextEl = document.getElementById('ampConnectionText');
+      
+      if (!url) {
+        toast('Please enter an upstream URL', 'error');
+        return;
+      }
+      
+      // Set testing state
+      btn.classList.add('testing');
+      btn.disabled = true;
+      textEl.textContent = 'Testing...';
+      statusEl.classList.remove('connected', 'disconnected', 'not-configured');
+      statusEl.classList.add('checking');
+      statusTextEl.textContent = 'Checking...';
+      
+      try {
+        // Try to reach the upstream models endpoint
+        const testUrl = url.replace(/\/$/, '') + '/v1/models';
+        const response = await fetch(testUrl, {
+          method: 'GET',
+          headers: key ? { 'Authorization': `Bearer ${key}` } : {},
+          signal: AbortSignal.timeout(10000)
+        });
+        
+        if (response.ok) {
+          statusEl.classList.remove('checking');
+          statusEl.classList.add('connected');
+          statusTextEl.textContent = 'Connected';
+          toast('Connection successful!', 'success');
+        } else {
+          statusEl.classList.remove('checking');
+          statusEl.classList.add('disconnected');
+          statusTextEl.textContent = 'Connection failed';
+          toast(`Connection failed: HTTP ${response.status}`, 'error');
+        }
+      } catch (e) {
+        statusEl.classList.remove('checking');
+        statusEl.classList.add('disconnected');
+        statusTextEl.textContent = 'Connection failed';
+        
+        if (e.name === 'TimeoutError') {
+          toast('Connection timed out', 'error');
+        } else if (e.name === 'TypeError' && e.message.includes('Failed to fetch')) {
+          // CORS or network error - could still be valid
+          statusEl.classList.remove('disconnected');
+          statusEl.classList.add('connected');
+          statusTextEl.textContent = 'Configured (CORS blocked test)';
+          toast('Note: Direct test blocked by CORS, but config saved', 'info');
+        } else {
+          toast('Connection error: ' + e.message, 'error');
+        }
+      } finally {
+        btn.classList.remove('testing');
+        btn.disabled = false;
+        textEl.textContent = 'Test';
+      }
+    }
+
     async function saveAmpSettings() {
+      const btn = document.getElementById('btnSaveAmp');
+      const textEl = document.getElementById('saveAmpText');
+      const iconEl = document.getElementById('saveAmpIcon');
+      
+      // Set saving state
+      btn.classList.add('saving');
+      btn.disabled = true;
+      textEl.textContent = 'Saving...';
+      iconEl.innerHTML = '<circle cx="12" cy="12" r="10" stroke-dasharray="60" stroke-dashoffset="0"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/></circle>';
+      
       try {
         const u = document.getElementById('ampUpstreamUrl').value,
           k = document.getElementById('ampUpstreamKey').value;
@@ -6977,10 +7516,29 @@
         if (k) await api('PUT', '/ampcode/upstream-api-key', {
           value: k
         });
-        toast('Saved', 'success');
+        
+        // Update status
+        updateAmpConnectionStatus(u, k);
+        
+        // Show success
+        iconEl.innerHTML = '<polyline points="20 6 9 17 4 12"></polyline>';
+        textEl.textContent = 'Saved!';
+        toast('Connection settings saved', 'success');
+        
+        // Reset button after delay
+        setTimeout(() => {
+          btn.classList.remove('saving');
+          btn.disabled = false;
+          textEl.textContent = 'Save Connection';
+          iconEl.innerHTML = '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline>';
+        }, 2000);
       }
 
       catch (e) {
+        btn.classList.remove('saving');
+        btn.disabled = false;
+        textEl.textContent = 'Save Connection';
+        iconEl.innerHTML = '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline>';
         toast('Failed: ' + e.message, 'error');
       }
     }
