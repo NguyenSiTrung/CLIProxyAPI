@@ -928,6 +928,500 @@
       transform: translateY(-2px);
     }
 
+    /* Authentication Page Styles */
+    .auth-section-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+      margin-bottom: 20px;
+    }
+
+    @media (max-width: 900px) {
+      .auth-section-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .auth-card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .auth-card-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .auth-card-icon.cyan {
+      background: rgba(0, 229, 255, 0.12);
+      color: var(--accent-cyan);
+    }
+
+    .auth-card-icon.purple {
+      background: rgba(167, 139, 250, 0.12);
+      color: var(--accent-purple);
+    }
+
+    .auth-card-icon.green {
+      background: rgba(34, 211, 160, 0.12);
+      color: var(--accent-green);
+    }
+
+    .auth-card-icon svg {
+      width: 22px;
+      height: 22px;
+    }
+
+    .auth-card-title h3 {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .auth-card-title p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    /* OAuth Provider Cards */
+    .auth-oauth-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 12px;
+    }
+
+    .auth-provider-card {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 16px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .auth-provider-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent-cyan), var(--accent-purple));
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .auth-provider-card:hover {
+      border-color: var(--border-glow);
+      transform: translateY(-3px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+
+    .auth-provider-card:hover::before {
+      opacity: 1;
+    }
+
+    .auth-provider-card:focus {
+      outline: none;
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.15);
+    }
+
+    .auth-provider-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .auth-provider-card.anthropic .auth-provider-icon { background: rgba(204, 119, 85, 0.15); border-color: rgba(204, 119, 85, 0.3); }
+    .auth-provider-card.gemini .auth-provider-icon { background: rgba(66, 133, 244, 0.15); border-color: rgba(66, 133, 244, 0.3); }
+    .auth-provider-card.codex .auth-provider-icon { background: rgba(16, 163, 127, 0.15); border-color: rgba(16, 163, 127, 0.3); }
+    .auth-provider-card.antigravity .auth-provider-icon { background: rgba(167, 139, 250, 0.15); border-color: rgba(167, 139, 250, 0.3); }
+    .auth-provider-card.qwen .auth-provider-icon { background: rgba(96, 165, 250, 0.15); border-color: rgba(96, 165, 250, 0.3); }
+    .auth-provider-card.iflow .auth-provider-icon { background: rgba(34, 211, 160, 0.15); border-color: rgba(34, 211, 160, 0.3); }
+
+    .auth-provider-name {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .auth-provider-status {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .auth-provider-status .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+
+    .auth-provider-card.connected .auth-provider-status .status-dot {
+      background: var(--accent-green);
+    }
+
+    .auth-provider-card.connected .auth-provider-status {
+      color: var(--accent-green);
+    }
+
+    /* Auth Dropzone */
+    .auth-dropzone {
+      border: 2px dashed var(--border-color);
+      border-radius: var(--radius-lg);
+      padding: 40px 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      background: var(--bg-input);
+      position: relative;
+    }
+
+    .auth-dropzone:hover {
+      border-color: var(--accent-cyan);
+      background: rgba(0, 229, 255, 0.03);
+    }
+
+    .auth-dropzone.dragover {
+      border-color: var(--accent-cyan);
+      background: rgba(0, 229, 255, 0.08);
+      transform: scale(1.01);
+      box-shadow: 0 0 20px rgba(0, 229, 255, 0.15);
+    }
+
+    .auth-dropzone-icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 16px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, rgba(0, 229, 255, 0.1), rgba(167, 139, 250, 0.1));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent-cyan);
+    }
+
+    .auth-dropzone-icon svg {
+      width: 28px;
+      height: 28px;
+    }
+
+    .auth-dropzone-title {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text-primary);
+      margin-bottom: 8px;
+    }
+
+    .auth-dropzone-subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .auth-dropzone-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 20px;
+      background: rgba(0, 229, 255, 0.1);
+      border: 1px solid rgba(0, 229, 255, 0.3);
+      border-radius: var(--radius-sm);
+      color: var(--accent-cyan);
+      font-size: 13px;
+      font-weight: 500;
+      transition: all 0.2s;
+    }
+
+    .auth-dropzone:hover .auth-dropzone-btn {
+      background: rgba(0, 229, 255, 0.15);
+      border-color: var(--accent-cyan);
+    }
+
+    .auth-dropzone-formats {
+      margin-top: 16px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .auth-upload-status {
+      margin-top: 16px;
+      padding: 12px 16px;
+      border-radius: var(--radius-sm);
+      display: none;
+    }
+
+    .auth-upload-status.show {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .auth-upload-status.uploading {
+      background: rgba(0, 229, 255, 0.1);
+      border: 1px solid rgba(0, 229, 255, 0.3);
+      color: var(--accent-cyan);
+    }
+
+    .auth-upload-status.success {
+      background: rgba(34, 211, 160, 0.1);
+      border: 1px solid rgba(34, 211, 160, 0.3);
+      color: var(--accent-green);
+    }
+
+    .auth-upload-status.error {
+      background: rgba(248, 113, 113, 0.1);
+      border: 1px solid rgba(248, 113, 113, 0.3);
+      color: var(--accent-red);
+    }
+
+    .auth-upload-spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid transparent;
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Auth Files Table Enhanced */
+    .auth-table-container {
+      overflow-x: auto;
+      border-radius: var(--radius-md);
+    }
+
+    .auth-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .auth-table thead {
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .auth-table th {
+      padding: 14px 16px;
+      text-align: left;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .auth-table td {
+      padding: 16px;
+      border-bottom: 1px solid rgba(140, 140, 220, 0.15);
+      vertical-align: middle;
+    }
+
+    .auth-table tbody tr {
+      transition: all 0.2s;
+    }
+
+    .auth-table tbody tr:hover {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .auth-table tbody tr:last-child td {
+      border-bottom: none;
+    }
+
+    .auth-provider-cell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .auth-provider-badge {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      background: rgba(167, 139, 250, 0.15);
+      flex-shrink: 0;
+    }
+
+    .auth-identity-cell {
+      max-width: 200px;
+    }
+
+    .auth-identity-email {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .auth-identity-filename {
+      font-size: 11px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .auth-metrics {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .auth-metric {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .auth-metric.requests {
+      background: rgba(0, 229, 255, 0.1);
+      color: var(--accent-cyan);
+    }
+
+    .auth-metric.failed {
+      background: rgba(248, 113, 113, 0.1);
+      color: var(--accent-red);
+    }
+
+    .auth-status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+
+    .auth-status-badge.active {
+      background: rgba(34, 211, 160, 0.12);
+      color: var(--accent-green);
+    }
+
+    .auth-status-badge.expired {
+      background: rgba(248, 113, 113, 0.12);
+      color: var(--accent-red);
+    }
+
+    .auth-status-badge.expiring {
+      background: rgba(251, 191, 36, 0.12);
+      color: var(--accent-yellow);
+    }
+
+    .auth-status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .auth-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .auth-action-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      background: var(--bg-input);
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+
+    .auth-action-btn:hover {
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+      background: rgba(0, 229, 255, 0.1);
+    }
+
+    .auth-action-btn.danger:hover {
+      border-color: var(--accent-red);
+      color: var(--accent-red);
+      background: rgba(248, 113, 113, 0.1);
+    }
+
+    .auth-action-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .auth-table-empty {
+      padding: 48px 24px;
+      text-align: center;
+    }
+
+    .auth-table-empty-icon {
+      width: 64px;
+      height: 64px;
+      margin: 0 auto 16px;
+      border-radius: 50%;
+      background: rgba(140, 140, 220, 0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+    }
+
+    .auth-table-empty-icon svg {
+      width: 28px;
+      height: 28px;
+    }
+
+    .auth-table-empty h4 {
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .auth-table-empty p {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
     .code-editor {
       width: 100%;
       min-height: 400px;
@@ -2224,6 +2718,85 @@
       .stats-grid {
         grid-template-columns: 1fr 1fr;
       }
+
+      /* Auth page mobile styles */
+      .auth-section-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .auth-oauth-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .auth-provider-card {
+        padding: 16px 12px;
+      }
+
+      .auth-provider-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 20px;
+      }
+
+      .auth-dropzone {
+        padding: 30px 16px;
+      }
+
+      .auth-table-container {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .auth-table {
+        min-width: 700px;
+      }
+
+      .auth-action-btn {
+        width: 28px;
+        height: 28px;
+      }
+
+      .auth-card-header {
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .auth-oauth-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .auth-provider-card {
+        flex-direction: row;
+        padding: 14px 16px;
+        gap: 14px;
+      }
+
+      .auth-provider-icon {
+        width: 36px;
+        height: 36px;
+        font-size: 18px;
+      }
+
+      .auth-provider-name {
+        font-size: 13px;
+      }
+
+      .auth-provider-status {
+        display: none;
+      }
+
+      .card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+      }
+
+      .auth-dropzone-btn {
+        padding: 8px 16px;
+        font-size: 12px;
+      }
     }
 
     /* Amp Page Styles */
@@ -2726,62 +3299,164 @@
       <div id="page-auth" class="page">
         <div class="page-header">
           <h1 class="page-title">Authentication</h1>
-          <p class="page-subtitle">Manage OAuth logins and auth files</p>
+          <p class="page-subtitle">Manage OAuth connections, auth files, and credentials</p>
         </div>
+
+        <!-- OAuth and Upload Grid -->
+        <div class="auth-section-grid">
+          <!-- OAuth Login Card -->
+          <div class="card">
+            <div class="auth-card-header">
+              <div class="auth-card-icon purple">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+                  <polyline points="10 17 15 12 10 7"/>
+                  <line x1="15" y1="12" x2="3" y2="12"/>
+                </svg>
+              </div>
+              <div class="auth-card-title">
+                <h3>OAuth Login</h3>
+                <p>Connect providers via OAuth authentication</p>
+              </div>
+            </div>
+            <div class="auth-oauth-grid">
+              <button class="auth-provider-card anthropic" onclick="startOAuth('anthropic')" aria-label="Connect Anthropic via OAuth">
+                <div class="auth-provider-icon">🤖</div>
+                <span class="auth-provider-name">Anthropic</span>
+                <span class="auth-provider-status"><span class="status-dot"></span>Click to connect</span>
+              </button>
+              <button class="auth-provider-card gemini" onclick="startOAuth('gemini-cli')" aria-label="Connect Gemini CLI via OAuth">
+                <div class="auth-provider-icon">✨</div>
+                <span class="auth-provider-name">Gemini CLI</span>
+                <span class="auth-provider-status"><span class="status-dot"></span>Click to connect</span>
+              </button>
+              <button class="auth-provider-card codex" onclick="startOAuth('codex')" aria-label="Connect Codex via OAuth">
+                <div class="auth-provider-icon">🧠</div>
+                <span class="auth-provider-name">Codex</span>
+                <span class="auth-provider-status"><span class="status-dot"></span>Click to connect</span>
+              </button>
+              <button class="auth-provider-card antigravity" onclick="startOAuth('antigravity')" aria-label="Connect Antigravity via OAuth">
+                <div class="auth-provider-icon">🚀</div>
+                <span class="auth-provider-name">Antigravity</span>
+                <span class="auth-provider-status"><span class="status-dot"></span>Click to connect</span>
+              </button>
+              <button class="auth-provider-card qwen" onclick="startOAuth('qwen')" aria-label="Connect Qwen via OAuth">
+                <div class="auth-provider-icon">💬</div>
+                <span class="auth-provider-name">Qwen</span>
+                <span class="auth-provider-status"><span class="status-dot"></span>Click to connect</span>
+              </button>
+              <button class="auth-provider-card iflow" onclick="startOAuth('iflow')" aria-label="Connect IFlow via OAuth">
+                <div class="auth-provider-icon">🌊</div>
+                <span class="auth-provider-name">IFlow</span>
+                <span class="auth-provider-status"><span class="status-dot"></span>Click to connect</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Upload Auth File Card -->
+          <div class="card">
+            <div class="auth-card-header">
+              <div class="auth-card-icon cyan">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+              </div>
+              <div class="auth-card-title">
+                <h3>Upload Auth File</h3>
+                <p>Import JSON credentials for CLI providers</p>
+              </div>
+            </div>
+            <div id="uploadDropzone" class="auth-dropzone" role="button" tabindex="0" aria-label="Upload auth JSON file"
+              onclick="document.getElementById('authFileInput').click()"
+              onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('authFileInput').click();}"
+              ondragover="event.preventDefault();this.classList.add('dragover');"
+              ondragleave="this.classList.remove('dragover');"
+              ondrop="this.classList.remove('dragover');handleFileDrop(event)">
+              <div class="auth-dropzone-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+              </div>
+              <div class="auth-dropzone-title">Drop auth file here</div>
+              <div class="auth-dropzone-subtitle">or click to browse your files</div>
+              <div class="auth-dropzone-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                </svg>
+                Choose File
+              </div>
+              <div class="auth-dropzone-formats">Supports: claude.json, gemini.json, codex.json, etc.</div>
+              <input type="file" id="authFileInput" accept=".json" style="display:none" onchange="handleFileSelect(this.files[0])">
+            </div>
+            <div id="uploadStatus" class="auth-upload-status" role="status" aria-live="polite"></div>
+          </div>
+        </div>
+
+        <!-- Auth Files Table Card -->
         <div class="card">
           <div class="card-header">
-            <h3 class="card-title">OAuth Login</h3>
+            <div class="auth-card-header" style="margin-bottom:0">
+              <div class="auth-card-icon green">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                  <line x1="16" y1="13" x2="8" y2="13"/>
+                  <line x1="16" y1="17" x2="8" y2="17"/>
+                  <polyline points="10 9 9 9 8 9"/>
+                </svg>
+              </div>
+              <div class="auth-card-title">
+                <h3>Auth Files</h3>
+                <p>Manage your OAuth tokens and uploaded credentials</p>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-secondary btn-sm" onclick="loadAuthFiles()" title="Refresh auth files">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                  <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                </svg>
+                Refresh
+              </button>
+              <button class="btn btn-danger btn-sm" onclick="deleteAllAuthFiles()" title="Delete all auth files">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                </svg>
+                Delete All
+              </button>
+            </div>
           </div>
-          <div class="oauth-grid"><button class="oauth-btn" onclick="startOAuth('anthropic')"><span
-                style="font-size:20px">🤖</span>Anthropic</button><button class="oauth-btn"
-              onclick="startOAuth('gemini-cli')"><span style="font-size:20px">✨</span>Gemini CLI</button><button
-              class="oauth-btn" onclick="startOAuth('codex')"><span
-                style="font-size:20px">🧠</span>Codex</button><button class="oauth-btn"
-              onclick="startOAuth('antigravity')"><span style="font-size:20px">🚀</span>Antigravity</button><button
-              class="oauth-btn" onclick="startOAuth('qwen')"><span style="font-size:20px">💬</span>Qwen</button><button
-              class="oauth-btn" onclick="startOAuth('iflow')"><span style="font-size:20px">🌊</span>IFlow</button></div>
-        </div>
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">Upload Auth File</h3>
-          </div>
-          <div id="uploadDropzone"
-            style="border: 2px dashed var(--border-color); border-radius: var(--radius-md); padding: 40px; text-align: center; cursor: pointer; transition: all 0.2s;"
-            onclick="document.getElementById('authFileInput').click()"
-            ondragover="event.preventDefault(); this.style.borderColor='var(--accent-cyan)'; this.style.background='rgba(0,212,255,0.05)';"
-            ondragleave="this.style.borderColor='var(--border-color)'; this.style.background='transparent';"
-            ondrop="handleFileDrop(event)">
-            <div style="font-size: 40px; margin-bottom: 12px;">📁</div>
-            <p style="color: var(--text-secondary); margin-bottom: 8px;">Drop auth file here or click to upload</p>
-            <p style="color: var(--text-muted); font-size: 12px;">Supports JSON auth files (claude.json, gemini.json,
-              etc.)</p><input type="file" id="authFileInput" accept=".json" style="display:none"
-              onchange="handleFileSelect(this.files[0])">
-          </div>
-          <div id="uploadStatus" style="margin-top: 12px; display: none;"></div>
-        </div>
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">Auth Files</h3>
-            <div style="display:flex;gap:8px"><button class="btn btn-secondary btn-sm"
-                onclick="loadAuthFiles()">Refresh</button><button class="btn btn-danger btn-sm"
-                onclick="deleteAllAuthFiles()">Delete All</button></div>
-          </div>
-          <div class="table-container">
-            <table>
+          <div class="auth-table-container">
+            <table class="auth-table">
               <thead>
                 <tr>
                   <th>Provider</th>
-                  <th>Email / Filename</th>
+                  <th>Identity</th>
                   <th>Project / Region</th>
                   <th>Last Refresh</th>
-                  <th>Requests / Failed</th>
+                  <th>Usage</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
               </thead>
               <tbody id="authFilesTable">
                 <tr>
-                  <td colspan="7" class="empty-state">Loading...</td>
+                  <td colspan="7">
+                    <div class="auth-table-empty">
+                      <div class="auth-table-empty-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
+                      </div>
+                      <h4>Loading auth files...</h4>
+                      <p>Please wait while we fetch your credentials</p>
+                    </div>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -4889,11 +5564,21 @@
         const tbody = document.getElementById('authFilesTable');
 
         if (!d.files?.length) {
-          tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No auth files</td></tr>';
+          tbody.innerHTML = `<tr><td colspan="7">
+            <div class="auth-table-empty">
+              <div class="auth-table-empty-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                  <polyline points="14 2 14 8 20 8"/>
+                </svg>
+              </div>
+              <h4>No auth files yet</h4>
+              <p>Connect via OAuth or upload an auth file to get started</p>
+            </div>
+          </td></tr>`;
           return;
         }
 
-        // Build a map of auth_index to stats by aggregating from all usage details
         const statsByAuthIndex = {};
         Object.values(usageApis).forEach(apiStats => {
           if (apiStats.models) {
@@ -4916,20 +5601,27 @@
           }
         });
 
+        const providerEmojis = {
+          'anthropic': '🤖', 'claude': '🤖',
+          'gemini': '✨', 'gemini-cli': '✨',
+          'codex': '🧠', 'openai': '🧠',
+          'antigravity': '🚀',
+          'qwen': '💬',
+          'iflow': '🌊'
+        };
+
         tbody.innerHTML = d.files.map(f => {
           const provider = f.provider || f.type || 'unknown';
           const email = f.email || '-';
           const filename = f.name || '-';
           const project = f.project || f.project_id || '-';
           const region = f.region || '-';
+          const emoji = providerEmojis[provider.toLowerCase()] || '🔑';
 
-          // Try to find stats using multiple lookup strategies:
-          // 1. Direct lookup by various identifiable fields
           let stats = usageApis[f.id] || usageApis[f.name] || usageApis[f.email] || usageApis[f.account] || usageApis[project] || {};
           let requests = stats.total_requests || 0;
           let failed = 0;
 
-          // 2. If direct lookup found stats, count failed requests from details
           if (stats.models) {
             Object.values(stats.models).forEach(m => {
               if (m.details) {
@@ -4940,32 +5632,79 @@
             });
           }
 
-          // 3. Also check by auth_index if available
           const authIndex = f.auth_index;
           if (authIndex !== undefined && authIndex !== null && statsByAuthIndex[authIndex]) {
-            // Use auth_index based stats, which may be more accurate
             requests = statsByAuthIndex[authIndex].requests;
             failed = statsByAuthIndex[authIndex].failed;
           }
 
           const projectRegion = project !== '-' ? `${project}${region !== '-' ? ' / ' + region : ''}` : (region !== '-' ? region : '-');
-          // Format last refresh
+          
           let lastRefresh = '-';
           const lr = f.last_refresh || f.lastRefresh || f.last_refreshed_at || f.lastRefreshedAt;
-
           if (lr) {
             const date = new Date(lr);
-
             if (!isNaN(date)) {
               lastRefresh = date.toLocaleString();
-            }
-
-            else {
+            } else {
               lastRefresh = lr;
             }
           }
 
-          return `<tr> <td><span class="badge badge-purple">${provider}</span></td> <td><div style="font-size:13px">${email}</div><div style="font-size:11px;color:var(--text-muted)">${filename}</div></td> <td style="font-size:13px">${projectRegion}</td> <td><span style="font-size:12px;color:var(--text-secondary)">${lastRefresh}</span></td> <td><div style="display:flex;gap:6px"><span class="badge badge-cyan" title="Total Requests">${requests.toLocaleString()}</span>${failed > 0 ? `<span class="badge badge-red" title="Failed Requests">${failed.toLocaleString()}</span>` : ''}</div></td> <td><span class="badge ${f.expired ? 'badge-red' : 'badge-green'}">${f.expired ? 'Expired' : 'Active'}</span></td> <td> <button class="btn btn-secondary btn-sm" onclick="viewAuthFile('${f.name}')" title="View">👁</button> <button class="btn btn-secondary btn-sm" onclick="downloadAuth('${f.name}')" title="Download">↓</button> <button class="btn btn-danger btn-sm" onclick="deleteAuth('${f.name}')" title="Delete">×</button> </td> </tr>`;
+          const statusClass = f.expired ? 'expired' : 'active';
+          const statusText = f.expired ? 'Expired' : 'Active';
+
+          return `<tr>
+            <td>
+              <div class="auth-provider-cell">
+                <div class="auth-provider-badge">${emoji}</div>
+                <span style="font-weight:500;text-transform:capitalize">${provider}</span>
+              </div>
+            </td>
+            <td>
+              <div class="auth-identity-cell">
+                <div class="auth-identity-email" title="${email}">${email}</div>
+                <div class="auth-identity-filename" title="${filename}">${filename}</div>
+              </div>
+            </td>
+            <td style="font-size:13px;color:var(--text-secondary)">${projectRegion}</td>
+            <td style="font-size:12px;color:var(--text-muted)">${lastRefresh}</td>
+            <td>
+              <div class="auth-metrics">
+                <span class="auth-metric requests" title="Total Requests">${requests.toLocaleString()}</span>
+                ${failed > 0 ? `<span class="auth-metric failed" title="Failed Requests">${failed.toLocaleString()}</span>` : ''}
+              </div>
+            </td>
+            <td>
+              <span class="auth-status-badge ${statusClass}">
+                <span class="auth-status-dot"></span>
+                ${statusText}
+              </span>
+            </td>
+            <td>
+              <div class="auth-actions">
+                <button class="auth-action-btn" onclick="viewAuthFile('${f.name}')" title="View contents">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                    <circle cx="12" cy="12" r="3"/>
+                  </svg>
+                </button>
+                <button class="auth-action-btn" onclick="downloadAuth('${f.name}')" title="Download">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="7 10 12 15 17 10"/>
+                    <line x1="12" y1="15" x2="12" y2="3"/>
+                  </svg>
+                </button>
+                <button class="auth-action-btn danger" onclick="deleteAuth('${f.name}')" title="Delete">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  </svg>
+                </button>
+              </div>
+            </td>
+          </tr>`;
         }).join('');
       }
 
@@ -5049,23 +5788,42 @@
       }
 
       const status = document.getElementById('uploadStatus');
-      status.style.display = 'block';
-
-      status.innerHTML = `<p style="color:var(--accent-cyan)">⏳ Uploading ${file.name}...</p>`;
+      status.className = 'auth-upload-status show uploading';
+      status.innerHTML = `
+        <div class="auth-upload-spinner"></div>
+        <span>Uploading ${file.name}...</span>
+      `;
 
       try {
         await uploadAuthFile(file);
 
-        status.innerHTML = `<p style="color:var(--accent-green)">✓ ${file.name} uploaded successfully !</p>`;
+        status.className = 'auth-upload-status show success';
+        status.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+            <polyline points="22 4 12 14.01 9 11.01"/>
+          </svg>
+          <span>${file.name} uploaded successfully!</span>
+        `;
         toast('Auth file uploaded', 'success');
         loadAuthFiles();
-        // Reset file input
         document.getElementById('authFileInput').value = '';
-        setTimeout(() => status.style.display = 'none', 3000);
+        setTimeout(() => {
+          status.className = 'auth-upload-status';
+          status.innerHTML = '';
+        }, 4000);
       }
 
       catch (e) {
-        status.innerHTML = `<p style="color:var(--accent-red)">✗ Failed: ${e.message}</p>`;
+        status.className = 'auth-upload-status show error';
+        status.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="15" y1="9" x2="9" y2="15"/>
+            <line x1="9" y1="9" x2="15" y2="15"/>
+          </svg>
+          <span>Failed: ${e.message}</span>
+        `;
         toast('Upload failed: ' + e.message, 'error');
       }
     }
