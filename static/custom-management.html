@@ -2744,6 +2744,284 @@
       transform: translateX(24px);
     }
 
+    /* Toggle Loading State */
+    .toggle-enhanced.loading {
+      pointer-events: none;
+      opacity: 0.7;
+    }
+
+    .toggle-enhanced.loading .toggle-enhanced-slider::after {
+      content: '';
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      left: 6px;
+      top: 6px;
+      border: 2px solid transparent;
+      border-top-color: var(--accent-cyan);
+      border-radius: 50%;
+      animation: toggle-spin 0.6s linear infinite;
+    }
+
+    .toggle-enhanced.loading input:checked+.toggle-enhanced-slider::after {
+      left: auto;
+      right: 6px;
+    }
+
+    @keyframes toggle-spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Toggle Success Flash */
+    .toggle-enhanced.success .toggle-enhanced-slider {
+      animation: toggle-success 0.4s ease-out;
+    }
+
+    @keyframes toggle-success {
+      0%, 100% { box-shadow: none; }
+      50% { box-shadow: 0 0 20px rgba(34, 211, 160, 0.5); }
+    }
+
+    /* Config Setting Item Hover Enhancement */
+    .config-setting-item {
+      position: relative;
+    }
+
+    .config-setting-item::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: transparent;
+      transition: background 0.2s;
+    }
+
+    .config-setting-item:hover::after {
+      background: var(--accent-cyan);
+    }
+
+    /* Config Setting Status Indicator */
+    .config-setting-status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .setting-status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      transition: all 0.2s;
+    }
+
+    .setting-status-dot.enabled {
+      background: var(--accent-green);
+      box-shadow: 0 0 8px rgba(34, 211, 160, 0.4);
+    }
+
+    /* Config Editor Toolbar */
+    .config-editor-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      background: rgba(10, 10, 25, 0.6);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .config-editor-info {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .config-editor-info span {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .config-editor-info svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .config-unsaved-indicator {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: rgba(251, 191, 36, 0.15);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      border-radius: 20px;
+      font-size: 11px;
+      color: var(--accent-yellow);
+      animation: pulse-glow 2s ease-in-out infinite;
+    }
+
+    .config-unsaved-indicator.visible {
+      display: flex;
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    .config-unsaved-indicator svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    /* Config Action Buttons */
+    .config-actions {
+      display: flex;
+      gap: 8px;
+      margin-left: auto;
+    }
+
+    .btn-config-action {
+      padding: 8px 14px;
+      font-size: 12px;
+      border-radius: 6px;
+      border: 1px solid var(--border-color);
+      background: rgba(255, 255, 255, 0.03);
+      color: var(--text-secondary);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-config-action:hover {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: var(--accent-cyan);
+      color: var(--text-primary);
+    }
+
+    .btn-config-action svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .btn-config-action.saving {
+      pointer-events: none;
+      opacity: 0.7;
+    }
+
+    .btn-config-action.saving svg {
+      animation: toggle-spin 0.6s linear infinite;
+    }
+
+    /* YAML Validation Error */
+    .yaml-error-banner {
+      display: none;
+      padding: 12px 16px;
+      background: rgba(248, 113, 113, 0.1);
+      border: 1px solid rgba(248, 113, 113, 0.3);
+      border-radius: 8px;
+      margin: 12px 16px 0;
+      font-size: 13px;
+      color: var(--accent-red);
+    }
+
+    .yaml-error-banner.visible {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .yaml-error-banner svg {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .yaml-error-banner .error-details {
+      flex: 1;
+    }
+
+    .yaml-error-banner .error-title {
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .yaml-error-banner .error-message {
+      font-family: 'Monaco', 'Menlo', monospace;
+      font-size: 12px;
+      opacity: 0.9;
+    }
+
+    /* Config Section Quick Status */
+    .config-section-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: rgba(34, 211, 160, 0.1);
+      border-radius: 20px;
+      font-size: 11px;
+      color: var(--accent-green);
+      margin-left: auto;
+    }
+
+    .config-section-status svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    /* Tooltip styles */
+    .config-tooltip {
+      position: relative;
+      cursor: help;
+    }
+
+    .config-tooltip::before {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 12px;
+      background: rgba(20, 20, 40, 0.95);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.2s;
+      z-index: 100;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .config-tooltip::after {
+      content: '';
+      position: absolute;
+      bottom: calc(100% + 2px);
+      left: 50%;
+      transform: translateX(-50%);
+      border: 6px solid transparent;
+      border-top-color: rgba(20, 20, 40, 0.95);
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.2s;
+    }
+
+    .config-tooltip:hover::before,
+    .config-tooltip:hover::after {
+      opacity: 1;
+      visibility: visible;
+    }
+
     /* Config Editor Section */
     .config-editor-section {
       background: var(--bg-card);
@@ -3721,25 +3999,32 @@
                 <h3>General Settings</h3>
                 <p>Core system toggles</p>
               </div>
+              <div class="config-section-status" id="settingsStatus" style="display:none">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+                <span>Saved</span>
+              </div>
             </div>
             <div class="config-settings-list">
-              <div class="config-setting-item">
+              <div class="config-setting-item" data-setting="debug">
                 <div class="config-setting-info">
                   <div class="config-setting-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                       fill="none" stroke="currentColor" stroke-width="2">
-                      <line x1="12" y1="23" x2="12" y2="10"></line>
-                      <line x1="18" y1="20" x2="18" y2="4"></line>
-                      <line x1="6" y1="20" x2="6" y2="16"></line>
-                      <rect x="3" y="2" width="18" height="2" rx="1"></rect>
+                      <path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
                     </svg></div>
                   <div class="config-setting-text">
                     <h4>Debug Mode</h4>
-                    <p>Enable verbose logging</p>
+                    <p>Enable verbose logging for troubleshooting</p>
                   </div>
-                </div><label class="toggle-enhanced"><input type="checkbox" id="toggleDebug"
-                    onchange="toggleSetting('debug', this.checked)"><span class="toggle-enhanced-slider"></span></label>
+                </div>
+                <div class="config-setting-status">
+                  <span class="setting-status-dot" id="statusDebug"></span>
+                  <label class="toggle-enhanced" id="toggleDebugLabel"><input type="checkbox" id="toggleDebug"
+                    onchange="toggleSettingEnhanced('debug', this.checked, this)"><span class="toggle-enhanced-slider"></span></label>
+                </div>
               </div>
-              <div class="config-setting-item">
+              <div class="config-setting-item" data-setting="usage-statistics-enabled">
                 <div class="config-setting-info">
                   <div class="config-setting-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                       fill="none" stroke="currentColor" stroke-width="2">
@@ -3747,13 +4032,17 @@
                     </svg></div>
                   <div class="config-setting-text">
                     <h4>Usage Statistics</h4>
-                    <p>Track request metrics</p>
+                    <p>Track request counts and token metrics</p>
                   </div>
-                </div><label class="toggle-enhanced"><input type="checkbox" id="toggleUsageStats"
-                    onchange="toggleSetting('usage-statistics-enabled', this.checked)"><span
+                </div>
+                <div class="config-setting-status">
+                  <span class="setting-status-dot" id="statusUsageStats"></span>
+                  <label class="toggle-enhanced" id="toggleUsageStatsLabel"><input type="checkbox" id="toggleUsageStats"
+                    onchange="toggleSettingEnhanced('usage-statistics-enabled', this.checked, this)"><span
                     class="toggle-enhanced-slider"></span></label>
+                </div>
               </div>
-              <div class="config-setting-item">
+              <div class="config-setting-item" data-setting="logging-to-file">
                 <div class="config-setting-info">
                   <div class="config-setting-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                       fill="none" stroke="currentColor" stroke-width="2">
@@ -3761,47 +4050,58 @@
                       <polyline points="14 2 14 8 20 8"></polyline>
                       <line x1="16" y1="13" x2="8" y2="13"></line>
                       <line x1="16" y1="17" x2="8" y2="17"></line>
-                      <polyline points="10 9 9 9 8 9"></polyline>
                     </svg></div>
                   <div class="config-setting-text">
                     <h4>Logging to File</h4>
-                    <p>Write logs to disk</p>
+                    <p>Persist logs to disk for later analysis</p>
                   </div>
-                </div><label class="toggle-enhanced"><input type="checkbox" id="toggleLogging"
-                    onchange="toggleSetting('logging-to-file', this.checked)"><span
+                </div>
+                <div class="config-setting-status">
+                  <span class="setting-status-dot" id="statusLogging"></span>
+                  <label class="toggle-enhanced" id="toggleLoggingLabel"><input type="checkbox" id="toggleLogging"
+                    onchange="toggleSettingEnhanced('logging-to-file', this.checked, this)"><span
                     class="toggle-enhanced-slider"></span></label>
+                </div>
               </div>
-              <div class="config-setting-item">
+              <div class="config-setting-item" data-setting="request-log">
                 <div class="config-setting-info">
                   <div class="config-setting-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                       fill="none" stroke="currentColor" stroke-width="2">
-                      <circle cx="12" cy="12" r="10"></circle>
-                      <line x1="12" y1="8" x2="12" y2="12"></line>
-                      <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                      <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                      <path d="M3 3v5h5"></path>
+                      <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
+                      <path d="M16 21h5v-5"></path>
                     </svg></div>
                   <div class="config-setting-text">
                     <h4>Request Log</h4>
-                    <p>Log all request details</p>
+                    <p>Log detailed request/response information</p>
                   </div>
-                </div><label class="toggle-enhanced"><input type="checkbox" id="toggleRequestLog"
-                    onchange="toggleSetting('request-log', this.checked)"><span
+                </div>
+                <div class="config-setting-status">
+                  <span class="setting-status-dot" id="statusRequestLog"></span>
+                  <label class="toggle-enhanced" id="toggleRequestLogLabel"><input type="checkbox" id="toggleRequestLog"
+                    onchange="toggleSettingEnhanced('request-log', this.checked, this)"><span
                     class="toggle-enhanced-slider"></span></label>
+                </div>
               </div>
-              <div class="config-setting-item">
+              <div class="config-setting-item" data-setting="ws-auth">
                 <div class="config-setting-info">
                   <div class="config-setting-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
                       fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M12 2a10 10 0 0 1 10 10 10 10 0 0 1-10 10 10 10 0 0 1-10-10 10 10 0 0 1 10-10z"></path>
-                      <path d="M12 16v-4"></path>
-                      <path d="M12 8h.01"></path>
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                     </svg></div>
                   <div class="config-setting-text">
                     <h4>WebSocket Auth</h4>
-                    <p>Require auth for WS</p>
+                    <p>Require authentication for WebSocket connections</p>
                   </div>
-                </div><label class="toggle-enhanced"><input type="checkbox" id="toggleWsAuth"
-                    onchange="toggleSetting('ws-auth', this.checked)"><span
+                </div>
+                <div class="config-setting-status">
+                  <span class="setting-status-dot" id="statusWsAuth"></span>
+                  <label class="toggle-enhanced" id="toggleWsAuthLabel"><input type="checkbox" id="toggleWsAuth"
+                    onchange="toggleSettingEnhanced('ws-auth', this.checked, this)"><span
                     class="toggle-enhanced-slider"></span></label>
+                </div>
               </div>
             </div>
           </div>
@@ -3815,17 +4115,71 @@
                   </svg></div>
                 <div>
                   <h3>Advanced Configuration</h3>
-                  <p>Edit full YAML configuration</p>
+                  <p>Edit full YAML configuration <span class="config-tooltip" data-tooltip="Press Ctrl+S to save">ⓘ</span></p>
                 </div>
-              </div><button class="btn-save-config" onclick="saveConfig()"><svg xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                  <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                  <polyline points="7 3 7 8 15 8"></polyline>
-                </svg>Save </button>
+              </div>
+              <div class="config-unsaved-indicator" id="configUnsavedIndicator">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="8" x2="12" y2="12"></line>
+                  <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                </svg>
+                <span>Unsaved changes</span>
+              </div>
+              <div class="config-actions">
+                <button class="btn-config-action" onclick="reloadConfig()" title="Reload configuration from server">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                    <path d="M3 3v5h5"></path>
+                    <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
+                    <path d="M16 21h5v-5"></path>
+                  </svg>
+                  Reset
+                </button>
+                <button class="btn-save-config" id="btnSaveConfig" onclick="saveConfigEnhanced()">
+                  <svg xmlns="http://www.w3.org/2000/svg" id="saveConfigIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                  </svg>
+                  <span id="saveConfigText">Save</span>
+                </button>
+              </div>
+            </div>
+            <div class="yaml-error-banner" id="yamlErrorBanner">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="15" y1="9" x2="9" y2="15"></line>
+                <line x1="9" y1="9" x2="15" y2="15"></line>
+              </svg>
+              <div class="error-details">
+                <div class="error-title">Invalid YAML syntax</div>
+                <div class="error-message" id="yamlErrorMessage"></div>
+              </div>
+            </div>
+            <div class="config-editor-toolbar">
+              <div class="config-editor-info">
+                <span id="configLineCount">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="17" y1="10" x2="3" y2="10"></line>
+                    <line x1="21" y1="6" x2="3" y2="6"></line>
+                    <line x1="21" y1="14" x2="3" y2="14"></line>
+                    <line x1="17" y1="18" x2="3" y2="18"></line>
+                  </svg>
+                  0 lines
+                </span>
+                <span id="configCharCount">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="4 7 4 4 20 4 20 7"></polyline>
+                    <line x1="9" y1="20" x2="15" y2="20"></line>
+                    <line x1="12" y1="4" x2="12" y2="20"></line>
+                  </svg>
+                  0 chars
+                </span>
+              </div>
             </div>
             <div class="config-editor-content"><textarea id="configEditor" class="code-editor"
-                placeholder="Loading config..." style="height: 100%; min-height: 480px;"></textarea></div>
+                placeholder="Loading config..." style="height: 100%; min-height: 440px;" oninput="onConfigEditorInput()"></textarea></div>
           </div>
         </div>
       </div>
@@ -6228,53 +6582,313 @@
       document.getElementById('modal').classList.remove('active');
     }
 
+    // Configuration state management
+    let configState = {
+      originalYaml: '',
+      hasUnsavedChanges: false
+    };
+
     async function loadConfig() {
       try {
-        const [cfg,
-          yaml] = await Promise.all([api('GET', '/config'), api('GET', '/config.yaml')]);
-        document.getElementById('toggleDebug').checked = cfg.debug || false;
-        document.getElementById('toggleUsageStats').checked = cfg.usage_statistics_enabled || cfg['usage-statistics-enabled'] || false;
-        document.getElementById('toggleLogging').checked = cfg.logging_to_file || cfg['logging-to-file'] || false;
-        document.getElementById('toggleRequestLog').checked = cfg.request_log || cfg['request-log'] || false;
-        document.getElementById('toggleWsAuth').checked = cfg.websocket_auth || cfg['websocket-auth'] || false;
+        const [cfg, yaml] = await Promise.all([api('GET', '/config'), api('GET', '/config.yaml')]);
+        
+        // Set toggle states and update status dots
+        const debugChecked = cfg.debug || false;
+        const usageStatsChecked = cfg.usage_statistics_enabled || cfg['usage-statistics-enabled'] || false;
+        const loggingChecked = cfg.logging_to_file || cfg['logging-to-file'] || false;
+        const requestLogChecked = cfg.request_log || cfg['request-log'] || false;
+        const wsAuthChecked = cfg.websocket_auth || cfg['websocket-auth'] || false;
+        
+        document.getElementById('toggleDebug').checked = debugChecked;
+        document.getElementById('toggleUsageStats').checked = usageStatsChecked;
+        document.getElementById('toggleLogging').checked = loggingChecked;
+        document.getElementById('toggleRequestLog').checked = requestLogChecked;
+        document.getElementById('toggleWsAuth').checked = wsAuthChecked;
+        
+        // Update status dots
+        updateStatusDot('statusDebug', debugChecked);
+        updateStatusDot('statusUsageStats', usageStatsChecked);
+        updateStatusDot('statusLogging', loggingChecked);
+        updateStatusDot('statusRequestLog', requestLogChecked);
+        updateStatusDot('statusWsAuth', wsAuthChecked);
+        
+        // Set YAML editor
         document.getElementById('configEditor').value = yaml;
-      }
-
-      catch (e) {
-        toast('Failed: ' + e.message, 'error');
-      }
-    }
-
-    async function toggleSetting(s, v) {
-      try {
-        await api('PUT', `/${s}`, {
-          value: v
-        });
-
-        toast(`${s} updated`, 'success');
-      }
-
-      catch (e) {
-        toast('Failed: ' + e.message, 'error');
+        configState.originalYaml = yaml;
+        configState.hasUnsavedChanges = false;
+        updateConfigEditorInfo();
+        hideUnsavedIndicator();
+        hideYamlError();
+      } catch (e) {
+        toast('Failed to load config: ' + e.message, 'error');
       }
     }
-
-    async function saveConfig() {
+    
+    function updateStatusDot(id, enabled) {
+      const dot = document.getElementById(id);
+      if (dot) {
+        dot.classList.toggle('enabled', enabled);
+      }
+    }
+    
+    function updateConfigEditorInfo() {
+      const editor = document.getElementById('configEditor');
+      if (!editor) return;
+      
+      const content = editor.value;
+      const lines = content.split('\n').length;
+      const chars = content.length;
+      
+      const lineCountEl = document.getElementById('configLineCount');
+      const charCountEl = document.getElementById('configCharCount');
+      
+      if (lineCountEl) {
+        lineCountEl.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="17" y1="10" x2="3" y2="10"></line>
+            <line x1="21" y1="6" x2="3" y2="6"></line>
+            <line x1="21" y1="14" x2="3" y2="14"></line>
+            <line x1="17" y1="18" x2="3" y2="18"></line>
+          </svg>
+          ${lines} lines`;
+      }
+      
+      if (charCountEl) {
+        charCountEl.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="4 7 4 4 20 4 20 7"></polyline>
+            <line x1="9" y1="20" x2="15" y2="20"></line>
+            <line x1="12" y1="4" x2="12" y2="20"></line>
+          </svg>
+          ${chars.toLocaleString()} chars`;
+      }
+    }
+    
+    function onConfigEditorInput() {
+      const editor = document.getElementById('configEditor');
+      if (!editor) return;
+      
+      updateConfigEditorInfo();
+      
+      // Check for unsaved changes
+      if (editor.value !== configState.originalYaml) {
+        configState.hasUnsavedChanges = true;
+        showUnsavedIndicator();
+      } else {
+        configState.hasUnsavedChanges = false;
+        hideUnsavedIndicator();
+      }
+      
+      // Validate YAML on input (debounced)
+      clearTimeout(configState.validateTimeout);
+      configState.validateTimeout = setTimeout(() => {
+        validateYaml(editor.value);
+      }, 500);
+    }
+    
+    function showUnsavedIndicator() {
+      const indicator = document.getElementById('configUnsavedIndicator');
+      if (indicator) indicator.classList.add('visible');
+    }
+    
+    function hideUnsavedIndicator() {
+      const indicator = document.getElementById('configUnsavedIndicator');
+      if (indicator) indicator.classList.remove('visible');
+    }
+    
+    function validateYaml(content) {
+      // Basic YAML validation
       try {
-        await fetch('/v0/management/config.yaml', {
-          method: 'PUT', headers: {
-            'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/yaml'
+        // Check for common YAML syntax errors
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          // Check for tabs (YAML uses spaces)
+          if (line.includes('\t')) {
+            showYamlError(`Line ${i + 1}: Tab characters are not allowed in YAML. Use spaces for indentation.`);
+            return false;
           }
-
-          , body: document.getElementById('configEditor').value
-        });
-        toast('Saved', 'success');
+          // Check for inconsistent indentation
+          const leadingSpaces = line.match(/^(\s*)/)[1].length;
+          if (leadingSpaces % 2 !== 0 && line.trim().length > 0) {
+            showYamlError(`Line ${i + 1}: Indentation should use 2 spaces.`);
+            return false;
+          }
+        }
+        hideYamlError();
+        return true;
+      } catch (e) {
+        showYamlError(e.message);
+        return false;
       }
-
-      catch (e) {
+    }
+    
+    function showYamlError(message) {
+      const banner = document.getElementById('yamlErrorBanner');
+      const msgEl = document.getElementById('yamlErrorMessage');
+      if (banner && msgEl) {
+        msgEl.textContent = message;
+        banner.classList.add('visible');
+      }
+    }
+    
+    function hideYamlError() {
+      const banner = document.getElementById('yamlErrorBanner');
+      if (banner) banner.classList.remove('visible');
+    }
+    
+    async function reloadConfig() {
+      if (configState.hasUnsavedChanges) {
+        if (!confirm('You have unsaved changes. Reload and discard them?')) {
+          return;
+        }
+      }
+      toast('Reloading configuration...', 'info');
+      await loadConfig();
+      toast('Configuration reloaded', 'success');
+    }
+    
+    async function toggleSettingEnhanced(setting, value, inputEl) {
+      const label = inputEl.closest('.toggle-enhanced');
+      const statusDotId = {
+        'debug': 'statusDebug',
+        'usage-statistics-enabled': 'statusUsageStats',
+        'logging-to-file': 'statusLogging',
+        'request-log': 'statusRequestLog',
+        'ws-auth': 'statusWsAuth'
+      }[setting];
+      
+      // Add loading state
+      if (label) label.classList.add('loading');
+      
+      try {
+        await api('PUT', `/${setting}`, { value });
+        
+        // Update status dot
+        updateStatusDot(statusDotId, value);
+        
+        // Show success state
+        if (label) {
+          label.classList.remove('loading');
+          label.classList.add('success');
+          setTimeout(() => label.classList.remove('success'), 400);
+        }
+        
+        // Show saved indicator briefly
+        const statusEl = document.getElementById('settingsStatus');
+        if (statusEl) {
+          statusEl.style.display = 'flex';
+          setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
+        }
+        
+        toast(`${setting.replace(/-/g, ' ')} ${value ? 'enabled' : 'disabled'}`, 'success');
+      } catch (e) {
+        // Revert toggle on error
+        inputEl.checked = !value;
+        if (label) label.classList.remove('loading');
         toast('Failed: ' + e.message, 'error');
       }
     }
+    
+    async function saveConfigEnhanced() {
+      const editor = document.getElementById('configEditor');
+      const btn = document.getElementById('btnSaveConfig');
+      const btnText = document.getElementById('saveConfigText');
+      const btnIcon = document.getElementById('saveConfigIcon');
+      
+      if (!editor) return;
+      
+      // Validate YAML first
+      if (!validateYaml(editor.value)) {
+        toast('Please fix YAML errors before saving', 'error');
+        return;
+      }
+      
+      // Set saving state
+      if (btn) btn.classList.add('saving');
+      if (btnText) btnText.textContent = 'Saving...';
+      if (btnIcon) {
+        btnIcon.innerHTML = '<circle cx="12" cy="12" r="10" stroke-dasharray="60" stroke-dashoffset="0"><animateTransform attributeName="transform" type="rotate" from="0 12 12" to="360 12 12" dur="1s" repeatCount="indefinite"/></circle>';
+      }
+      
+      try {
+        const response = await fetch('/v0/management/config.yaml', {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/yaml'
+          },
+          body: editor.value
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(errorText || 'Failed to save configuration');
+        }
+        
+        // Update state
+        configState.originalYaml = editor.value;
+        configState.hasUnsavedChanges = false;
+        hideUnsavedIndicator();
+        
+        // Show success
+        if (btnIcon) {
+          btnIcon.innerHTML = '<polyline points="20 6 9 17 4 12"></polyline>';
+        }
+        if (btnText) btnText.textContent = 'Saved!';
+        
+        toast('Configuration saved successfully', 'success');
+        
+        // Reset button after delay
+        setTimeout(() => {
+          if (btn) btn.classList.remove('saving');
+          if (btnText) btnText.textContent = 'Save';
+          if (btnIcon) {
+            btnIcon.innerHTML = '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline>';
+          }
+        }, 2000);
+        
+      } catch (e) {
+        if (btn) btn.classList.remove('saving');
+        if (btnText) btnText.textContent = 'Save';
+        if (btnIcon) {
+          btnIcon.innerHTML = '<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline>';
+        }
+        toast('Failed to save: ' + e.message, 'error');
+      }
+    }
+    
+    // Keep old function for backwards compatibility
+    async function saveConfig() {
+      await saveConfigEnhanced();
+    }
+    
+    // Keep old function for backwards compatibility
+    async function toggleSetting(s, v) {
+      const inputEl = document.querySelector(`input[onchange*="${s}"]`);
+      if (inputEl) {
+        await toggleSettingEnhanced(s, v, inputEl);
+      } else {
+        // Fallback to basic implementation
+        try {
+          await api('PUT', `/${s}`, { value: v });
+          toast(`${s} updated`, 'success');
+        } catch (e) {
+          toast('Failed: ' + e.message, 'error');
+        }
+      }
+    }
+    
+    // Keyboard shortcut for save (Ctrl+S)
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        const configEditor = document.getElementById('configEditor');
+        if (configEditor && document.activeElement === configEditor) {
+          e.preventDefault();
+          saveConfigEnhanced();
+        }
+      }
+    });
 
     async function loadAmpSettings() {
       try {
