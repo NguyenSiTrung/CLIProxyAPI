@@ -4830,7 +4830,7 @@
         grouped[owner].push(id);
       });
 
-      container.innerHTML = Object.entries(grouped).map(([owner, modelList]) => {
+      container.innerHTML = Object.entries(grouped).sort((a, b) => a[0].localeCompare(b[0])).map(([owner, modelList]) => {
         const { icon, class: iconClass } = getProviderIcon(owner);
         return `
           <div class="models-provider-card" data-provider="${owner}">
