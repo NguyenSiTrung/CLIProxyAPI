@@ -5617,7 +5617,7 @@
               </svg>
               Server Status
             </h3>
-            <button class="btn btn-secondary btn-sm" onclick="loadDashboard()">
+            <button class="btn btn-secondary btn-sm" onclick="loadDashboard()" id="dashboardRefreshBtn">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
                 <polyline points="23 4 23 10 17 10"></polyline>
                 <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
@@ -5687,7 +5687,7 @@
           </div>
           <div class="models-header-right">
             <span class="models-total-count" id="modelsTotalCount">0 models</span>
-            <button class="btn btn-secondary btn-sm" onclick="loadModels()" style="display:flex;align-items:center;gap:6px">
+            <button class="btn btn-secondary btn-sm" onclick="loadModels()" id="modelsRefreshBtn" style="display:flex;align-items:center;gap:6px">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
                 <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
@@ -5840,7 +5840,7 @@
               </div>
             </div>
             <div style="display:flex;gap:8px">
-              <button class="btn btn-secondary btn-sm" onclick="loadAuthFiles()" title="Refresh auth files">
+              <button class="btn btn-secondary btn-sm" onclick="loadAuthFiles()" id="authFilesRefreshBtn" title="Refresh auth files">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
                   <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
@@ -7363,6 +7363,12 @@
     });
 
     async function loadDashboard() {
+      const refreshBtn = document.getElementById('dashboardRefreshBtn');
+      if (refreshBtn) {
+        refreshBtn.classList.add('loading');
+        refreshBtn.disabled = true;
+      }
+      
       try {
 
         // Fetch config with full response to get headers
@@ -7413,6 +7419,11 @@
 
       catch (e) {
         toast('Failed to load dashboard: ' + e.message, 'error');
+      } finally {
+        if (refreshBtn) {
+          refreshBtn.classList.remove('loading');
+          refreshBtn.disabled = false;
+        }
       }
     }
 
@@ -7461,6 +7472,12 @@
     }
 
     async function loadModels() {
+      const refreshBtn = document.getElementById('modelsRefreshBtn');
+      if (refreshBtn) {
+        refreshBtn.classList.add('loading');
+        refreshBtn.disabled = true;
+      }
+      
       const container = document.getElementById('modelsContainer');
       container.innerHTML = `
         <div class="models-loading">
@@ -7491,6 +7508,11 @@
             <p>The /v1/models endpoint requires API authentication. Add access keys in the <strong>API Keys</strong> tab or check your auth files.</p>
           </div>
         `;
+      } finally {
+        if (refreshBtn) {
+          refreshBtn.classList.remove('loading');
+          refreshBtn.disabled = false;
+        }
       }
     }
 
@@ -7682,7 +7704,10 @@
 
     async function loadUsageStats() {
       const refreshBtn = document.getElementById('usageRefreshBtn');
-      if (refreshBtn) refreshBtn.disabled = true;
+      if (refreshBtn) {
+        refreshBtn.classList.add('loading');
+        refreshBtn.disabled = true;
+      }
 
       try {
         const d = await api('GET', '/usage');
@@ -7703,7 +7728,10 @@
         toast('Failed to load usage stats: ' + e.message, 'error');
         console.error(e);
       } finally {
-        if (refreshBtn) refreshBtn.disabled = false;
+        if (refreshBtn) {
+          refreshBtn.classList.remove('loading');
+          refreshBtn.disabled = false;
+        }
       }
     }
 
@@ -8366,6 +8394,12 @@
     }
 
     async function loadAnalytics() {
+      const refreshBtn = document.getElementById('analyticsRefreshBtn');
+      if (refreshBtn) {
+        refreshBtn.classList.add('loading');
+        refreshBtn.disabled = true;
+      }
+      
       hideAnalyticsError();
       
       try {
@@ -8507,6 +8541,11 @@
         showAnalyticsError('Failed to load analytics: ' + e.message);
         toast('Failed to load analytics: ' + e.message, 'error');
         console.error(e);
+      } finally {
+        if (refreshBtn) {
+          refreshBtn.classList.remove('loading');
+          refreshBtn.disabled = false;
+        }
       }
     }
 
@@ -9057,6 +9096,12 @@ Tokens: ${JSON.stringify(f.tokens, null, 2)}`;
     }
 
     async function loadAuthFiles() {
+      const refreshBtn = document.getElementById('authFilesRefreshBtn');
+      if (refreshBtn) {
+        refreshBtn.classList.add('loading');
+        refreshBtn.disabled = true;
+      }
+      
       try {
         const [d, usageRes] = await Promise.all([
           api('GET', '/auth-files'),
@@ -9213,6 +9258,11 @@ Tokens: ${JSON.stringify(f.tokens, null, 2)}`;
 
       catch (e) {
         toast('Failed: ' + e.message, 'error');
+      } finally {
+        if (refreshBtn) {
+          refreshBtn.classList.remove('loading');
+          refreshBtn.disabled = false;
+        }
       }
     }
 
