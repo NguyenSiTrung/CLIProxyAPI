@@ -4555,6 +4555,333 @@
       }
     }
 
+    /* ========== Additional Mobile Responsive Styles for All Tabs ========== */
+    
+    /* Models Page Mobile */
+    @media (max-width: 768px) {
+      .models-page-header {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      
+      .models-header-left {
+        flex-wrap: wrap;
+      }
+      
+      .models-header-right {
+        justify-content: flex-start;
+      }
+      
+      .models-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+      }
+      
+      .models-search-container {
+        min-width: unset;
+        max-width: none;
+        width: 100%;
+      }
+      
+      .models-filters {
+        width: 100%;
+      }
+      
+      .models-provider-header {
+        padding: 14px 16px;
+      }
+      
+      .models-provider-info {
+        gap: 10px;
+      }
+      
+      .models-provider-icon {
+        width: 32px;
+        height: 32px;
+        font-size: 16px;
+      }
+      
+      .models-provider-name {
+        font-size: 14px;
+      }
+    }
+
+    /* API Keys Page Mobile */
+    @media (max-width: 768px) {
+      .keys-page-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 16px;
+      }
+      
+      .keys-tabs {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+      }
+      
+      .keys-tabs::-webkit-scrollbar {
+        display: none;
+      }
+      
+      .keys-tab {
+        flex-shrink: 0;
+        white-space: nowrap;
+      }
+      
+      .keys-section-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+      }
+      
+      .keys-bulk-actions {
+        margin-left: 0;
+        justify-content: flex-start;
+      }
+      
+      .key-card {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+        padding: 16px;
+      }
+      
+      .key-icon {
+        display: none;
+      }
+      
+      .key-info {
+        width: 100%;
+      }
+      
+      .key-value {
+        font-size: 12px;
+        word-break: break-all;
+      }
+      
+      .key-actions {
+        justify-content: flex-start;
+        flex-wrap: wrap;
+      }
+      
+      .key-action-btn {
+        flex: 1;
+        min-width: 80px;
+        justify-content: center;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .keys-tab {
+        padding: 8px 14px;
+        font-size: 13px;
+      }
+      
+      .keys-tab svg {
+        display: none;
+      }
+      
+      .key-format-hint {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        text-align: left;
+      }
+      
+      .key-format-hint code {
+        word-break: break-all;
+      }
+    }
+
+    /* Logs Page Mobile */
+    @media (max-width: 768px) {
+      .log-controls {
+        flex-direction: column;
+        gap: 10px;
+      }
+      
+      .log-filter-group {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      
+      .log-search-container {
+        width: 100%;
+        min-width: unset;
+      }
+      
+      .log-time-filters {
+        margin-left: 0;
+        width: 100%;
+        justify-content: flex-start;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+      }
+      
+      .log-stats-bar {
+        gap: 10px;
+        padding: 8px 12px;
+      }
+      
+      .log-stat-item {
+        font-size: 11px;
+      }
+      
+      .terminal-window {
+        height: calc(100vh - 280px);
+        min-height: 350px;
+      }
+      
+      .log-entry {
+        grid-template-columns: 1fr;
+        gap: 6px;
+      }
+      
+      .log-time {
+        order: 1;
+      }
+      
+      .log-lvl {
+        order: 2;
+        width: fit-content;
+      }
+      
+      .log-msg {
+        order: 3;
+      }
+      
+      .log-entry:hover::after {
+        display: none;
+      }
+      
+      .scroll-bottom-btn {
+        right: 16px;
+        bottom: 16px;
+        width: 36px;
+        height: 36px;
+      }
+    }
+
+    /* Analytics Page Mobile (if exists) */
+    @media (max-width: 768px) {
+      .analytics-grid,
+      .chart-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .analytics-card {
+        padding: 16px;
+      }
+    }
+
+    /* Amp Code Page Mobile */
+    @media (max-width: 768px) {
+      .amp-hero {
+        padding: 20px;
+        gap: 16px;
+      }
+      
+      .amp-hero h2 {
+        font-size: 22px;
+      }
+      
+      .amp-hero p {
+        font-size: 14px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .amp-hero {
+        padding: 16px;
+      }
+      
+      .amp-hero h2 {
+        font-size: 18px;
+      }
+      
+      .amp-connection-status {
+        padding: 8px 14px;
+        font-size: 12px;
+      }
+    }
+
+    /* Config Page Mobile Enhancements */
+    @media (max-width: 768px) {
+      .config-page-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+      }
+      
+      .config-section-header {
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      
+      .config-section-icon {
+        width: 36px;
+        height: 36px;
+      }
+      
+      .config-section-title h3 {
+        font-size: 15px;
+      }
+    }
+
+    /* Usage Stats Page Mobile Enhancements */
+    @media (max-width: 768px) {
+      .usage-chart-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      
+      .usage-chart-controls {
+        width: 100%;
+        justify-content: space-between;
+      }
+      
+      .usage-chart-value {
+        font-size: 24px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .usage-stat-card {
+        padding: 16px;
+      }
+      
+      .usage-stat-value {
+        font-size: 22px;
+      }
+      
+      .usage-stat-icon {
+        width: 36px;
+        height: 36px;
+      }
+      
+      .usage-chart-container {
+        height: 180px;
+      }
+    }
+
+    /* Auth Page Mobile Enhancements */
+    @media (max-width: 768px) {
+      .auth-card-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+      }
+      
+      .auth-card-icon {
+        width: 40px;
+        height: 40px;
+      }
+    }
+
     /* Amp Page Styles */
     .amp-hero {
       background: linear-gradient(135deg, rgba(0, 229, 255, 0.1), rgba(167, 139, 250, 0.1));
