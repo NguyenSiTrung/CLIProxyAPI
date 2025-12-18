@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>CLI Proxy API - Management</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -4270,6 +4270,288 @@
 
       .login-card h1 {
         font-size: 20px;
+      }
+    }
+
+    /* ========== Enhanced Mobile UX Improvements ========== */
+    
+    /* Safe area insets for notched devices (iPhone X+) */
+    @supports (padding: max(0px)) {
+      .mobile-header {
+        padding-left: max(16px, env(safe-area-inset-left));
+        padding-right: max(16px, env(safe-area-inset-right));
+      }
+      
+      .toast-container {
+        bottom: max(24px, env(safe-area-inset-bottom));
+        right: max(16px, env(safe-area-inset-right));
+      }
+      
+      .main {
+        padding-bottom: max(24px, env(safe-area-inset-bottom));
+      }
+      
+      .sidebar {
+        padding-bottom: max(20px, env(safe-area-inset-bottom));
+      }
+    }
+
+    /* Improved toast positioning on mobile */
+    @media (max-width: 768px) {
+      .toast-container {
+        left: 16px;
+        right: 16px;
+        bottom: 16px;
+      }
+      
+      .toast {
+        min-width: auto;
+        width: 100%;
+      }
+    }
+
+    /* Touch-friendly minimum tap targets (44px per Apple HIG) */
+    @media (max-width: 768px) {
+      .btn {
+        min-height: 44px;
+      }
+      
+      .form-input {
+        min-height: 48px;
+        font-size: 16px; /* Prevents iOS zoom on focus */
+      }
+      
+      .date-range-btn {
+        min-height: 40px;
+        padding: 8px 14px;
+      }
+      
+      .chart-view-btn {
+        min-height: 36px;
+        padding: 6px 12px;
+      }
+      
+      .toggle {
+        width: 52px;
+        height: 30px;
+      }
+      
+      .toggle-slider::before {
+        width: 24px;
+        height: 24px;
+      }
+      
+      .toggle input:checked+.toggle-slider::before {
+        transform: translateX(22px);
+      }
+    }
+
+    /* Horizontal scrollable tabs on mobile */
+    @media (max-width: 768px) {
+      .tabs {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        flex-wrap: nowrap;
+        padding-bottom: 8px;
+        margin-bottom: 16px;
+      }
+      
+      .tabs::-webkit-scrollbar {
+        display: none;
+      }
+      
+      .tab {
+        flex-shrink: 0;
+        white-space: nowrap;
+      }
+    }
+
+    /* Horizontal scrollable filter pills on mobile */
+    @media (max-width: 768px) {
+      .models-filters {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        padding-bottom: 4px;
+      }
+      
+      .models-filters::-webkit-scrollbar {
+        display: none;
+      }
+      
+      .models-filter-pills {
+        flex-wrap: nowrap;
+      }
+      
+      .models-filter-pill {
+        flex-shrink: 0;
+      }
+    }
+
+    /* Improved modal on mobile */
+    @media (max-width: 768px) {
+      .modal-overlay {
+        padding: 12px;
+        align-items: flex-end;
+      }
+      
+      .modal {
+        margin: 0;
+        max-width: 100%;
+        max-height: 90vh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        padding: 24px 20px;
+      }
+      
+      .modal-header {
+        position: sticky;
+        top: 0;
+        background: var(--bg-secondary);
+        margin: -24px -20px 20px -20px;
+        padding: 20px;
+        border-bottom: 1px solid var(--border-color);
+        z-index: 1;
+      }
+      
+      .modal-footer {
+        flex-direction: column;
+        gap: 8px;
+      }
+      
+      .modal-footer .btn {
+        width: 100%;
+      }
+    }
+
+    /* Better card header on mobile */
+    @media (max-width: 600px) {
+      .card-header {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+      }
+      
+      .card-header .btn {
+        width: 100%;
+        justify-content: center;
+      }
+    }
+
+    /* Settings row touch-friendly */
+    @media (max-width: 768px) {
+      .settings-row {
+        padding: 20px 0;
+      }
+      
+      .settings-info h4 {
+        font-size: 15px;
+      }
+      
+      .settings-info p {
+        font-size: 14px;
+      }
+    }
+
+    /* Date range selector on mobile */
+    @media (max-width: 480px) {
+      .date-range-selector {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 4px;
+      }
+      
+      .date-range-btn {
+        text-align: center;
+      }
+    }
+
+    /* Model badges on mobile - prevent text overflow */
+    @media (max-width: 480px) {
+      .models-list {
+        padding: 12px;
+      }
+      
+      .model-badge {
+        max-width: 100%;
+        overflow: hidden;
+      }
+      
+      .model-badge span {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+    }
+
+    /* OAuth grid on mobile */
+    @media (max-width: 480px) {
+      .oauth-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .oauth-btn {
+        padding: 14px 16px;
+      }
+    }
+
+    /* Config section on mobile */
+    @media (max-width: 480px) {
+      .config-section-header {
+        padding: 16px;
+      }
+      
+      .config-setting-item {
+        padding: 14px 16px;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+      }
+      
+      .config-setting-value {
+        width: 100%;
+      }
+    }
+
+    /* Server status items on mobile */
+    @media (max-width: 480px) {
+      .server-status-item {
+        padding: 12px;
+      }
+      
+      .status-info p {
+        font-size: 13px;
+        word-break: break-all;
+      }
+    }
+
+    /* Better table scroll indicators */
+    @media (max-width: 768px) {
+      .table-container {
+        position: relative;
+      }
+      
+      .table-container::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        width: 20px;
+        background: linear-gradient(to right, transparent, var(--bg-primary));
+        pointer-events: none;
+        opacity: 0.8;
+      }
+    }
+
+    /* Prevent horizontal overflow */
+    @media (max-width: 768px) {
+      .page {
+        overflow-x: hidden;
       }
     }
 
