@@ -399,6 +399,192 @@
     .stat-card.yellow .stat-value { color: var(--accent-yellow); }
     .stat-card.yellow .stat-icon { background: rgba(251, 191, 36, 0.15); color: var(--accent-yellow); }
 
+    /* Skeleton Loading Animation */
+    @keyframes skeleton-pulse {
+      0%, 100% { opacity: 0.4; }
+      50% { opacity: 0.8; }
+    }
+
+    .stat-card.loading .stat-value,
+    .stat-card.loading .stat-label {
+      background: linear-gradient(90deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 100%);
+      background-size: 200% 100%;
+      animation: skeleton-pulse 1.5s ease-in-out infinite;
+      border-radius: 4px;
+      color: transparent !important;
+    }
+
+    .stat-card.loading .stat-value {
+      min-width: 60px;
+      min-height: 34px;
+    }
+
+    .stat-card.loading .stat-label {
+      min-width: 100px;
+      min-height: 18px;
+    }
+
+    /* Dashboard Last Updated */
+    .dashboard-last-updated {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 8px 14px;
+      background: rgba(20, 20, 40, 0.6);
+      border-radius: 20px;
+      border: 1px solid var(--border-color);
+    }
+
+    .dashboard-last-updated svg {
+      width: 14px;
+      height: 14px;
+      opacity: 0.7;
+    }
+
+    .dashboard-last-updated.refreshing svg {
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    /* Dashboard Header Controls */
+    .dashboard-header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    /* Version Badge Styles */
+    .version-badge {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .version-badge.up-to-date {
+      background: rgba(34, 211, 160, 0.15);
+      color: var(--accent-green);
+      border: 1px solid rgba(34, 211, 160, 0.3);
+    }
+
+    .version-badge.outdated {
+      background: rgba(251, 191, 36, 0.15);
+      color: var(--accent-yellow);
+      border: 1px solid rgba(251, 191, 36, 0.3);
+    }
+
+    .version-badge.unknown {
+      background: rgba(136, 136, 170, 0.15);
+      color: var(--text-muted);
+      border: 1px solid rgba(136, 136, 170, 0.3);
+    }
+
+    .version-badge svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    /* Quick Actions Tooltips */
+    .quick-action-btn {
+      position: relative;
+    }
+
+    .quick-action-btn::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%) translateY(4px);
+      background: rgba(0, 0, 0, 0.9);
+      color: var(--text-primary);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 400;
+      white-space: nowrap;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.2s ease;
+      pointer-events: none;
+      z-index: 100;
+      border: 1px solid var(--border-color);
+    }
+
+    .quick-action-btn::before {
+      content: '';
+      position: absolute;
+      bottom: calc(100% + 4px);
+      left: 50%;
+      transform: translateX(-50%);
+      border: 5px solid transparent;
+      border-top-color: rgba(0, 0, 0, 0.9);
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.2s ease;
+      z-index: 101;
+    }
+
+    .quick-action-btn:hover::after,
+    .quick-action-btn:hover::before {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .quick-action-btn:hover::before {
+      transform: translateX(-50%);
+    }
+
+    /* Refresh Button Loading State */
+    .btn.loading {
+      position: relative;
+      color: transparent !important;
+      pointer-events: none;
+    }
+
+    .btn.loading::after {
+      content: '';
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      top: 50%;
+      left: 50%;
+      margin-left: -8px;
+      margin-top: -8px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: var(--text-primary);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    /* Uptime Display */
+    .server-uptime {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .uptime-value {
+      font-size: 14px;
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .uptime-label {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
     /* Dashboard Page Header */
     #page-dashboard .page-header {
       display: flex;
@@ -3890,8 +4076,36 @@
         align-items: stretch;
       }
 
+      .dashboard-header-controls {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .dashboard-last-updated {
+        font-size: 11px;
+        padding: 6px 10px;
+      }
+
       .health-indicator {
         align-self: flex-start;
+      }
+
+      /* Quick action tooltips - hide on mobile (touch) */
+      .quick-action-btn::after,
+      .quick-action-btn::before {
+        display: none;
+      }
+
+      /* Server status mobile */
+      .server-status-item {
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .version-badge {
+        order: 3;
+        margin-top: 4px;
       }
 
       /* Auth page mobile styles */
@@ -5486,9 +5700,18 @@
             <h1 class="page-title">Dashboard</h1>
             <p class="page-subtitle">Server overview and quick actions</p>
           </div>
-          <div class="health-indicator" id="healthIndicator">
-            <div class="health-pulse"></div>
-            <span class="health-text">Online</span>
+          <div class="dashboard-header-controls">
+            <div class="dashboard-last-updated" id="dashboardLastUpdated">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+              <span id="dashboardUpdateTime">Not yet updated</span>
+            </div>
+            <div class="health-indicator" id="healthIndicator">
+              <div class="health-pulse"></div>
+              <span class="health-text">Online</span>
+            </div>
           </div>
         </div>
         <div class="stats-grid">
@@ -5546,7 +5769,7 @@
             <h3 class="card-title">Quick Actions</h3>
           </div>
           <div class="quick-actions-grid">
-            <button class="quick-action-btn" onclick="navigateTo('models')">
+            <button class="quick-action-btn" onclick="navigateTo('models')" data-tooltip="Browse all available AI models">
               <div class="quick-action-icon cyan">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
@@ -5556,7 +5779,7 @@
               </div>
               <span>View Models</span>
             </button>
-            <button class="quick-action-btn" onclick="navigateTo('auth')">
+            <button class="quick-action-btn" onclick="navigateTo('auth')" data-tooltip="Manage OAuth and auth files">
               <div class="quick-action-icon purple">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
@@ -5565,7 +5788,7 @@
               </div>
               <span>Add Auth</span>
             </button>
-            <button class="quick-action-btn" onclick="navigateTo('usage')">
+            <button class="quick-action-btn" onclick="navigateTo('usage')" data-tooltip="View detailed usage statistics">
               <div class="quick-action-icon green">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <line x1="18" y1="20" x2="18" y2="10"></line>
@@ -5575,7 +5798,7 @@
               </div>
               <span>View Usage</span>
             </button>
-            <button class="quick-action-btn" onclick="navigateTo('logs')">
+            <button class="quick-action-btn" onclick="navigateTo('logs')" data-tooltip="Check recent request logs">
               <div class="quick-action-icon yellow">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -5587,7 +5810,7 @@
               </div>
               <span>View Logs</span>
             </button>
-            <button class="quick-action-btn" onclick="navigateTo('keys')">
+            <button class="quick-action-btn" onclick="navigateTo('keys')" data-tooltip="Manage API access keys">
               <div class="quick-action-icon blue">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
@@ -5595,7 +5818,7 @@
               </div>
               <span>API Keys</span>
             </button>
-            <button class="quick-action-btn" onclick="navigateTo('config')">
+            <button class="quick-action-btn" onclick="navigateTo('config')" data-tooltip="Configure server settings">
               <div class="quick-action-icon red">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="3"></circle>
@@ -5665,7 +5888,26 @@
                 <h4>Latest Version</h4>
                 <p id="latestVersion">-</p>
               </div>
-              <button class="btn btn-secondary btn-sm" onclick="checkLatestVersion()">Check Update</button>
+              <span class="version-badge unknown" id="versionStatusBadge">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <line x1="12" y1="16" x2="12" y2="12"></line>
+                  <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                </svg>
+                <span id="versionStatusText">Check Update</span>
+              </span>
+              <button class="btn btn-secondary btn-sm" onclick="checkLatestVersion()" id="checkUpdateBtn">Check</button>
+            </div>
+            <div class="server-status-item">
+              <div class="status-icon-wrapper cyan">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                </svg>
+              </div>
+              <div class="status-info">
+                <h4>Server Uptime</h4>
+                <p id="serverUptime">-</p>
+              </div>
             </div>
           </div>
         </div>
@@ -7362,12 +7604,24 @@
       });
     });
 
+    // Dashboard state
+    let dashboardStartTime = Date.now();
+    let currentServerVersion = '-';
+
     async function loadDashboard() {
       const refreshBtn = document.getElementById('dashboardRefreshBtn');
+      const lastUpdatedEl = document.getElementById('dashboardLastUpdated');
+      const statCards = document.querySelectorAll('.stats-grid .stat-card');
+      
+      // Add loading states
       if (refreshBtn) {
         refreshBtn.classList.add('loading');
         refreshBtn.disabled = true;
       }
+      if (lastUpdatedEl) {
+        lastUpdatedEl.classList.add('refreshing');
+      }
+      statCards.forEach(card => card.classList.add('loading'));
       
       try {
 
@@ -7386,16 +7640,21 @@
         const config = await configRes.json();
         serverInfo = config;
         accessApiKeys = config['api-keys'] || config.api_keys || [];
+        currentServerVersion = version;
 
         // Fetch usage
         const usage = await api('GET', '/usage').catch(() => ({
           usage: {}
         }));
 
+        // Remove loading state and update values
+        statCards.forEach(card => card.classList.remove('loading'));
+
         document.getElementById('statRequests').textContent = (usage.usage?.total_requests || 0).toLocaleString();
         const total = usage.usage?.total_requests || 0,
           failed = usage.usage?.failed_requests || usage.failed_requests || 0;
-        document.getElementById('statSuccess').textContent = (total > 0 ? ((total - failed) / total * 100).toFixed(1) : '100') + '%';
+        const successRate = total > 0 ? ((total - failed) / total * 100).toFixed(1) : '-';
+        document.getElementById('statSuccess').textContent = successRate === '-' ? '-' : successRate + '%';
 
         document.getElementById('serverVersion').textContent = `Version: ${version
           }
@@ -7407,6 +7666,15 @@
         document.getElementById('versionBadge').textContent = version;
         document.getElementById('buildDate').textContent = buildDate;
 
+        // Update last updated timestamp
+        const updateTimeEl = document.getElementById('dashboardUpdateTime');
+        if (updateTimeEl) {
+          updateTimeEl.textContent = 'Updated ' + new Date().toLocaleTimeString();
+        }
+
+        // Update uptime (simulated since server doesn't provide it, based on build date or session)
+        updateServerUptime(buildDate);
+
         // Load auth files count
         api('GET', '/auth-files').then(d => document.getElementById('statAuthFiles').textContent = (d.files || []).length).catch(() => { });
 
@@ -7415,17 +7683,65 @@
           document.getElementById('statModels').textContent = models.length;
           allModels = models;
         }).catch(() => document.getElementById('statModels').textContent = '-');
+
+        // Update health indicator
+        const healthIndicator = document.getElementById('healthIndicator');
+        if (healthIndicator) {
+          healthIndicator.classList.remove('offline');
+          healthIndicator.querySelector('.health-text').textContent = 'Online';
+        }
       }
 
       catch (e) {
         toast('Failed to load dashboard: ' + e.message, 'error');
+        statCards.forEach(card => card.classList.remove('loading'));
+        
+        // Update health indicator to offline
+        const healthIndicator = document.getElementById('healthIndicator');
+        if (healthIndicator) {
+          healthIndicator.classList.add('offline');
+          healthIndicator.querySelector('.health-text').textContent = 'Offline';
+        }
       } finally {
         if (refreshBtn) {
           refreshBtn.classList.remove('loading');
           refreshBtn.disabled = false;
         }
+        if (lastUpdatedEl) {
+          lastUpdatedEl.classList.remove('refreshing');
+        }
       }
     }
+
+    function updateServerUptime(buildDate) {
+      const uptimeEl = document.getElementById('serverUptime');
+      if (!uptimeEl) return;
+
+      // Calculate uptime from session start or build date
+      const now = Date.now();
+      const uptimeMs = now - dashboardStartTime;
+      
+      const seconds = Math.floor(uptimeMs / 1000);
+      const minutes = Math.floor(seconds / 60);
+      const hours = Math.floor(minutes / 60);
+      const days = Math.floor(hours / 24);
+
+      let uptimeStr = '';
+      if (days > 0) uptimeStr = `${days}d ${hours % 24}h ${minutes % 60}m`;
+      else if (hours > 0) uptimeStr = `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+      else if (minutes > 0) uptimeStr = `${minutes}m ${seconds % 60}s`;
+      else uptimeStr = `${seconds}s`;
+
+      uptimeEl.textContent = uptimeStr + ' (session)';
+    }
+
+    // Update uptime every second
+    setInterval(() => {
+      const uptimeEl = document.getElementById('serverUptime');
+      if (uptimeEl && uptimeEl.textContent !== '-') {
+        updateServerUptime();
+      }
+    }, 1000);
 
     let allModels = [];
     let accessApiKeys = [];
@@ -7666,15 +7982,99 @@
     }
 
     async function checkLatestVersion() {
+      const checkBtn = document.getElementById('checkUpdateBtn');
+      if (checkBtn) {
+        checkBtn.classList.add('loading');
+        checkBtn.disabled = true;
+      }
+      
       try {
         const d = await api('GET', '/latest-version');
-        document.getElementById('latestVersion').textContent = d['latest-version'] || '-';
+        const latestVersion = d['latest-version'] || '-';
+        document.getElementById('latestVersion').textContent = latestVersion;
+        
+        // Compare versions and update badge
+        updateVersionBadge(currentServerVersion, latestVersion);
+        
         toast('Version check complete', 'success');
       }
 
       catch (e) {
         toast('Failed: ' + e.message, 'error');
+        
+        // Reset badge to unknown
+        const badge = document.getElementById('versionStatusBadge');
+        const badgeText = document.getElementById('versionStatusText');
+        if (badge && badgeText) {
+          badge.className = 'version-badge unknown';
+          badgeText.textContent = 'Check Failed';
+        }
+      } finally {
+        if (checkBtn) {
+          checkBtn.classList.remove('loading');
+          checkBtn.disabled = false;
+        }
       }
+    }
+
+    function updateVersionBadge(current, latest) {
+      const badge = document.getElementById('versionStatusBadge');
+      const badgeText = document.getElementById('versionStatusText');
+      if (!badge || !badgeText) return;
+
+      if (!current || current === '-' || !latest || latest === '-') {
+        badge.className = 'version-badge unknown';
+        badge.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+          <span id="versionStatusText">Unknown</span>
+        `;
+        return;
+      }
+
+      // Compare versions (simple string comparison, works for semver)
+      const isUpToDate = compareVersions(current, latest) >= 0;
+      
+      if (isUpToDate) {
+        badge.className = 'version-badge up-to-date';
+        badge.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+          </svg>
+          <span id="versionStatusText">Up to date</span>
+        `;
+      } else {
+        badge.className = 'version-badge outdated';
+        badge.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span id="versionStatusText">Update available</span>
+        `;
+      }
+    }
+
+    function compareVersions(v1, v2) {
+      // Remove 'v' prefix if present
+      v1 = v1.replace(/^v/, '');
+      v2 = v2.replace(/^v/, '');
+      
+      const parts1 = v1.split('.').map(p => parseInt(p, 10) || 0);
+      const parts2 = v2.split('.').map(p => parseInt(p, 10) || 0);
+      
+      for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+        const p1 = parts1[i] || 0;
+        const p2 = parts2[i] || 0;
+        if (p1 > p2) return 1;
+        if (p1 < p2) return -1;
+      }
+      return 0;
     }
 
     // XSS protection helper
