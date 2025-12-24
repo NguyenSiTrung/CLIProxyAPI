@@ -313,6 +313,7 @@ func parseGeminiCLIUsage(data []byte) usage.Detail {
 		OutputTokens:    node.Get("candidatesTokenCount").Int(),
 		ReasoningTokens: node.Get("thoughtsTokenCount").Int(),
 		TotalTokens:     node.Get("totalTokenCount").Int(),
+		CachedTokens:    node.Get("cachedContentTokenCount").Int(),
 	}
 	if detail.TotalTokens == 0 {
 		detail.TotalTokens = detail.InputTokens + detail.OutputTokens + detail.ReasoningTokens
@@ -334,6 +335,7 @@ func parseGeminiUsage(data []byte) usage.Detail {
 		OutputTokens:    node.Get("candidatesTokenCount").Int(),
 		ReasoningTokens: node.Get("thoughtsTokenCount").Int(),
 		TotalTokens:     node.Get("totalTokenCount").Int(),
+		CachedTokens:    node.Get("cachedContentTokenCount").Int(),
 	}
 	if detail.TotalTokens == 0 {
 		detail.TotalTokens = detail.InputTokens + detail.OutputTokens + detail.ReasoningTokens
@@ -358,6 +360,7 @@ func parseGeminiStreamUsage(line []byte) (usage.Detail, bool) {
 		OutputTokens:    node.Get("candidatesTokenCount").Int(),
 		ReasoningTokens: node.Get("thoughtsTokenCount").Int(),
 		TotalTokens:     node.Get("totalTokenCount").Int(),
+		CachedTokens:    node.Get("cachedContentTokenCount").Int(),
 	}
 	if detail.TotalTokens == 0 {
 		detail.TotalTokens = detail.InputTokens + detail.OutputTokens + detail.ReasoningTokens
@@ -382,6 +385,7 @@ func parseGeminiCLIStreamUsage(line []byte) (usage.Detail, bool) {
 		OutputTokens:    node.Get("candidatesTokenCount").Int(),
 		ReasoningTokens: node.Get("thoughtsTokenCount").Int(),
 		TotalTokens:     node.Get("totalTokenCount").Int(),
+		CachedTokens:    node.Get("cachedContentTokenCount").Int(),
 	}
 	if detail.TotalTokens == 0 {
 		detail.TotalTokens = detail.InputTokens + detail.OutputTokens + detail.ReasoningTokens
@@ -406,6 +410,7 @@ func parseAntigravityUsage(data []byte) usage.Detail {
 		OutputTokens:    node.Get("candidatesTokenCount").Int(),
 		ReasoningTokens: node.Get("thoughtsTokenCount").Int(),
 		TotalTokens:     node.Get("totalTokenCount").Int(),
+		CachedTokens:    node.Get("cachedContentTokenCount").Int(),
 	}
 	if detail.TotalTokens == 0 {
 		detail.TotalTokens = detail.InputTokens + detail.OutputTokens + detail.ReasoningTokens
@@ -433,6 +438,7 @@ func parseAntigravityStreamUsage(line []byte) (usage.Detail, bool) {
 		OutputTokens:    node.Get("candidatesTokenCount").Int(),
 		ReasoningTokens: node.Get("thoughtsTokenCount").Int(),
 		TotalTokens:     node.Get("totalTokenCount").Int(),
+		CachedTokens:    node.Get("cachedContentTokenCount").Int(),
 	}
 	if detail.TotalTokens == 0 {
 		detail.TotalTokens = detail.InputTokens + detail.OutputTokens + detail.ReasoningTokens
