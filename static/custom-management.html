@@ -10578,9 +10578,12 @@ Tokens: ${JSON.stringify(f.tokens, null, 2)}`;
           return;
         }
 
-        // Detect provider from callback URL path
+        // Detect provider from callback URL path or port
         const pathLower = url.pathname.toLowerCase();
+        const port = url.port;
         let provider = '';
+        
+        // First try to detect by path
         if (pathLower.includes('anthropic')) provider = 'anthropic';
         else if (pathLower.includes('codex')) provider = 'codex';
         else if (pathLower.includes('google') || pathLower.includes('gemini')) provider = 'gemini';
@@ -10588,8 +10591,20 @@ Tokens: ${JSON.stringify(f.tokens, null, 2)}`;
         else if (pathLower.includes('antigravity')) provider = 'antigravity';
         else if (pathLower.includes('qwen')) provider = 'qwen';
         
+        // If not detected by path, try by port number
+        if (!provider && port) {
+          const portProviderMap = {
+            '54545': 'anthropic',
+            '8085': 'gemini',
+            '1455': 'codex',
+            '51121': 'antigravity',
+            '11451': 'iflow'
+          };
+          provider = portProviderMap[port] || '';
+        }
+        
         if (!provider) {
-          toast('Could not detect provider from URL. Supported: anthropic, codex, gemini, iflow, antigravity, qwen', 'error');
+          toast('Could not detect provider from URL. Supported ports: 54545 (Anthropic), 8085 (Gemini), 1455 (Codex), 51121 (Antigravity), 11451 (IFlow)', 'error');
           return;
         }
 
