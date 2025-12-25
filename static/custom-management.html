@@ -1643,15 +1643,64 @@
       padding: 16px 0 0;
     }
 
-    .manual-callback-form .form-group {
-      margin-bottom: 0;
+    .callback-input-wrapper {
+      display: flex;
+      gap: 8px;
+      align-items: stretch;
     }
 
-    .manual-callback-form .form-hint {
-      display: block;
+    .callback-url-input {
+      flex: 1;
+      padding: 12px 16px;
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+      font-size: 13px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      transition: all 0.2s ease;
+    }
+
+    .callback-url-input:focus {
+      outline: none;
+      border-color: #fb923c;
+      box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.15);
+    }
+
+    .callback-url-input::placeholder {
+      color: var(--text-muted);
+      opacity: 0.7;
+    }
+
+    .callback-submit-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 16px;
+      background: linear-gradient(135deg, #fb923c, #f97316);
+      border: none;
+      border-radius: var(--radius-md);
+      color: white;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      min-width: 48px;
+    }
+
+    .callback-submit-btn:hover {
+      background: linear-gradient(135deg, #f97316, #ea580c);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(251, 146, 60, 0.3);
+    }
+
+    .callback-submit-btn:active {
+      transform: translateY(0);
+    }
+
+    .callback-hint {
       font-size: 12px;
       color: var(--text-muted);
-      margin-top: 8px;
+      margin-top: 10px;
+      padding-left: 2px;
     }
 
     /* Auth Dropzone */
@@ -6664,20 +6713,17 @@
               </div>
             </div>
             <div class="manual-callback-form">
-              <div class="form-group">
-                <label for="callbackUrlInput">Callback URL</label>
-                <input type="text" id="callbackUrlInput" class="form-control" 
-                  placeholder="e.g., http://localhost:54545/callback?code=xxx&state=yyy" 
-                  style="font-family: monospace; font-size: 12px;">
-                <small class="form-hint">After OAuth completes, copy the full callback URL from your browser and paste it here</small>
+              <div class="callback-input-wrapper">
+                <input type="text" id="callbackUrlInput" class="callback-url-input" 
+                  placeholder="Paste callback URL here (e.g., http://localhost:54545/callback?code=xxx&state=yyy)">
+                <button class="callback-submit-btn" onclick="submitManualCallback()" title="Submit Callback">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                  </svg>
+                </button>
               </div>
-              <button class="btn btn-primary" onclick="submitManualCallback()" style="margin-top: 12px;">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="9 11 12 14 22 4"></polyline>
-                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-                </svg>
-                Submit Callback
-              </button>
+              <div class="callback-hint">After OAuth login completes, copy the full URL from your browser's address bar and paste it above</div>
             </div>
           </div>
 
