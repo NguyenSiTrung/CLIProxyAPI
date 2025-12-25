@@ -1519,6 +1519,11 @@
       color: var(--accent-green);
     }
 
+    .auth-card-icon.orange {
+      background: rgba(251, 146, 60, 0.12);
+      color: #fb923c;
+    }
+
     .auth-card-icon svg {
       width: 22px;
       height: 22px;
@@ -1631,6 +1636,22 @@
 
     .auth-provider-card.connected .auth-provider-status {
       color: var(--accent-green);
+    }
+
+    /* Manual Callback Form */
+    .manual-callback-form {
+      padding: 16px 0 0;
+    }
+
+    .manual-callback-form .form-group {
+      margin-bottom: 0;
+    }
+
+    .manual-callback-form .form-hint {
+      display: block;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 8px;
     }
 
     /* Auth Dropzone */
@@ -6628,6 +6649,38 @@
             </div>
           </div>
 
+          <!-- Manual OAuth Callback Card -->
+          <div class="card">
+            <div class="auth-card-header">
+              <div class="auth-card-icon orange">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                </svg>
+              </div>
+              <div class="auth-card-title">
+                <h3>Manual OAuth Callback</h3>
+                <p>Paste callback URL from remote OAuth flow (for Docker/VPS deployments)</p>
+              </div>
+            </div>
+            <div class="manual-callback-form">
+              <div class="form-group">
+                <label for="callbackUrlInput">Callback URL</label>
+                <input type="text" id="callbackUrlInput" class="form-control" 
+                  placeholder="e.g., http://localhost:54545/callback?code=xxx&state=yyy" 
+                  style="font-family: monospace; font-size: 12px;">
+                <small class="form-hint">After OAuth completes, copy the full callback URL from your browser and paste it here</small>
+              </div>
+              <button class="btn btn-primary" onclick="submitManualCallback()" style="margin-top: 12px;">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 11 12 14 22 4"></polyline>
+                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                </svg>
+                Submit Callback
+              </button>
+            </div>
+          </div>
+
           <!-- Upload Auth File Card -->
           <div class="card">
             <div class="auth-card-header">
@@ -10456,6 +10509,67 @@ Tokens: ${JSON.stringify(f.tokens, null, 2)}`;
 
       catch (e) {
         toast('OAuth failed: ' + e.message, 'error');
+      }
+    }
+
+    async function submitManualCallback() {
+      const urlInput = document.getElementById('callbackUrlInput');
+      const callbackUrl = urlInput.value.trim();
+      
+      if (!callbackUrl) {
+        toast('Please enter a callback URL', 'error');
+        return;
+      }
+
+      try {
+        const url = new URL(callbackUrl);
+        const code = url.searchParams.get('code');
+        const state = url.searchParams.get('state');
+        const error = url.searchParams.get('error') || url.searchParams.get('error_description');
+        
+        if (!code && !error) {
+          toast('Invalid callback URL: missing code parameter', 'error');
+          return;
+        }
+
+        // Detect provider from callback URL path
+        const pathLower = url.pathname.toLowerCase();
+        let provider = '';
+        if (pathLower.includes('anthropic')) provider = 'anthropic';
+        else if (pathLower.includes('codex')) provider = 'codex';
+        else if (pathLower.includes('google') || pathLower.includes('gemini')) provider = 'gemini';
+        else if (pathLower.includes('iflow')) provider = 'iflow';
+        else if (pathLower.includes('antigravity')) provider = 'antigravity';
+        else if (pathLower.includes('qwen')) provider = 'qwen';
+        
+        if (!provider) {
+          toast('Could not detect provider from URL. Supported: anthropic, codex, gemini, iflow, antigravity, qwen', 'error');
+          return;
+        }
+
+        // Submit to the server's callback endpoint
+        const callbackPath = `/${provider}/callback`;
+        const params = new URLSearchParams();
+        if (code) params.set('code', code);
+        if (state) params.set('state', state);
+        if (error) params.set('error', error);
+
+        const response = await fetch(`${callbackPath}?${params.toString()}`);
+        
+        if (response.ok) {
+          toast(`OAuth callback submitted for ${provider}. Check if authentication completed.`, 'success');
+          urlInput.value = '';
+          // Refresh auth status after a short delay
+          setTimeout(() => loadAuthStatus(), 1500);
+        } else {
+          toast(`Failed to submit callback: ${response.statusText}`, 'error');
+        }
+      } catch (e) {
+        if (e instanceof TypeError && e.message.includes('URL')) {
+          toast('Invalid URL format. Please paste the complete callback URL.', 'error');
+        } else {
+          toast('Failed to submit callback: ' + e.message, 'error');
+        }
       }
     }
 
