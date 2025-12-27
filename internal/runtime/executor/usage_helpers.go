@@ -19,7 +19,7 @@ type usageReporter struct {
 	provider    string
 	model       string
 	authID      string
-	authIndex   uint64
+	authIndex   string
 	apiKey      string
 	source      string
 	requestedAt time.Time
@@ -299,6 +299,20 @@ func parseClaudeStreamUsage(line []byte) (usage.Detail, bool) {
 	return detail, true
 }
 
+func parseGeminiFamilyUsageDetail(node gjson.Result) usage.Detail {
+	detail := usage.Detail{
+		InputTokens:     node.Get("promptTokenCount").Int(),
+		OutputTokens:    node.Get("candidatesTokenCount").Int(),
+		ReasoningTokens: node.Get("thoughtsTokenCount").Int(),
+		TotalTokens:     node.Get("totalTokenCount").Int(),
+		CachedTokens:    node.Get("cachedContentTokenCount").Int(),
+	}
+	if detail.TotalTokens == 0 {
+		detail.TotalTokens = detail.InputTokens + detail.OutputTokens + detail.ReasoningTokens
+	}
+	return detail
+}
+
 func parseGeminiCLIUsage(data []byte) usage.Detail {
 	usageNode := gjson.ParseBytes(data)
 	node := usageNode.Get("response.usageMetadata")
@@ -308,16 +322,7 @@ func parseGeminiCLIUsage(data []byte) usage.Detail {
 	if !node.Exists() {
 		return usage.Detail{}
 	}
-	detail := usage.Detail{
-		InputTokens:     node.Get("promptTokenCount").Int(),
-		OutputTokens:    node.Get("candidatesTokenCount").Int(),
-		ReasoningTokens: node.Get("thoughtsTokenCount").Int(),
-		TotalTokens:     node.Get("totalTokenCount").Int(),
-	}
-	if detail.TotalTokens == 0 {
-		detail.TotalTokens = detail.InputTokens + detail.OutputTokens + detail.ReasoningTokens
-	}
-	return detail
+	return parseGeminiFamilyUsageDetail(node)
 }
 
 func parseGeminiUsage(data []byte) usage.Detail {
@@ -329,16 +334,7 @@ func parseGeminiUsage(data []byte) usage.Detail {
 	if !node.Exists() {
 		return usage.Detail{}
 	}
-	detail := usage.Detail{
-		InputTokens:     node.Get("promptTokenCount").Int(),
-		OutputTokens:    node.Get("candidatesTokenCount").Int(),
-		ReasoningTokens: node.Get("thoughtsTokenCount").Int(),
-		TotalTokens:     node.Get("totalTokenCount").Int(),
-	}
-	if detail.TotalTokens == 0 {
-		detail.TotalTokens = detail.InputTokens + detail.OutputTokens + detail.ReasoningTokens
-	}
-	return detail
+	return parseGeminiFamilyUsageDetail(node)
 }
 
 func parseGeminiStreamUsage(line []byte) (usage.Detail, bool) {
@@ -353,16 +349,7 @@ func parseGeminiStreamUsage(line []byte) (usage.Detail, bool) {
 	if !node.Exists() {
 		return usage.Detail{}, false
 	}
-	detail := usage.Detail{
-		InputTokens:     node.Get("promptTokenCount").Int(),
-		OutputTokens:    node.Get("candidatesTokenCount").Int(),
-		ReasoningTokens: node.Get("thoughtsTokenCount").Int(),
-		TotalTokens:     node.Get("totalTokenCount").Int(),
-	}
-	if detail.TotalTokens == 0 {
-		detail.TotalTokens = detail.InputTokens + detail.OutputTokens + detail.ReasoningTokens
-	}
-	return detail, true
+	return parseGeminiFamilyUsageDetail(node), true
 }
 
 func parseGeminiCLIStreamUsage(line []byte) (usage.Detail, bool) {
@@ -377,16 +364,7 @@ func parseGeminiCLIStreamUsage(line []byte) (usage.Detail, bool) {
 	if !node.Exists() {
 		return usage.Detail{}, false
 	}
-	detail := usage.Detail{
-		InputTokens:     node.Get("promptTokenCount").Int(),
-		OutputTokens:    node.Get("candidatesTokenCount").Int(),
-		ReasoningTokens: node.Get("thoughtsTokenCount").Int(),
-		TotalTokens:     node.Get("totalTokenCount").Int(),
-	}
-	if detail.TotalTokens == 0 {
-		detail.TotalTokens = detail.InputTokens + detail.OutputTokens + detail.ReasoningTokens
-	}
-	return detail, true
+	return parseGeminiFamilyUsageDetail(node), true
 }
 
 func parseAntigravityUsage(data []byte) usage.Detail {
@@ -401,16 +379,7 @@ func parseAntigravityUsage(data []byte) usage.Detail {
 	if !node.Exists() {
 		return usage.Detail{}
 	}
-	detail := usage.Detail{
-		InputTokens:     node.Get("promptTokenCount").Int(),
-		OutputTokens:    node.Get("candidatesTokenCount").Int(),
-		ReasoningTokens: node.Get("thoughtsTokenCount").Int(),
-		TotalTokens:     node.Get("totalTokenCount").Int(),
-	}
-	if detail.TotalTokens == 0 {
-		detail.TotalTokens = detail.InputTokens + detail.OutputTokens + detail.ReasoningTokens
-	}
-	return detail
+	return parseGeminiFamilyUsageDetail(node)
 }
 
 func parseAntigravityStreamUsage(line []byte) (usage.Detail, bool) {
@@ -428,16 +397,7 @@ func parseAntigravityStreamUsage(line []byte) (usage.Detail, bool) {
 	if !node.Exists() {
 		return usage.Detail{}, false
 	}
-	detail := usage.Detail{
-		InputTokens:     node.Get("promptTokenCount").Int(),
-		OutputTokens:    node.Get("candidatesTokenCount").Int(),
-		ReasoningTokens: node.Get("thoughtsTokenCount").Int(),
-		TotalTokens:     node.Get("totalTokenCount").Int(),
-	}
-	if detail.TotalTokens == 0 {
-		detail.TotalTokens = detail.InputTokens + detail.OutputTokens + detail.ReasoningTokens
-	}
-	return detail, true
+	return parseGeminiFamilyUsageDetail(node), true
 }
 
 var stopChunkWithoutUsage sync.Map

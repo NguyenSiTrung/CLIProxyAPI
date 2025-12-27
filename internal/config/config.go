@@ -39,6 +39,9 @@ type Config struct {
 	// Debug enables or disables debug-level logging and other debug features.
 	Debug bool `yaml:"debug" json:"debug"`
 
+	// CommercialMode disables high-overhead HTTP middleware features to minimize per-request memory usage.
+	CommercialMode bool `yaml:"commercial-mode" json:"commercial-mode"`
+
 	// LoggingToFile controls whether application logs are written to rotating files or stdout.
 	LoggingToFile bool `yaml:"logging-to-file" json:"logging-to-file"`
 
@@ -59,6 +62,9 @@ type Config struct {
 
 	// QuotaExceeded defines the behavior when a quota is exceeded.
 	QuotaExceeded QuotaExceeded `yaml:"quota-exceeded" json:"quota-exceeded"`
+
+	// Routing controls credential selection behavior.
+	Routing RoutingConfig `yaml:"routing" json:"routing"`
 
 	// WebsocketAuth enables or disables authentication for the WebSocket API.
 	WebsocketAuth bool `yaml:"ws-auth" json:"ws-auth"`
@@ -143,6 +149,13 @@ type QuotaExceeded struct {
 	SwitchPreviewModel bool `yaml:"switch-preview-model" json:"switch-preview-model"`
 }
 
+// RoutingConfig configures how credentials are selected for requests.
+type RoutingConfig struct {
+	// Strategy selects the credential selection strategy.
+	// Supported values: "round-robin" (default), "fill-first".
+	Strategy string `yaml:"strategy,omitempty" json:"strategy,omitempty"`
+}
+
 // AmpModelMapping defines a model name mapping for Amp CLI requests.
 // When Amp requests a model that isn't available locally, this mapping
 // allows routing to an alternative model that IS available.
@@ -153,6 +166,11 @@ type AmpModelMapping struct {
 	// To is the target model name to route to (e.g., "claude-sonnet-4").
 	// The target model must have available providers in the registry.
 	To string `yaml:"to" json:"to"`
+
+	// Regex indicates whether the 'from' field should be interpreted as a regular
+	// expression for matching model names. When true, this mapping is evaluated
+	// after exact matches and in the order provided. Defaults to false (exact match).
+	Regex bool `yaml:"regex,omitempty" json:"regex,omitempty"`
 }
 
 // AmpCode groups Amp CLI integration settings including upstream routing,
