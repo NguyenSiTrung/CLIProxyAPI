@@ -9319,8 +9319,8 @@
         return;
       }
 
-      providerContainer.innerHTML = '<div class="config-settings-list">' + pEntries.map(([name, stats]) => `
-        <div class="config-setting-item provider-clickable" style="padding:12px 16px;transition:all 0.2s" onclick="showProviderDetail('${escapeHtml(name).replace(/'/g, "\\'")}')">
+      providerContainer.innerHTML = '<div class="config-settings-list">' + pEntries.map(([name, stats], idx) => `
+        <div class="config-setting-item provider-clickable" style="padding:12px 16px;transition:all 0.2s" data-provider-key="${escapeHtml(name)}" data-provider-idx="${idx}">
           <div class="config-setting-info">
             <div class="config-setting-text">
               <h4 style="font-family:monospace;font-size:13px" title="${escapeHtml(name)}">${escapeHtml(name.length > 25 ? name.slice(0, 22) + '...' : name)}</h4>
@@ -9335,15 +9335,30 @@
           </div>
         </div>
       `).join('') + '</div>';
+
+      // Add click handlers
+      providerContainer.querySelectorAll('.provider-clickable').forEach(el => {
+        el.addEventListener('click', () => {
+          const key = el.dataset.providerKey;
+          if (key) showProviderDetail(key);
+        });
+      });
     }
 
     function showProviderDetail(providerKey) {
       const usageData = usageState.rawData;
-      if (!usageData || !usageData.apis) return;
+      if (!usageData) {
+        toast('No usage data available', 'error');
+        return;
+      }
+      if (!usageData.apis) {
+        toast('No API usage data available', 'error');
+        return;
+      }
 
       const apiData = usageData.apis[providerKey];
       if (!apiData) {
-        toast('Provider data not found', 'error');
+        toast('Provider data not found: ' + providerKey, 'error');
         return;
       }
 
