@@ -6626,6 +6626,438 @@
         grid-template-columns: 1fr;
       }
     }
+
+    /* ========== Model Pricing Styles ========== */
+    .models-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 24px;
+      padding: 6px;
+      background: rgba(20, 20, 45, 0.6);
+      border-radius: var(--radius-md);
+      border: 1px solid var(--border-color);
+      width: fit-content;
+    }
+
+    .models-tab {
+      padding: 10px 20px;
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.25s ease;
+      font-size: 14px;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid transparent;
+      background: transparent;
+    }
+
+    .models-tab svg {
+      width: 16px;
+      height: 16px;
+      opacity: 0.7;
+    }
+
+    .models-tab:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.06);
+    }
+
+    .models-tab.active {
+      color: white;
+      background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+      box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
+    }
+
+    .models-tab.active svg {
+      opacity: 1;
+    }
+
+    .models-tab-content {
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .models-tab-content.active {
+      display: block;
+    }
+
+    .pricing-grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .pricing-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      transition: all 0.2s;
+    }
+
+    .pricing-card:hover {
+      border-color: var(--border-glow);
+    }
+
+    .pricing-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .pricing-card-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .pricing-card-title h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .pricing-card-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .pricing-card-icon.anthropic { background: rgba(255, 165, 0, 0.15); }
+    .pricing-card-icon.google { background: rgba(66, 133, 244, 0.15); }
+    .pricing-card-icon.openai { background: rgba(0, 166, 126, 0.15); }
+    .pricing-card-icon.other { background: rgba(167, 139, 250, 0.15); }
+
+    .pricing-model-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .pricing-model-item {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 16px;
+      align-items: center;
+      padding: 12px 16px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+      transition: all 0.2s;
+    }
+
+    .pricing-model-item:hover {
+      border-color: var(--border-color);
+      background: rgba(0, 0, 0, 0.3);
+    }
+
+    .pricing-model-item.has-pricing {
+      border-color: rgba(34, 211, 160, 0.3);
+      background: rgba(34, 211, 160, 0.05);
+    }
+
+    .pricing-model-name {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .pricing-model-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pricing-btn {
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      border: 1px solid var(--border-color);
+      background: transparent;
+      color: var(--text-secondary);
+    }
+
+    .pricing-btn:hover {
+      border-color: var(--accent-cyan);
+      color: var(--accent-cyan);
+      background: rgba(0, 229, 255, 0.1);
+    }
+
+    .pricing-btn.active {
+      border-color: var(--accent-green);
+      color: var(--accent-green);
+      background: rgba(34, 211, 160, 0.1);
+    }
+
+    .pricing-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .pricing-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .pricing-badge.configured {
+      background: rgba(34, 211, 160, 0.15);
+      color: var(--accent-green);
+    }
+
+    .pricing-badge.not-configured {
+      background: rgba(136, 136, 170, 0.15);
+      color: var(--text-muted);
+    }
+
+    .pricing-search-container {
+      position: relative;
+      margin-bottom: 20px;
+      max-width: 400px;
+    }
+
+    .pricing-search-input {
+      width: 100%;
+      padding: 12px 16px 12px 44px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-md);
+      color: var(--text-primary);
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .pricing-search-input:focus {
+      outline: none;
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.1);
+    }
+
+    .pricing-search-icon {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 18px;
+      color: var(--text-muted);
+    }
+
+    /* Pricing Modal Styles */
+    .pricing-modal-content {
+      padding: 24px;
+    }
+
+    .pricing-form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+    }
+
+    .pricing-form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .pricing-form-group.full-width {
+      grid-column: 1 / -1;
+    }
+
+    .pricing-form-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .pricing-form-label span {
+      font-weight: 400;
+      text-transform: none;
+      color: var(--text-muted);
+    }
+
+    .pricing-form-input {
+      padding: 10px 14px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .pricing-form-input:focus {
+      outline: none;
+      border-color: var(--accent-cyan);
+      box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.1);
+    }
+
+    .pricing-form-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .pricing-form-hint {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .pricing-presets {
+      margin-bottom: 20px;
+      padding: 16px;
+      background: rgba(0, 229, 255, 0.05);
+      border: 1px solid rgba(0, 229, 255, 0.2);
+      border-radius: var(--radius-sm);
+    }
+
+    .pricing-presets-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--accent-cyan);
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pricing-presets-title svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .pricing-preset-btns {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .pricing-preset-btn {
+      padding: 6px 12px;
+      border-radius: 16px;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: 1px solid var(--border-color);
+      background: rgba(0, 0, 0, 0.2);
+      color: var(--text-secondary);
+    }
+
+    .pricing-preset-btn:hover {
+      border-color: var(--accent-cyan);
+      color: var(--text-primary);
+      background: rgba(0, 229, 255, 0.1);
+    }
+
+    /* Usage Stats Cost Display */
+    .usage-cost-card {
+      background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(167, 139, 250, 0.1));
+      border: 1px solid rgba(251, 191, 36, 0.3);
+      border-radius: var(--radius-md);
+      padding: 20px;
+      margin-top: 20px;
+    }
+
+    .usage-cost-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .usage-cost-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--accent-yellow);
+    }
+
+    .usage-cost-title svg {
+      width: 20px;
+      height: 20px;
+    }
+
+    .usage-cost-total {
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--accent-yellow);
+    }
+
+    .usage-cost-breakdown {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 12px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(251, 191, 36, 0.2);
+    }
+
+    .usage-cost-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: var(--radius-sm);
+    }
+
+    .usage-cost-item-label {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .usage-cost-item-value {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .usage-cost-note {
+      margin-top: 12px;
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .usage-cost-note svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    @media (max-width: 768px) {
+      .pricing-form-grid {
+        grid-template-columns: 1fr;
+      }
+      .pricing-form-group.full-width {
+        grid-column: 1;
+      }
+    }
   </style>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -6939,8 +7371,8 @@
               </svg>
             </div>
             <div>
-              <h1 class="page-title" style="margin:0">Available Models</h1>
-              <p class="page-subtitle">AI models accessible through the proxy</p>
+              <h1 class="page-title" style="margin:0">Models</h1>
+              <p class="page-subtitle">Browse available models and configure pricing</p>
             </div>
           </div>
           <div class="models-header-right">
@@ -6953,28 +7385,80 @@
             </button>
           </div>
         </div>
-        
-        <div class="models-toolbar">
-          <div class="models-search-container">
-            <svg class="models-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+
+        <!-- Models Tabs -->
+        <div class="models-tabs">
+          <button class="models-tab active" data-tab="models-list" onclick="switchModelsTab('models-list')">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
             </svg>
-            <input type="text" id="modelSearch" class="models-search-input" placeholder="Search models by name or provider..." oninput="filterModels()">
-            <button class="models-search-clear" id="modelSearchClear" onclick="clearModelSearch()" style="display:none">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            Available Models
+          </button>
+          <button class="models-tab" data-tab="models-pricing" onclick="switchModelsTab('models-pricing')">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="1" x2="12" y2="23"/>
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+            </svg>
+            Model Pricing
+          </button>
+        </div>
+
+        <!-- Available Models Tab Content -->
+        <div id="models-list" class="models-tab-content active">
+          <div class="models-toolbar">
+            <div class="models-search-container">
+              <svg class="models-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
               </svg>
-            </button>
+              <input type="text" id="modelSearch" class="models-search-input" placeholder="Search models by name or provider..." oninput="filterModels()">
+              <button class="models-search-clear" id="modelSearchClear" onclick="clearModelSearch()" style="display:none">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            </div>
+            <div class="models-filter-pills" id="modelsFilterPills">
+              <button class="models-filter-pill active" data-provider="all" onclick="filterModelsByProvider('all')">All</button>
+            </div>
           </div>
-          <div class="models-filter-pills" id="modelsFilterPills">
-            <button class="models-filter-pill active" data-provider="all" onclick="filterModelsByProvider('all')">All</button>
+          
+          <div id="modelsContainer" class="models-grid-container">
+            <div class="models-loading">
+              <div class="models-loading-spinner"></div>
+              <p>Loading models...</p>
+            </div>
           </div>
         </div>
-        
-        <div id="modelsContainer" class="models-grid-container">
-          <div class="models-loading">
-            <div class="models-loading-spinner"></div>
-            <p>Loading models...</p>
+
+        <!-- Model Pricing Tab Content -->
+        <div id="models-pricing" class="models-tab-content">
+          <div class="pricing-search-container">
+            <svg class="pricing-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input type="text" id="pricingSearch" class="pricing-search-input" placeholder="Search models to configure pricing..." oninput="filterPricingModels()">
+          </div>
+
+          <div class="pricing-presets">
+            <div class="pricing-presets-title">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+              </svg>
+              Quick Actions
+            </div>
+            <div class="pricing-preset-btns">
+              <button class="pricing-preset-btn" onclick="applyDefaultPricing()">Apply Default Pricing (All Known Models)</button>
+              <button class="pricing-preset-btn" onclick="clearAllPricing()">Clear All Pricing</button>
+              <button class="pricing-preset-btn" onclick="exportPricing()">Export Pricing Config</button>
+              <button class="pricing-preset-btn" onclick="importPricingPrompt()">Import Pricing Config</button>
+            </div>
+          </div>
+
+          <div id="pricingContainer" class="pricing-grid">
+            <div class="models-loading">
+              <div class="models-loading-spinner"></div>
+              <p>Loading models for pricing configuration...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -7748,6 +8232,97 @@
                   </div>
                 </div><span class="badge badge-yellow" id="usageCacheWrite">-</span>
               </div>
+            </div>
+          </div>
+
+          <!-- Estimated Cost Card -->
+          <div class="config-section">
+            <div class="config-section-header">
+              <div class="config-section-icon" style="background:rgba(251, 191, 36, 0.15)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                  fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="1" x2="12" y2="23"/>
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg></div>
+              <div class="config-section-title">
+                <h3>Estimated Cost</h3>
+                <p>Based on configured pricing</p>
+              </div>
+            </div>
+            <div id="usageCostContainer" class="config-settings-list">
+              <div class="config-setting-item" style="background:rgba(251, 191, 36, 0.05);border-radius:8px;margin-bottom:8px">
+                <div class="config-setting-info">
+                  <div class="config-setting-icon" style="background:rgba(251, 191, 36, 0.15)"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                      fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="12" y1="1" x2="12" y2="23"/>
+                      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                    </svg></div>
+                  <div class="config-setting-text">
+                    <h4 style="color:var(--accent-yellow)">Total Cost</h4>
+                    <p>Estimated API cost</p>
+                  </div>
+                </div><span class="badge" style="font-size:16px;padding:8px 14px;background:rgba(251, 191, 36, 0.15);color:var(--accent-yellow)" id="usageTotalCost">$0.00</span>
+              </div>
+              <div class="config-setting-item">
+                <div class="config-setting-info">
+                  <div class="config-setting-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                      fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="13 17 18 12 13 7"></polyline>
+                      <polyline points="6 17 11 12 6 7"></polyline>
+                    </svg></div>
+                  <div class="config-setting-text">
+                    <h4>Input Cost</h4>
+                    <p>Cost for input tokens</p>
+                  </div>
+                </div><span class="badge badge-cyan" id="usageInputCost">$0.00</span>
+              </div>
+              <div class="config-setting-item">
+                <div class="config-setting-info">
+                  <div class="config-setting-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                      fill="none" stroke="currentColor" stroke-width="2">
+                      <polyline points="18 17 13 12 18 7"></polyline>
+                      <polyline points="11 17 6 12 11 7"></polyline>
+                    </svg></div>
+                  <div class="config-setting-text">
+                    <h4>Output Cost</h4>
+                    <p>Cost for output tokens</p>
+                  </div>
+                </div><span class="badge badge-purple" id="usageOutputCost">$0.00</span>
+              </div>
+              <div class="config-setting-item">
+                <div class="config-setting-info">
+                  <div class="config-setting-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                      fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                      <path d="M3 3v5h5"/>
+                      <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/>
+                      <path d="M16 16h5v5"/>
+                    </svg></div>
+                  <div class="config-setting-text">
+                    <h4>Cached Cost</h4>
+                    <p>Cost for cached input tokens</p>
+                  </div>
+                </div><span class="badge" style="background:rgba(34, 211, 160, 0.15);color:var(--accent-green)" id="usageCachedCost">$0.00</span>
+              </div>
+              <div class="config-setting-item">
+                <div class="config-setting-info">
+                  <div class="config-setting-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+                      fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                    </svg></div>
+                  <div class="config-setting-text">
+                    <h4>Models with Pricing</h4>
+                    <p>Models included in cost estimate</p>
+                  </div>
+                </div><span class="badge badge-green" id="usagePricedModels">0</span>
+              </div>
+            </div>
+            <div id="usageCostNote" style="margin-top:12px;padding:12px;background:rgba(0,0,0,0.2);border-radius:8px;font-size:11px;color:var(--text-muted);display:flex;align-items:center;gap:8px">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
+              <span>Configure model pricing in <a href="#" onclick="navigateTo('models');setTimeout(()=>switchModelsTab('models-pricing'),100);return false" style="color:var(--accent-cyan)">Models → Model Pricing</a> tab to see accurate cost estimates.</span>
             </div>
           </div>
           <div class="config-section">
@@ -9031,6 +9606,443 @@
       renderModels(filtered);
     }
 
+    // ========== Model Pricing System ==========
+    const PRICING_STORAGE_KEY = 'cli-proxy-model-pricing';
+    let modelPricingConfig = {};
+
+    // Default pricing for well-known models (prices per 1M tokens in USD)
+    const DEFAULT_MODEL_PRICING = {
+      // OpenAI Models
+      'gpt-4o': { input: 2.50, output: 10.00, cached_input: 1.25 },
+      'gpt-4o-2024-08-06': { input: 2.50, output: 10.00, cached_input: 1.25 },
+      'gpt-4o-2024-05-13': { input: 5.00, output: 15.00 },
+      'gpt-4o-mini': { input: 0.15, output: 0.60, cached_input: 0.075 },
+      'gpt-4o-mini-2024-07-18': { input: 0.15, output: 0.60, cached_input: 0.075 },
+      'gpt-4-turbo': { input: 10.00, output: 30.00 },
+      'gpt-4-turbo-2024-04-09': { input: 10.00, output: 30.00 },
+      'gpt-4': { input: 30.00, output: 60.00 },
+      'gpt-4-0613': { input: 30.00, output: 60.00 },
+      'gpt-4.1': { input: 2.00, output: 8.00, cached_input: 0.50 },
+      'gpt-4.1-mini': { input: 0.40, output: 1.60, cached_input: 0.10 },
+      'gpt-4.1-nano': { input: 0.10, output: 0.40, cached_input: 0.025 },
+      'gpt-3.5-turbo': { input: 0.50, output: 1.50 },
+      'gpt-3.5-turbo-0125': { input: 0.50, output: 1.50 },
+      'o1': { input: 15.00, output: 60.00 },
+      'o1-preview': { input: 15.00, output: 60.00 },
+      'o1-mini': { input: 1.10, output: 4.40 },
+      'o3': { input: 2.00, output: 8.00, cached_input: 0.50 },
+      'o3-mini': { input: 1.10, output: 4.40 },
+      'o4-mini': { input: 1.10, output: 4.40, cached_input: 0.275 },
+      
+      // Anthropic Claude Models
+      'claude-3-5-sonnet-20241022': { input: 3.00, output: 15.00, cached_input: 0.30 },
+      'claude-3-5-sonnet-20240620': { input: 3.00, output: 15.00, cached_input: 0.30 },
+      'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00, cached_input: 0.08 },
+      'claude-3-opus-20240229': { input: 15.00, output: 75.00, cached_input: 1.50 },
+      'claude-3-sonnet-20240229': { input: 3.00, output: 15.00, cached_input: 0.30 },
+      'claude-3-haiku-20240307': { input: 0.25, output: 1.25, cached_input: 0.03 },
+      'claude-sonnet-4-20250514': { input: 3.00, output: 15.00, cached_input: 0.30 },
+      'claude-opus-4-20250514': { input: 15.00, output: 75.00, cached_input: 1.50 },
+      'claude-sonnet-4-5-20250514': { input: 3.00, output: 15.00, cached_input: 0.30 },
+      'claude-opus-4-5-20250514': { input: 5.00, output: 25.00, cached_input: 0.50 },
+      'claude-haiku-4-5-20250514': { input: 1.00, output: 5.00, cached_input: 0.10 },
+      
+      // Google Gemini Models
+      'gemini-1.5-pro': { input: 1.25, output: 5.00, cached_input: 0.3125 },
+      'gemini-1.5-pro-latest': { input: 1.25, output: 5.00, cached_input: 0.3125 },
+      'gemini-1.5-flash': { input: 0.075, output: 0.30, cached_input: 0.01875 },
+      'gemini-1.5-flash-latest': { input: 0.075, output: 0.30, cached_input: 0.01875 },
+      'gemini-1.5-flash-8b': { input: 0.0375, output: 0.15 },
+      'gemini-2.0-flash': { input: 0.10, output: 0.40, cached_input: 0.025 },
+      'gemini-2.0-flash-exp': { input: 0.10, output: 0.40, cached_input: 0.025 },
+      'gemini-2.0-flash-lite': { input: 0.075, output: 0.30 },
+      'gemini-2.5-pro': { input: 1.25, output: 10.00, cached_input: 0.125 },
+      'gemini-2.5-pro-preview': { input: 1.25, output: 10.00, cached_input: 0.125 },
+      'gemini-2.5-flash': { input: 0.15, output: 0.60, cached_input: 0.0375 },
+      'gemini-2.5-flash-preview': { input: 0.15, output: 0.60, cached_input: 0.0375 },
+      'gemini-pro': { input: 0.50, output: 1.50 },
+      
+      // DeepSeek Models
+      'deepseek-chat': { input: 0.14, output: 0.28, cached_input: 0.014 },
+      'deepseek-coder': { input: 0.14, output: 0.28, cached_input: 0.014 },
+      'deepseek-reasoner': { input: 0.55, output: 2.19 },
+      
+      // Mistral Models
+      'mistral-large-latest': { input: 2.00, output: 6.00 },
+      'mistral-medium-latest': { input: 2.70, output: 8.10 },
+      'mistral-small-latest': { input: 0.20, output: 0.60 },
+      'codestral-latest': { input: 0.30, output: 0.90 },
+      
+      // Meta Llama Models (typical hosted pricing)
+      'llama-3.1-405b': { input: 3.00, output: 3.00 },
+      'llama-3.1-70b': { input: 0.88, output: 0.88 },
+      'llama-3.1-8b': { input: 0.20, output: 0.20 },
+      'llama-3-70b': { input: 0.79, output: 0.79 },
+      'llama-3-8b': { input: 0.20, output: 0.20 },
+    };
+
+    function loadPricingConfig() {
+      try {
+        const stored = localStorage.getItem(PRICING_STORAGE_KEY);
+        if (stored) {
+          modelPricingConfig = JSON.parse(stored);
+        }
+      } catch (e) {
+        console.error('Failed to load pricing config:', e);
+        modelPricingConfig = {};
+      }
+    }
+
+    function savePricingConfig() {
+      try {
+        localStorage.setItem(PRICING_STORAGE_KEY, JSON.stringify(modelPricingConfig));
+      } catch (e) {
+        console.error('Failed to save pricing config:', e);
+        toast('Failed to save pricing configuration', 'error');
+      }
+    }
+
+    function switchModelsTab(tabId) {
+      document.querySelectorAll('.models-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.tab === tabId);
+      });
+      document.querySelectorAll('.models-tab-content').forEach(content => {
+        content.classList.toggle('active', content.id === tabId);
+      });
+      
+      if (tabId === 'models-pricing') {
+        renderPricingModels();
+      }
+    }
+
+    function renderPricingModels() {
+      const container = document.getElementById('pricingContainer');
+      
+      if (!allModels || allModels.length === 0) {
+        container.innerHTML = `
+          <div class="models-empty">
+            <div class="models-empty-icon">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+              </svg>
+            </div>
+            <h4>No models available</h4>
+            <p>Load models from the "Available Models" tab first.</p>
+          </div>
+        `;
+        return;
+      }
+
+      const grouped = {};
+      allModels.forEach(m => {
+        const id = m.id || m.name || 'unknown';
+        const owner = m.owned_by || m.provider || 'other';
+        if (!grouped[owner]) grouped[owner] = [];
+        grouped[owner].push(id);
+      });
+
+      container.innerHTML = Object.entries(grouped).sort((a, b) => a[0].localeCompare(b[0])).map(([owner, modelList]) => {
+        const { icon, class: iconClass } = getProviderIcon(owner);
+        const configuredCount = modelList.filter(id => modelPricingConfig[id]).length;
+        
+        return `
+          <div class="pricing-card">
+            <div class="pricing-card-header">
+              <div class="pricing-card-title">
+                <div class="pricing-card-icon ${iconClass}">${icon}</div>
+                <h3>${owner}</h3>
+                <span class="pricing-badge ${configuredCount > 0 ? 'configured' : 'not-configured'}">
+                  ${configuredCount}/${modelList.length} configured
+                </span>
+              </div>
+            </div>
+            <div class="pricing-model-list">
+              ${modelList.map(id => {
+                const hasPricing = !!modelPricingConfig[id];
+                const hasDefault = !!getDefaultPricing(id);
+                return `
+                  <div class="pricing-model-item ${hasPricing ? 'has-pricing' : ''}" data-model="${id}">
+                    <div class="pricing-model-name">${id}</div>
+                    <div class="pricing-model-actions">
+                      ${hasPricing ? `
+                        <span class="pricing-badge configured">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                          Configured
+                        </span>
+                      ` : hasDefault ? `
+                        <span class="pricing-badge not-configured">Default available</span>
+                      ` : ''}
+                      <button class="pricing-btn ${hasPricing ? 'active' : ''}" onclick="openPricingModal('${id}')">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                        </svg>
+                        ${hasPricing ? 'Edit' : 'Set Pricing'}
+                      </button>
+                      ${hasPricing ? `
+                        <button class="pricing-btn" onclick="removePricing('${id}')" title="Remove pricing">
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                          </svg>
+                        </button>
+                      ` : ''}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function filterPricingModels() {
+      const search = document.getElementById('pricingSearch').value.toLowerCase();
+      const items = document.querySelectorAll('.pricing-model-item');
+      const cards = document.querySelectorAll('.pricing-card');
+      
+      items.forEach(item => {
+        const modelName = item.dataset.model.toLowerCase();
+        item.style.display = modelName.includes(search) ? '' : 'none';
+      });
+      
+      cards.forEach(card => {
+        const visibleItems = card.querySelectorAll('.pricing-model-item:not([style*="display: none"])');
+        card.style.display = visibleItems.length > 0 ? '' : 'none';
+      });
+    }
+
+    function getDefaultPricing(modelId) {
+      if (DEFAULT_MODEL_PRICING[modelId]) {
+        return DEFAULT_MODEL_PRICING[modelId];
+      }
+      
+      const lowerModelId = modelId.toLowerCase();
+      for (const [key, pricing] of Object.entries(DEFAULT_MODEL_PRICING)) {
+        if (lowerModelId.includes(key.toLowerCase()) || key.toLowerCase().includes(lowerModelId)) {
+          return pricing;
+        }
+      }
+      
+      return null;
+    }
+
+    function openPricingModal(modelId) {
+      const existing = modelPricingConfig[modelId] || {};
+      const defaultPricing = getDefaultPricing(modelId);
+      
+      const content = `
+        <div class="pricing-modal-content">
+          <h3 style="margin-bottom:20px;color:var(--text-primary)">Configure Pricing: <span style="color:var(--accent-cyan)">${modelId}</span></h3>
+          
+          ${defaultPricing ? `
+            <div class="pricing-presets" style="margin-bottom:20px">
+              <div class="pricing-presets-title">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+                Default pricing available
+              </div>
+              <div class="pricing-preset-btns">
+                <button class="pricing-preset-btn" onclick="applyPresetPricing('${modelId}')">
+                  Apply Default: $${defaultPricing.input}/M input, $${defaultPricing.output}/M output
+                  ${defaultPricing.cached_input ? `, $${defaultPricing.cached_input}/M cached` : ''}
+                </button>
+              </div>
+            </div>
+          ` : ''}
+          
+          <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">
+            Set pricing per 1 million tokens (USD). Leave fields empty to skip.
+          </p>
+          
+          <div class="pricing-form-grid">
+            <div class="pricing-form-group">
+              <label class="pricing-form-label">Input Tokens <span>(per 1M)</span></label>
+              <input type="number" step="0.001" min="0" class="pricing-form-input" id="pricingInput" 
+                value="${existing.input || ''}" placeholder="e.g., 3.00">
+            </div>
+            <div class="pricing-form-group">
+              <label class="pricing-form-label">Output Tokens <span>(per 1M)</span></label>
+              <input type="number" step="0.001" min="0" class="pricing-form-input" id="pricingOutput" 
+                value="${existing.output || ''}" placeholder="e.g., 15.00">
+            </div>
+            <div class="pricing-form-group">
+              <label class="pricing-form-label">Cached Input <span>(per 1M, optional)</span></label>
+              <input type="number" step="0.001" min="0" class="pricing-form-input" id="pricingCached" 
+                value="${existing.cached_input || ''}" placeholder="e.g., 0.30">
+            </div>
+            <div class="pricing-form-group">
+              <label class="pricing-form-label">Cached Write <span>(per 1M, optional)</span></label>
+              <input type="number" step="0.001" min="0" class="pricing-form-input" id="pricingCacheWrite" 
+                value="${existing.cache_write || ''}" placeholder="e.g., 3.75">
+            </div>
+          </div>
+          
+          <div style="display:flex;gap:12px;margin-top:24px;justify-content:flex-end">
+            <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+            <button class="btn btn-primary" onclick="savePricingForModel('${modelId}')">Save Pricing</button>
+          </div>
+        </div>
+      `;
+      
+      showModal('Model Pricing', content);
+    }
+
+    function applyPresetPricing(modelId) {
+      const defaultPricing = getDefaultPricing(modelId);
+      if (defaultPricing) {
+        document.getElementById('pricingInput').value = defaultPricing.input || '';
+        document.getElementById('pricingOutput').value = defaultPricing.output || '';
+        document.getElementById('pricingCached').value = defaultPricing.cached_input || '';
+        document.getElementById('pricingCacheWrite').value = defaultPricing.cache_write || '';
+      }
+    }
+
+    function savePricingForModel(modelId) {
+      const input = parseFloat(document.getElementById('pricingInput').value) || 0;
+      const output = parseFloat(document.getElementById('pricingOutput').value) || 0;
+      const cached = parseFloat(document.getElementById('pricingCached').value) || 0;
+      const cacheWrite = parseFloat(document.getElementById('pricingCacheWrite').value) || 0;
+      
+      if (input === 0 && output === 0) {
+        toast('Please set at least input or output pricing', 'error');
+        return;
+      }
+      
+      modelPricingConfig[modelId] = {
+        input: input,
+        output: output,
+        cached_input: cached || undefined,
+        cache_write: cacheWrite || undefined
+      };
+      
+      savePricingConfig();
+      closeModal();
+      renderPricingModels();
+      toast(`Pricing saved for ${modelId}`, 'success');
+    }
+
+    function removePricing(modelId) {
+      if (confirm(`Remove pricing configuration for ${modelId}?`)) {
+        delete modelPricingConfig[modelId];
+        savePricingConfig();
+        renderPricingModels();
+        toast(`Pricing removed for ${modelId}`, 'success');
+      }
+    }
+
+    function applyDefaultPricing() {
+      if (!allModels || allModels.length === 0) {
+        toast('No models loaded', 'error');
+        return;
+      }
+      
+      let applied = 0;
+      allModels.forEach(m => {
+        const id = m.id || m.name;
+        if (id && !modelPricingConfig[id]) {
+          const defaultPricing = getDefaultPricing(id);
+          if (defaultPricing) {
+            modelPricingConfig[id] = { ...defaultPricing };
+            applied++;
+          }
+        }
+      });
+      
+      if (applied > 0) {
+        savePricingConfig();
+        renderPricingModels();
+        toast(`Applied default pricing to ${applied} models`, 'success');
+      } else {
+        toast('No new models to configure (all known models already have pricing)', 'info');
+      }
+    }
+
+    function clearAllPricing() {
+      if (confirm('Clear all pricing configurations? This cannot be undone.')) {
+        modelPricingConfig = {};
+        savePricingConfig();
+        renderPricingModels();
+        toast('All pricing configurations cleared', 'success');
+      }
+    }
+
+    function exportPricing() {
+      const dataStr = JSON.stringify(modelPricingConfig, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'model-pricing-config.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      toast('Pricing configuration exported', 'success');
+    }
+
+    function importPricingPrompt() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = '.json';
+      input.onchange = async (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          try {
+            const text = await file.text();
+            const imported = JSON.parse(text);
+            modelPricingConfig = { ...modelPricingConfig, ...imported };
+            savePricingConfig();
+            renderPricingModels();
+            toast(`Imported pricing for ${Object.keys(imported).length} models`, 'success');
+          } catch (err) {
+            toast('Failed to import: Invalid JSON file', 'error');
+          }
+        }
+      };
+      input.click();
+    }
+
+    function calculateUsageCost(usageData) {
+      if (!usageData || !usageData.model_breakdown) return null;
+      
+      let totalCost = 0;
+      const breakdown = [];
+      
+      for (const [model, stats] of Object.entries(usageData.model_breakdown)) {
+        const pricing = modelPricingConfig[model] || getDefaultPricing(model);
+        if (pricing) {
+          const inputTokens = stats.input_tokens || stats.prompt_tokens || 0;
+          const outputTokens = stats.output_tokens || stats.completion_tokens || 0;
+          const cachedTokens = stats.cached_tokens || stats.cache_read_input_tokens || 0;
+          
+          const inputCost = (inputTokens / 1000000) * (pricing.input || 0);
+          const outputCost = (outputTokens / 1000000) * (pricing.output || 0);
+          const cachedCost = (cachedTokens / 1000000) * (pricing.cached_input || pricing.input || 0);
+          
+          const modelCost = inputCost + outputCost + cachedCost;
+          totalCost += modelCost;
+          
+          if (modelCost > 0) {
+            breakdown.push({
+              model,
+              inputTokens,
+              outputTokens,
+              cachedTokens,
+              cost: modelCost
+            });
+          }
+        }
+      }
+      
+      return { total: totalCost, breakdown };
+    }
+
+    // Initialize pricing on load
+    loadPricingConfig();
+
     async function checkLatestVersion() {
       const checkBtn = document.getElementById('checkUpdateBtn');
       if (checkBtn) {
@@ -9289,6 +10301,9 @@
       document.getElementById('usageCacheRead').textContent = totalCacheRead > 0 ? formatNumber(totalCacheRead) : '-';
       document.getElementById('usageCacheWrite').textContent = totalCacheWrite > 0 ? formatNumber(totalCacheWrite) : '-';
 
+      // Calculate and display estimated costs
+      updateUsageCosts(usageData, modelUsage);
+
       // Render Providers with XSS protection
       renderProviderStats(providerUsage);
 
@@ -9297,6 +10312,93 @@
 
       // Render Charts
       renderUsageChartsUnified(usageData);
+    }
+
+    function updateUsageCosts(usageData, modelUsage) {
+      let totalInputCost = 0;
+      let totalOutputCost = 0;
+      let totalCachedCost = 0;
+      let pricedModelCount = 0;
+      
+      const apis = usageData.apis || {};
+      
+      // Iterate through all models and calculate costs
+      for (const [apiKey, apiStats] of Object.entries(apis)) {
+        if (!apiStats || typeof apiStats !== 'object') continue;
+        
+        const models = apiStats.models || {};
+        for (const [modelName, modelStats] of Object.entries(models)) {
+          if (!modelStats || typeof modelStats !== 'object') continue;
+          
+          const pricing = modelPricingConfig[modelName] || getDefaultPricing(modelName);
+          if (!pricing) continue;
+          
+          let modelInput = 0, modelOutput = 0, modelCached = 0;
+          
+          const details = modelStats.details || [];
+          for (const detail of details) {
+            const t = detail.tokens || {};
+            modelInput += (t.input_tokens || 0);
+            modelOutput += (t.output_tokens || 0);
+            modelCached += (t.cached_tokens || t.cache_read_input_tokens || 0);
+          }
+          
+          // Calculate costs (prices are per 1M tokens)
+          // Note: input_tokens from API typically includes cached tokens
+          // So we need to subtract cached to avoid double-counting
+          const nonCachedInput = Math.max(0, modelInput - modelCached);
+          const inputCost = (nonCachedInput / 1000000) * (pricing.input || 0);
+          const outputCost = (modelOutput / 1000000) * (pricing.output || 0);
+          const cachedCost = (modelCached / 1000000) * (pricing.cached_input || pricing.input * 0.1 || 0);
+          
+          totalInputCost += inputCost;
+          totalOutputCost += outputCost;
+          totalCachedCost += cachedCost;
+          
+          if (modelInput > 0 || modelOutput > 0) {
+            pricedModelCount++;
+          }
+        }
+      }
+      
+      const totalCost = totalInputCost + totalOutputCost + totalCachedCost;
+      
+      // Update UI
+      const formatCost = (cost) => {
+        if (cost >= 1000) return '$' + cost.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+        if (cost >= 100) return '$' + cost.toFixed(1);
+        if (cost >= 1) return '$' + cost.toFixed(2);
+        if (cost >= 0.01) return '$' + cost.toFixed(3);
+        return '$' + cost.toFixed(4);
+      };
+      
+      document.getElementById('usageTotalCost').textContent = formatCost(totalCost);
+      document.getElementById('usageInputCost').textContent = formatCost(totalInputCost);
+      document.getElementById('usageOutputCost').textContent = formatCost(totalOutputCost);
+      document.getElementById('usageCachedCost').textContent = formatCost(totalCachedCost);
+      document.getElementById('usagePricedModels').textContent = pricedModelCount.toString();
+      
+      // Show/hide note based on whether we have pricing
+      const noteEl = document.getElementById('usageCostNote');
+      if (noteEl) {
+        if (pricedModelCount > 0 && totalCost > 0) {
+          noteEl.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            <span style="color:var(--accent-green)">Estimated cost based on ${pricedModelCount} model(s) with pricing configured.</span>
+          `;
+        } else {
+          noteEl.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span>Configure model pricing in <a href="#" onclick="navigateTo('models');setTimeout(()=>switchModelsTab('models-pricing'),100);return false" style="color:var(--accent-cyan)">Models → Model Pricing</a> tab to see accurate cost estimates.</span>
+          `;
+        }
+      }
     }
 
     function renderProviderStats(providerUsage) {
@@ -9365,21 +10467,39 @@
       const models = apiData.models || {};
       const modelEntries = Object.entries(models).sort((a, b) => b[1].total_requests - a[1].total_requests);
 
-      let totalInput = 0, totalOutput = 0, totalReasoning = 0;
+      let totalInput = 0, totalOutput = 0, totalReasoning = 0, totalCached = 0;
       let lastCallTime = null;
+      let totalCost = 0;
 
-      modelEntries.forEach(([, modelData]) => {
+      modelEntries.forEach(([modelName, modelData]) => {
         const details = modelData.details || [];
+        let modelInput = 0, modelOutput = 0, modelCached = 0;
         details.forEach(d => {
           const t = d.tokens || {};
-          totalInput += t.input_tokens || 0;
-          totalOutput += t.output_tokens || 0;
+          const input = t.input_tokens || 0;
+          const output = t.output_tokens || 0;
+          const cached = t.cached_tokens || 0;
+          totalInput += input;
+          totalOutput += output;
           totalReasoning += t.reasoning_tokens || 0;
+          totalCached += cached;
+          modelInput += input;
+          modelOutput += output;
+          modelCached += cached;
           if (d.timestamp) {
             const ts = new Date(d.timestamp);
             if (!lastCallTime || ts > lastCallTime) lastCallTime = ts;
           }
         });
+        const pricing = modelPricingConfig[modelName] || getDefaultPricing(modelName);
+        if (pricing) {
+          // Subtract cached from input to avoid double-counting (input_tokens includes cached)
+          const nonCachedInput = Math.max(0, modelInput - modelCached);
+          const inputCost = (nonCachedInput / 1000000) * (pricing.input || 0);
+          const outputCost = (modelOutput / 1000000) * (pricing.output || 0);
+          const cachedCost = (modelCached / 1000000) * (pricing.cached_input || pricing.input * 0.1 || 0);
+          totalCost += inputCost + outputCost + cachedCost;
+        }
       });
 
       const modalContent = `
@@ -9398,7 +10518,7 @@
           </div>
         </div>
 
-        <div class="provider-detail-summary">
+        <div class="provider-detail-summary" style="grid-template-columns: repeat(4, 1fr);">
           <div class="provider-summary-card">
             <div class="value">${(apiData.total_requests || 0).toLocaleString()}</div>
             <div class="label">Total Requests</div>
@@ -9406,6 +10526,10 @@
           <div class="provider-summary-card">
             <div class="value purple">${formatNumber(apiData.total_tokens || 0)}</div>
             <div class="label">Total Tokens</div>
+          </div>
+          <div class="provider-summary-card">
+            <div class="value" style="color: var(--accent-yellow);">$${totalCost.toFixed(4)}</div>
+            <div class="label">Est. Cost</div>
           </div>
           <div class="provider-summary-card">
             <div class="value green">${lastCallTime ? formatRelativeTime(lastCallTime) : '-'}</div>
@@ -9440,6 +10564,17 @@
               }
             });
 
+            const pricing = modelPricingConfig[modelName] || getDefaultPricing(modelName);
+            let modelCost = 0;
+            if (pricing) {
+              // Subtract cached from input to avoid double-counting (input_tokens includes cached)
+              const nonCachedInput = Math.max(0, modelInput - modelCacheRead);
+              const inputCost = (nonCachedInput / 1000000) * (pricing.input || 0);
+              const outputCost = (modelOutput / 1000000) * (pricing.output || 0);
+              const cachedCost = (modelCacheRead / 1000000) * (pricing.cached_input || pricing.input * 0.1 || 0);
+              modelCost = inputCost + outputCost + cachedCost;
+            }
+
             return `
               <div class="provider-model-item" id="provider-model-${idx}">
                 <div class="provider-model-item-header" onclick="toggleProviderModelDetail(${idx})">
@@ -9458,6 +10593,9 @@
                         <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
                       </svg>
                       <span class="value">${formatNumber(modelData.total_tokens || 0)}</span>
+                    </div>
+                    <div class="provider-model-stat" style="color: var(--accent-yellow);">
+                      <span class="value">$${modelCost.toFixed(4)}</span>
                     </div>
                     <div class="provider-model-expand">
                       <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -9483,6 +10621,10 @@
                     <div class="provider-model-detail-item">
                       <span class="label">Cache Read</span>
                       <span class="value">${modelCacheRead > 0 ? formatNumber(modelCacheRead) : '-'}</span>
+                    </div>
+                    <div class="provider-model-detail-item">
+                      <span class="label" style="color: var(--accent-yellow);">Est. Cost</span>
+                      <span class="value" style="color: var(--accent-yellow);">$${modelCost.toFixed(4)}</span>
                     </div>
                     <div class="provider-model-last-call">
                       <span class="label">
@@ -11414,6 +12556,13 @@ Tokens: ${JSON.stringify(f.tokens, null, 2)}`;
       } catch (e) {
         toast('Failed: ' + e.message, 'error');
       }
+    }
+
+    function showModal(title, content, footer = '') {
+      document.getElementById('modalTitle').textContent = title;
+      document.getElementById('modalContent').innerHTML = content;
+      document.getElementById('modalFooter').innerHTML = footer;
+      document.getElementById('modal').classList.add('active');
     }
 
     function closeModal() {
