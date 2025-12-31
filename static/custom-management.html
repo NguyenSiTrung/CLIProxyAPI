@@ -11116,11 +11116,7 @@
 
     async function exportUsageData() {
       try {
-        const response = await fetch('/v0/management/usage/export');
-        if (!response.ok) {
-          throw new Error('Failed to fetch export data');
-        }
-        const exportObj = await response.json();
+        const exportObj = await api('GET', '/usage/export');
         
         const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
@@ -11176,18 +11172,7 @@
           return;
         }
         
-        const response = await fetch('/v0/management/usage/import', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-        
-        if (!response.ok) {
-          const err = await response.json().catch(() => ({}));
-          throw new Error(err.error || 'Import failed');
-        }
-        
-        const result = await response.json();
+        const result = await api('POST', '/usage/import', payload);
         toast(`Imported ${result.added} records (${result.skipped} skipped)`, 'success');
         loadUsageStats(); // Refresh the display
       } catch (err) {
