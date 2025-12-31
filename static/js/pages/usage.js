@@ -1161,15 +1161,13 @@ export async function loadBackupFiles() {
   try {
     const result = await api('GET', '/usage/backups');
     
-    if (!result.enabled) {
-      listEl.innerHTML = '<div class="auto-backup-files-empty">Auto-backup not enabled in config.yaml</div>';
-      return;
-    }
-    
     const files = result.files || [];
     
     if (files.length === 0) {
-      listEl.innerHTML = '<div class="auto-backup-files-empty">No backup files found</div>';
+      const message = result.enabled 
+        ? 'No backup files found' 
+        : 'No backup files found (auto-backup is disabled)';
+      listEl.innerHTML = `<div class="auto-backup-files-empty">${message}</div>`;
       return;
     }
     
@@ -1199,6 +1197,28 @@ export async function loadBackupFiles() {
  */
 export function refreshBackupFiles() {
   loadBackupFiles();
+}
+
+/**
+ * Trigger a manual backup now
+ */
+export async function triggerManualBackup() {
+  const btn = document.getElementById('manualBackupBtn');
+  const label = document.getElementById('manualBackupBtnLabel');
+  
+  if (btn) btn.disabled = true;
+  if (label) label.textContent = 'Backing up...';
+  
+  try {
+    const result = await api('POST', '/usage/backups/trigger');
+    toast(result.message || 'Backup completed successfully', 'success');
+    loadBackupFiles();
+  } catch (err) {
+    toast('Backup failed: ' + err.message, 'error');
+  } finally {
+    if (btn) btn.disabled = false;
+    if (label) label.textContent = 'Backup Now';
+  }
 }
 
 /**
@@ -1265,6 +1285,7 @@ export const usageModule = {
   initAutoBackup,
   loadBackupFiles,
   refreshBackupFiles,
+  triggerManualBackup,
   importBackupFile
 };
 
@@ -1279,4 +1300,5 @@ window.importUsageData = importUsageData;
 window.toggleAutoBackupSettings = toggleAutoBackupSettings;
 window.initAutoBackup = initAutoBackup;
 window.refreshBackupFiles = refreshBackupFiles;
+window.triggerManualBackup = triggerManualBackup;
 window.importBackupFile = importBackupFile;

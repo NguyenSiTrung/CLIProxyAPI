@@ -97,9 +97,28 @@ func (h *Handler) ListBackupFiles(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"enabled":     true,
+		"enabled":     svc.IsRunning(),
 		"folder_path": svc.GetBackupFolderPath(),
 		"files":       files,
+	})
+}
+
+// TriggerManualBackup triggers an immediate backup of usage statistics.
+func (h *Handler) TriggerManualBackup(c *gin.Context) {
+	svc := usage.GetGlobalAutoBackupService()
+	if svc == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "auto-backup service not enabled"})
+		return
+	}
+
+	if err := svc.PerformBackupNow(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "backup failed: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "Manual backup completed successfully",
 	})
 }
 
