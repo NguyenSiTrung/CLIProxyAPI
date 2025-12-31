@@ -101,6 +101,7 @@ window.login = () => login(onAuthSuccess);
 window.logout = logout;
 window.navigateTo = navigateTo;
 window.toggleMobileSidebar = toggleMobileSidebar;
+window.closeMobileSidebar = closeMobileSidebar;
 window.closeModal = closeModal;
 
 // Initialize when DOM is ready
