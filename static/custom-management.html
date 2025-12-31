@@ -10281,9 +10281,31 @@
           if (!apiStats || typeof apiStats !== 'object') continue;
 
           const pKey = apiKey || 'unknown';
-          if (!providerUsage[pKey]) providerUsage[pKey] = { requests: 0, tokens: 0 };
+          if (!providerUsage[pKey]) providerUsage[pKey] = { requests: 0, tokens: 0, cost: 0 };
           providerUsage[pKey].requests += (apiStats.total_requests || 0);
           providerUsage[pKey].tokens += (apiStats.total_tokens || 0);
+
+          // Calculate cost for this provider
+          const providerModels = apiStats.models || {};
+          for (const [modelName, modelStats] of Object.entries(providerModels)) {
+            if (!modelStats || typeof modelStats !== 'object') continue;
+            const details = modelStats.details || [];
+            let modelInput = 0, modelOutput = 0, modelCached = 0;
+            for (const detail of details) {
+              const t = detail.tokens || {};
+              modelInput += (t.input_tokens || 0);
+              modelOutput += (t.output_tokens || 0);
+              modelCached += (t.cached_tokens || 0);
+            }
+            const pricing = modelPricingConfig[modelName] || getDefaultPricing(modelName);
+            if (pricing) {
+              const nonCachedInput = Math.max(0, modelInput - modelCached);
+              const inputCost = (nonCachedInput / 1000000) * (pricing.input || 0);
+              const outputCost = (modelOutput / 1000000) * (pricing.output || 0);
+              const cachedCost = (modelCached / 1000000) * (pricing.cached_input || pricing.input * 0.1 || 0);
+              providerUsage[pKey].cost += inputCost + outputCost + cachedCost;
+            }
+          }
 
           const models = apiStats.models || {};
           for (const [modelName, modelStats] of Object.entries(models)) {
@@ -10442,7 +10464,8 @@
               <p>${formatNumber(stats.tokens)} tokens</p>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:10px">
+          <div style="display:flex;align-items:center;gap:12px">
+            <span class="badge" style="background:rgba(251,191,36,0.15);color:var(--accent-yellow);font-weight:600">$${stats.cost.toFixed(4)}</span>
             <span class="badge badge-purple">${stats.requests.toLocaleString()}</span>
             <svg class="provider-item-arrow" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="9 18 15 12 9 6"></polyline>
