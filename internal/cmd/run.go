@@ -13,6 +13,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/api"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/telegram"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/usage"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy"
 	log "github.com/sirupsen/logrus"
 )
@@ -56,6 +57,18 @@ func StartService(cfg *config.Config, configPath string, localPassword string) {
 		telegramBot = telegram.NewBot(cfg.Telegram)
 		telegramBot.Start()
 		defer telegramBot.Stop()
+	}
+
+	// Start usage auto-backup service if configured
+	var autoBackupService *usage.AutoBackupService
+	if cfg.UsageStatisticsEnabled && cfg.UsageAutoBackup.Enabled {
+		autoBackupService = usage.NewAutoBackupService(cfg.UsageAutoBackup, usage.GetRequestStatistics())
+		if err := autoBackupService.Start(); err != nil {
+			log.Errorf("Failed to start auto-backup service: %v", err)
+		} else {
+			usage.SetGlobalAutoBackupService(autoBackupService)
+			defer autoBackupService.Stop()
+		}
 	}
 
 	err = service.Run(runCtx)

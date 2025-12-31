@@ -23,7 +23,7 @@ import { loadModels, fetchModels } from './pages/models.js';
 import { loadAuthFiles } from './pages/auth-files.js';
 import { loadKeys, setupKeysTabHandlers } from './pages/keys.js';
 import { loadConfig, setupConfigKeyboardShortcuts } from './pages/config.js';
-import { loadUsageStats } from './pages/usage.js';
+import { loadUsageStats, initAutoBackup } from './pages/usage.js';
 import { loadAnalytics } from './pages/analytics.js';
 import { loadAmpSettings } from './pages/amp.js';
 import { loadLogs } from './pages/logs.js';
@@ -82,6 +82,9 @@ function init() {
 
   // Initialize modal system
   initModal();
+
+  // Initialize auto-backup system
+  initAutoBackup();
 
   // Setup login handlers
   setupLoginHandlers(onAuthSuccess);

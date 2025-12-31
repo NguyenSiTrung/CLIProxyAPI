@@ -77,3 +77,64 @@ func (h *Handler) ImportUsageStatistics(c *gin.Context) {
 		"failed_requests": snapshot.FailureCount,
 	})
 }
+
+// ListBackupFiles returns a list of available backup files from the server.
+func (h *Handler) ListBackupFiles(c *gin.Context) {
+	svc := usage.GetGlobalAutoBackupService()
+	if svc == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"enabled":     false,
+			"folder_path": "",
+			"files":       []usage.BackupFileInfo{},
+		})
+		return
+	}
+
+	files, err := svc.ListBackupFiles()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"enabled":     true,
+		"folder_path": svc.GetBackupFolderPath(),
+		"files":       files,
+	})
+}
+
+// ImportBackupFile imports usage statistics from a server-side backup file.
+func (h *Handler) ImportBackupFile(c *gin.Context) {
+	if h == nil || h.usageStats == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "usage statistics unavailable"})
+		return
+	}
+
+	filename := c.Query("filename")
+	if filename == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "filename is required"})
+		return
+	}
+
+	svc := usage.GetGlobalAutoBackupService()
+	if svc == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "auto-backup service not enabled"})
+		return
+	}
+
+	payload, err := svc.ReadBackupFile(filename)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "failed to read backup file: " + err.Error()})
+		return
+	}
+
+	result := h.usageStats.MergeSnapshot(payload.Usage)
+	snapshot := h.usageStats.Snapshot()
+	c.JSON(http.StatusOK, gin.H{
+		"added":           result.Added,
+		"skipped":         result.Skipped,
+		"total_requests":  snapshot.TotalRequests,
+		"failed_requests": snapshot.FailureCount,
+		"backup_time":     payload.ExportedAt,
+	})
+}

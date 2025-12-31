@@ -139,8 +139,17 @@ type ModelSnapshot struct {
 
 var defaultRequestStatistics = NewRequestStatistics()
 
+// Global auto-backup service instance
+var globalAutoBackupService *AutoBackupService
+
 // GetRequestStatistics returns the shared statistics store.
 func GetRequestStatistics() *RequestStatistics { return defaultRequestStatistics }
+
+// SetGlobalAutoBackupService sets the global auto-backup service instance.
+func SetGlobalAutoBackupService(svc *AutoBackupService) { globalAutoBackupService = svc }
+
+// GetGlobalAutoBackupService returns the global auto-backup service instance.
+func GetGlobalAutoBackupService() *AutoBackupService { return globalAutoBackupService }
 
 // NewRequestStatistics constructs an empty statistics store.
 func NewRequestStatistics() *RequestStatistics {

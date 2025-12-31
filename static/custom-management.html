@@ -970,6 +970,67 @@
               </svg>
               Refresh
             </button>
+            <button class="btn btn-secondary btn-sm" onclick="toggleAutoBackupSettings()" id="autoBackupBtn" title="Auto-backup settings">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <polyline points="12 6 12 12 16 14"></polyline>
+              </svg>
+              <span id="autoBackupBtnLabel">Auto</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Auto-Backup Status Panel (Server-Side) -->
+        <div id="autoBackupPanel" class="auto-backup-panel" style="display:none">
+          <div class="auto-backup-header">
+            <div class="auto-backup-title">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                <path d="M3 3v5h5"></path>
+                <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
+                <path d="M16 16h5v5"></path>
+              </svg>
+              <h3>Auto-Backup Status</h3>
+            </div>
+            <button class="auto-backup-close" onclick="toggleAutoBackupSettings()">×</button>
+          </div>
+          <div class="auto-backup-content">
+            <div class="auto-backup-row">
+              <span>Server-side auto-backup</span>
+              <span id="autoBackupStatus" class="auto-backup-status">Checking...</span>
+            </div>
+            <div class="auto-backup-row" id="autoBackupIntervalRow" style="display:none">
+              <span>Backup interval</span>
+              <span id="autoBackupIntervalDisplay" class="auto-backup-next-time">--</span>
+            </div>
+            <div class="auto-backup-row" id="autoBackupFolderRow" style="display:none">
+              <span>Backup folder</span>
+              <span id="autoBackupFolderDisplay" class="auto-backup-last-time" style="word-break:break-all;text-align:right;max-width:200px">--</span>
+            </div>
+            <div class="auto-backup-info">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="16" x2="12" y2="12"></line>
+                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              </svg>
+              <span>Auto-backup is configured in config.yaml. Backups are saved to the server's file system.</span>
+            </div>
+            <!-- Backup Files List -->
+            <div class="auto-backup-files-section" id="autoBackupFilesSection">
+              <div class="auto-backup-files-header">
+                <span>Available Backups</span>
+                <button class="btn btn-secondary btn-sm" onclick="refreshBackupFiles()" title="Refresh list">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M23 4v6h-6"></path>
+                    <path d="M1 20v-6h6"></path>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                  </svg>
+                </button>
+              </div>
+              <div class="auto-backup-files-list" id="autoBackupFilesList">
+                <div class="auto-backup-files-loading">Loading...</div>
+              </div>
+            </div>
           </div>
         </div>
 
