@@ -19,6 +19,55 @@ const AUTO_REFRESH_DELAY = 5 * 60 * 1000; // 5 minutes
 // Supported providers for quota checking
 const SUPPORTED_PROVIDERS = ['antigravity', 'codex', 'gemini-cli'];
 
+// Antigravity quota configuration (matching original management center)
+const ANTIGRAVITY_QUOTA_URLS = [
+  'https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels',
+  'https://daily-cloudcode-pa.sandbox.googleapis.com/v1internal:fetchAvailableModels',
+  'https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels'
+];
+
+const ANTIGRAVITY_REQUEST_HEADERS = {
+  'Authorization': 'Bearer $TOKEN$',
+  'Content-Type': 'application/json',
+  'User-Agent': 'antigravity/1.11.5 windows/amd64'
+};
+
+const ANTIGRAVITY_QUOTA_GROUPS = [
+  { id: 'claude-gpt', label: 'Claude/GPT', identifiers: ['claude-sonnet-4-5-thinking', 'claude-opus-4-5-thinking', 'claude-sonnet-4-5', 'gpt-oss-120b-medium'] },
+  { id: 'gemini-3-pro', label: 'Gemini 3 Pro', identifiers: ['gemini-3-pro-high', 'gemini-3-pro-low'] },
+  { id: 'gemini-2-5-flash', label: 'Gemini 2.5 Flash', identifiers: ['gemini-2.5-flash', 'gemini-2.5-flash-thinking'] },
+  { id: 'gemini-2-5-flash-lite', label: 'Gemini 2.5 Flash Lite', identifiers: ['gemini-2.5-flash-lite'] },
+  { id: 'gemini-2-5-cu', label: 'Gemini 2.5 CU', identifiers: ['rev19-uic3-1p'] },
+  { id: 'gemini-3-flash', label: 'Gemini 3 Flash', identifiers: ['gemini-3-flash'] },
+  { id: 'gemini-image', label: 'gemini-3-pro-image', identifiers: ['gemini-3-pro-image'], labelFromModel: true }
+];
+
+// Codex quota configuration
+const CODEX_USAGE_URL = 'https://chatgpt.com/backend-api/wham/usage';
+
+const CODEX_REQUEST_HEADERS = {
+  'Authorization': 'Bearer $TOKEN$',
+  'Content-Type': 'application/json',
+  'User-Agent': 'codex_cli_rs/0.76.0 (Debian 13.0.0; x86_64) WindowsTerminal'
+};
+
+// Gemini CLI quota configuration
+const GEMINI_CLI_QUOTA_URL = 'https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota';
+
+const GEMINI_CLI_REQUEST_HEADERS = {
+  'Authorization': 'Bearer $TOKEN$',
+  'Content-Type': 'application/json'
+};
+
+const GEMINI_CLI_QUOTA_GROUPS = [
+  { id: 'gemini-2-5-flash-series', label: 'Gemini 2.5 Flash Series', modelIds: ['gemini-2.5-flash', 'gemini-2.5-flash-lite'] },
+  { id: 'gemini-2-5-pro', label: 'Gemini 2.5 Pro', modelIds: ['gemini-2.5-pro'] },
+  { id: 'gemini-3-pro-preview', label: 'Gemini 3 Pro Preview', modelIds: ['gemini-3-pro-preview'] },
+  { id: 'gemini-3-flash-preview', label: 'Gemini 3 Flash Preview', modelIds: ['gemini-3-flash-preview'] }
+];
+
+const GEMINI_CLI_IGNORED_MODEL_PREFIXES = ['gemini-2.0-flash'];
+
 /**
  * Load the quota page
  */
@@ -29,7 +78,7 @@ export async function loadQuotaPage() {
   container.innerHTML = `
     <div class="quota-empty-state">
       <div class="quota-loading-spinner"></div>
-      <p>Loading quota information...</p>
+      <p>Loading auth files...</p>
     </div>
   `;
 
@@ -40,11 +89,9 @@ export async function loadQuotaPage() {
     applyFilter();
     renderQuotaPage();
     
-    await fetchVisibleQuotas();
-    
-    startAutoRefresh();
-    
-    updateLastUpdated();
+    // Don't auto-fetch quotas - user must click "Fetch All" or individual refresh
+    // Show a hint message
+    updateLastUpdated('Click "Fetch All" to load quota data');
   } catch (e) {
     toast('Failed to load auth files: ' + e.message, 'error');
     container.innerHTML = `
@@ -119,6 +166,12 @@ function renderQuotaPage() {
     }
     
     if (!data) {
+      // Show idle card (not yet fetched) instead of loading card
+      return renderIdleCard(authFile);
+    }
+    
+    // Check if data is currently being fetched (has loading state)
+    if (data.loading) {
       return renderLoadingCard(authFile);
     }
     
@@ -136,6 +189,40 @@ function renderQuotaPage() {
 
   container.innerHTML = cardsHtml;
   renderPagination();
+}
+
+/**
+ * Render idle card for auth file (not yet fetched)
+ * @param {object} authFile - Auth file object
+ * @returns {string} HTML string
+ */
+function renderIdleCard(authFile) {
+  return `
+    <div class="quota-card idle" data-auth-index="${authFile.auth_index}">
+      <div class="quota-card-header">
+        <div class="quota-card-info">
+          <div class="quota-card-name">${escapeHtml(authFile.file_name || authFile.name)}</div>
+          <span class="quota-card-provider ${authFile.provider?.toLowerCase()}">${escapeHtml(authFile.provider || 'Unknown')}</span>
+        </div>
+        <div class="quota-card-actions">
+          <button class="quota-refresh-btn" onclick="refreshQuota('${authFile.auth_index}')" title="Fetch Quota">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 4v6h-6"></path>
+              <path d="M1 20v-6h6"></path>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="quota-idle-content">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M12 6v6l4 2"></path>
+        </svg>
+        <span>Click refresh to fetch quota</span>
+      </div>
+    </div>
+  `;
 }
 
 /**
@@ -209,6 +296,10 @@ async function fetchVisibleQuotas() {
  * @param {object} authFile - Auth file object
  */
 async function fetchQuotaForAuth(authFile) {
+  // Set loading state
+  quotaData.set(authFile.auth_index, { loading: true });
+  renderQuotaPage();
+  
   try {
     let data;
     const fetchFn = async () => {
@@ -227,6 +318,8 @@ async function fetchQuotaForAuth(authFile) {
     data = await retryWithBackoff(fetchFn, 3, 1000);
     if (data) {
       quotaData.set(authFile.auth_index, data);
+    } else {
+      quotaData.delete(authFile.auth_index);
     }
   } catch (e) {
     quotaData.set(authFile.auth_index, { error: e });
@@ -235,11 +328,12 @@ async function fetchQuotaForAuth(authFile) {
 
 /**
  * Update the last updated timestamp
+ * @param {string} [customMessage] - Optional custom message to display
  */
-function updateLastUpdated() {
+function updateLastUpdated(customMessage) {
   const el = document.getElementById('quotaUpdateTime');
   if (el) {
-    el.textContent = 'Updated ' + new Date().toLocaleTimeString();
+    el.textContent = customMessage || ('Updated ' + new Date().toLocaleTimeString());
   }
 }
 
@@ -295,59 +389,403 @@ export async function callQuotaAPI(authIndex, url, method, headers = null, data 
 }
 
 /**
+ * Parse Antigravity models payload and build quota groups
+ * @param {object} models - Models object from API response
+ * @returns {Array} Quota groups with remaining fraction and reset time
+ */
+function buildAntigravityQuotaGroups(models) {
+  if (!models || typeof models !== 'object') return [];
+  
+  const groups = [];
+  let geminiProResetTime = null;
+
+  for (const groupDef of ANTIGRAVITY_QUOTA_GROUPS) {
+    const matches = groupDef.identifiers
+      .map(id => {
+        const entry = models[id];
+        if (!entry) return null;
+        const quotaInfo = entry.quotaInfo || entry.quota_info || {};
+        const remainingValue = quotaInfo.remainingFraction ?? quotaInfo.remaining_fraction ?? quotaInfo.remaining;
+        const remainingFraction = normalizeQuotaFraction(remainingValue);
+        const resetTime = quotaInfo.resetTime || quotaInfo.reset_time;
+        const displayName = entry.displayName;
+        
+        if (remainingFraction === null && !resetTime) return null;
+        
+        return {
+          id: id,
+          remainingFraction: remainingFraction ?? (resetTime ? 0 : null),
+          resetTime: resetTime,
+          displayName: displayName
+        };
+      })
+      .filter(Boolean);
+
+    if (matches.length === 0) continue;
+
+    const remainingFraction = Math.min(...matches.map(m => m.remainingFraction));
+    const resetTime = matches.find(m => m.resetTime)?.resetTime;
+    const displayName = matches.find(m => m.displayName)?.displayName;
+    const label = groupDef.labelFromModel && displayName ? displayName : groupDef.label;
+
+    const group = {
+      id: groupDef.id,
+      label: label,
+      models: matches.map(m => m.id),
+      remainingFraction: remainingFraction,
+      percentage: Math.round(Math.max(0, Math.min(1, remainingFraction)) * 100),
+      resetTime: resetTime
+    };
+
+    groups.push(group);
+
+    if (groupDef.id === 'gemini-3-pro') {
+      geminiProResetTime = resetTime;
+    }
+  }
+
+  return groups;
+}
+
+/**
+ * Normalize quota fraction value to a number between 0 and 1
+ * @param {any} value - Value to normalize
+ * @returns {number|null} Normalized fraction or null
+ */
+function normalizeQuotaFraction(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    if (trimmed.endsWith('%')) {
+      const parsed = Number(trimmed.slice(0, -1));
+      return Number.isFinite(parsed) ? parsed / 100 : null;
+    }
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+/**
  * Fetch quota for Antigravity provider
  * @param {object} authFile - Auth file object
  * @returns {Promise<object>} Quota data
  */
 export async function fetchAntigravityQuota(authFile) {
-  const primaryUrl = 'https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels';
-  const fallbackUrl = 'https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels';
-  
-  const headers = {
-    'Authorization': 'Bearer $TOKEN$',
-    'Content-Type': 'application/json'
-  };
+  let lastError = null;
+  let lastStatusCode = null;
+  let priorityStatus = null;
+  let hadSuccess = false;
 
-  let response;
-  try {
-    response = await callQuotaAPI(authFile.auth_index, primaryUrl, 'POST', headers, {});
-  } catch (e) {
-    response = await callQuotaAPI(authFile.auth_index, fallbackUrl, 'POST', headers, {});
-  }
-
-  if (response.status_code !== 200) {
-    throw new Error(`HTTP ${response.status_code}: ${response.body || 'Unknown error'}`);
-  }
-
-  const data = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
-  
-  const quotaGroups = [];
-  let resetTime = null;
-
-  if (data.quotas && Array.isArray(data.quotas)) {
-    for (const quota of data.quotas) {
-      const label = quota.quotaGroupName || quota.quotaGroup || 'Unknown';
-      const remainingFraction = quota.remainingFraction ?? quota.remaining_fraction ?? 1;
-      const percentage = Math.round(remainingFraction * 100);
+  for (const url of ANTIGRAVITY_QUOTA_URLS) {
+    try {
+      const response = await callQuotaAPI(authFile.auth_index, url, 'POST', ANTIGRAVITY_REQUEST_HEADERS, '{}');
       
-      quotaGroups.push({
-        name: label,
-        percentage: percentage,
-        remainingFraction: remainingFraction
-      });
-
-      if (quota.resetTime || quota.reset_time) {
-        resetTime = quota.resetTime || quota.reset_time;
+      if (response.status_code < 200 || response.status_code >= 300) {
+        lastError = getApiCallErrorMessage(response);
+        lastStatusCode = response.status_code;
+        if (response.status_code === 403 || response.status_code === 404) {
+          priorityStatus = priorityStatus || response.status_code;
+        }
+        continue;
       }
+
+      hadSuccess = true;
+      const data = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
+      const models = data?.models;
+      
+      if (!models || typeof models !== 'object' || Array.isArray(models)) {
+        lastError = 'Empty models response';
+        continue;
+      }
+
+      const quotaGroups = buildAntigravityQuotaGroups(models);
+      
+      if (quotaGroups.length === 0) {
+        lastError = 'No quota groups found';
+        continue;
+      }
+
+      const resetTime = quotaGroups.find(g => g.resetTime)?.resetTime;
+
+      return {
+        provider: 'antigravity',
+        quotaGroups: quotaGroups,
+        resetTime: resetTime,
+        fetchedAt: new Date().toISOString()
+      };
+    } catch (e) {
+      lastError = e.message || 'Unknown error';
+      lastStatusCode = e.status || null;
     }
   }
 
-  return {
-    provider: 'antigravity',
-    quotaGroups: quotaGroups,
-    resetTime: resetTime,
-    fetchedAt: new Date().toISOString()
+  if (hadSuccess) {
+    return {
+      provider: 'antigravity',
+      quotaGroups: [],
+      resetTime: null,
+      fetchedAt: new Date().toISOString()
+    };
+  }
+
+  const err = new Error(lastError || 'Unknown error');
+  err.status = priorityStatus || lastStatusCode;
+  throw err;
+}
+
+/**
+ * Get error message from API call result
+ * @param {object} result - API call result
+ * @returns {string} Error message
+ */
+function getApiCallErrorMessage(result) {
+  const status = result.status_code;
+  const body = result.body;
+  let message = '';
+  
+  if (body && typeof body === 'object') {
+    message = body?.error?.message || body?.error || body?.message || '';
+  } else if (typeof body === 'string') {
+    message = body;
+  }
+  
+  if (status && message) return `${status} ${message}`.trim();
+  if (status) return `HTTP ${status}`;
+  return message || 'Request failed';
+}
+
+/**
+ * Decode base64url-encoded payload (JWT segment)
+ * @param {string} value - Base64url encoded string
+ * @returns {string|null} Decoded string or null
+ */
+function decodeBase64UrlPayload(value) {
+  const trimmed = (value || '').trim();
+  if (!trimmed) return null;
+  try {
+    const normalized = trimmed.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=');
+    return atob(padded);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extract chatgpt_account_id from id_token
+ * @param {any} value - id_token value (can be JWT string or object)
+ * @returns {string|null} Account ID or null
+ */
+function extractCodexChatgptAccountId(value) {
+  if (!value) return null;
+  
+  let payload = null;
+  
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    payload = value;
+  } else if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    
+    try {
+      payload = JSON.parse(trimmed);
+    } catch {
+      const segments = trimmed.split('.');
+      if (segments.length >= 2) {
+        const decoded = decodeBase64UrlPayload(segments[1]);
+        if (decoded) {
+          try {
+            payload = JSON.parse(decoded);
+          } catch {
+            return null;
+          }
+        }
+      }
+    }
+  }
+  
+  if (!payload) return null;
+  return (payload.chatgpt_account_id || payload.chatgptAccountId || '').trim() || null;
+}
+
+/**
+ * Resolve Codex chatgpt_account_id from auth file
+ * @param {object} file - Auth file object
+ * @returns {string|null} Account ID or null
+ */
+function resolveCodexChatgptAccountId(file) {
+  const metadata = file?.metadata || {};
+  const attributes = file?.attributes || {};
+  
+  const candidates = [
+    file.id_token,
+    metadata.id_token,
+    attributes.id_token
+  ];
+  
+  for (const candidate of candidates) {
+    const id = extractCodexChatgptAccountId(candidate);
+    if (id) return id;
+  }
+  
+  return null;
+}
+
+/**
+ * Resolve Codex plan type from auth file
+ * @param {object} file - Auth file object
+ * @returns {string|null} Plan type or null
+ */
+function resolveCodexPlanType(file) {
+  const metadata = file?.metadata || {};
+  const attributes = file?.attributes || {};
+  const idToken = typeof file?.id_token === 'object' ? file.id_token : {};
+  const metadataIdToken = typeof metadata?.id_token === 'object' ? metadata.id_token : {};
+  
+  const candidates = [
+    file.plan_type,
+    file.planType,
+    idToken?.plan_type,
+    idToken?.planType,
+    metadata?.plan_type,
+    metadata?.planType,
+    metadataIdToken?.plan_type,
+    metadataIdToken?.planType,
+    attributes?.plan_type,
+    attributes?.planType
+  ];
+  
+  for (const candidate of candidates) {
+    const normalized = normalizePlanType(candidate);
+    if (normalized) return normalized;
+  }
+  
+  return null;
+}
+
+/**
+ * Normalize plan type to lowercase
+ * @param {any} value - Plan type value
+ * @returns {string|null} Normalized plan type or null
+ */
+function normalizePlanType(value) {
+  if (typeof value === 'string') {
+    const trimmed = value.trim().toLowerCase();
+    return trimmed || null;
+  }
+  return null;
+}
+
+/**
+ * Format Codex reset time from window data
+ * @param {object} window - Rate limit window
+ * @returns {string} Formatted reset time
+ */
+function formatCodexResetLabel(window) {
+  if (!window) return '-';
+  
+  const resetAt = normalizeNumberValue(window.reset_at || window.resetAt);
+  if (resetAt !== null && resetAt > 0) {
+    return formatUnixSeconds(resetAt);
+  }
+  
+  const resetAfter = normalizeNumberValue(window.reset_after_seconds || window.resetAfterSeconds);
+  if (resetAfter !== null && resetAfter > 0) {
+    const targetSeconds = Math.floor(Date.now() / 1000 + resetAfter);
+    return formatUnixSeconds(targetSeconds);
+  }
+  
+  return '-';
+}
+
+/**
+ * Format Unix timestamp (seconds) to local date/time
+ * @param {number} value - Unix timestamp in seconds
+ * @returns {string} Formatted date string
+ */
+function formatUnixSeconds(value) {
+  if (!value) return '-';
+  const date = new Date(value * 1000);
+  if (isNaN(date.getTime())) return '-';
+  return date.toLocaleString(undefined, {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false
+  });
+}
+
+/**
+ * Normalize number value
+ * @param {any} value - Value to normalize
+ * @returns {number|null} Normalized number or null
+ */
+function normalizeNumberValue(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const parsed = Number(trimmed);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+/**
+ * Build Codex quota windows from rate limit data
+ * @param {object} payload - Usage API response
+ * @returns {Array} Rate limit windows
+ */
+function buildCodexQuotaWindows(payload) {
+  const rateLimit = payload.rate_limit || payload.rateLimit || {};
+  const codeReviewLimit = payload.code_review_rate_limit || payload.codeReviewRateLimit || {};
+  const windows = [];
+  
+  const addWindow = (id, label, windowData, limitReached, allowed) => {
+    if (!windowData) return;
+    
+    const resetLabel = formatCodexResetLabel(windowData);
+    const usedPercentRaw = normalizeNumberValue(windowData.used_percent || windowData.usedPercent);
+    const isLimitReached = Boolean(limitReached) || allowed === false;
+    const usedPercent = usedPercentRaw ?? (isLimitReached && resetLabel !== '-' ? 100 : null);
+    
+    windows.push({
+      id: id,
+      label: label,
+      usedPercent: usedPercent,
+      percentage: usedPercent !== null ? Math.max(0, 100 - usedPercent) : null,
+      resetLabel: resetLabel
+    });
   };
+  
+  addWindow(
+    'primary',
+    'Primary Window',
+    rateLimit.primary_window || rateLimit.primaryWindow,
+    rateLimit.limit_reached || rateLimit.limitReached,
+    rateLimit.allowed
+  );
+  
+  addWindow(
+    'secondary',
+    'Secondary Window',
+    rateLimit.secondary_window || rateLimit.secondaryWindow,
+    rateLimit.limit_reached || rateLimit.limitReached,
+    rateLimit.allowed
+  );
+  
+  addWindow(
+    'code-review',
+    'Code Review',
+    codeReviewLimit.primary_window || codeReviewLimit.primaryWindow,
+    codeReviewLimit.limit_reached || codeReviewLimit.limitReached,
+    codeReviewLimit.allowed
+  );
+  
+  return windows;
 }
 
 /**
@@ -356,48 +794,35 @@ export async function fetchAntigravityQuota(authFile) {
  * @returns {Promise<object>} Quota data
  */
 export async function fetchCodexQuota(authFile) {
-  const url = 'https://chatgpt.com/backend-api/wham/usage';
+  const planTypeFromFile = resolveCodexPlanType(authFile);
+  const accountId = resolveCodexChatgptAccountId(authFile);
+  
+  if (!accountId) {
+    throw new Error('Missing chatgpt_account_id - check id_token in auth file');
+  }
   
   const headers = {
-    'Authorization': 'Bearer $TOKEN$',
-    'Content-Type': 'application/json'
+    ...CODEX_REQUEST_HEADERS,
+    'Chatgpt-Account-Id': accountId
   };
 
-  const response = await callQuotaAPI(authFile.auth_index, url, 'GET', headers);
+  const response = await callQuotaAPI(authFile.auth_index, CODEX_USAGE_URL, 'GET', headers);
 
-  if (response.status_code !== 200) {
-    throw new Error(`HTTP ${response.status_code}: ${response.body || 'Unknown error'}`);
+  if (response.status_code < 200 || response.status_code >= 300) {
+    const err = new Error(getApiCallErrorMessage(response));
+    err.status = response.status_code;
+    throw err;
   }
 
   const data = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
   
-  let planType = 'free';
-  const rateLimitWindows = [];
-
-  if (data.plan_type || data.planType) {
-    planType = (data.plan_type || data.planType).toLowerCase();
+  if (!data) {
+    throw new Error('Empty response from usage API');
   }
-
-  if (data.rate_limit_windows || data.rateLimitWindows) {
-    const windows = data.rate_limit_windows || data.rateLimitWindows;
-    for (const window of Object.values(windows)) {
-      const name = window.name || window.windowName || 'Unknown';
-      const used = window.used || window.current || 0;
-      const limit = window.limit || window.max || 100;
-      const remaining = limit - used;
-      const percentage = limit > 0 ? Math.round((remaining / limit) * 100) : 0;
-      const resetTime = window.reset_time || window.resetTime || null;
-
-      rateLimitWindows.push({
-        name: name,
-        used: used,
-        limit: limit,
-        remaining: remaining,
-        percentage: percentage,
-        resetTime: resetTime
-      });
-    }
-  }
+  
+  const planTypeFromUsage = normalizePlanType(data.plan_type || data.planType);
+  const planType = planTypeFromUsage || planTypeFromFile || 'free';
+  const rateLimitWindows = buildCodexQuotaWindows(data);
 
   return {
     provider: 'codex',
@@ -409,55 +834,212 @@ export async function fetchCodexQuota(authFile) {
 }
 
 /**
+ * Extract Gemini CLI project ID from account string
+ * @param {any} value - Account value (e.g., "email (project-id)")
+ * @returns {string|null} Project ID or null
+ */
+function extractGeminiCliProjectId(value) {
+  if (typeof value !== 'string') return null;
+  const matches = Array.from(value.matchAll(/\(([^()]+)\)/g));
+  if (matches.length === 0) return null;
+  const candidate = matches[matches.length - 1]?.[1]?.trim();
+  return candidate || null;
+}
+
+/**
+ * Resolve Gemini CLI project ID from auth file
+ * @param {object} file - Auth file object
+ * @returns {string|null} Project ID or null
+ */
+function resolveGeminiCliProjectId(file) {
+  const metadata = file?.metadata || {};
+  const attributes = file?.attributes || {};
+  
+  const candidates = [
+    file.account,
+    metadata?.account,
+    attributes?.account
+  ];
+  
+  for (const candidate of candidates) {
+    const projectId = extractGeminiCliProjectId(candidate);
+    if (projectId) return projectId;
+  }
+  
+  return null;
+}
+
+/**
+ * Check if a Gemini CLI model should be ignored
+ * @param {string} modelId - Model ID
+ * @returns {boolean} True if should be ignored
+ */
+function isIgnoredGeminiCliModel(modelId) {
+  return GEMINI_CLI_IGNORED_MODEL_PREFIXES.some(
+    prefix => modelId === prefix || modelId.startsWith(`${prefix}-`)
+  );
+}
+
+/**
+ * Get the earliest reset time between two values
+ * @param {string|undefined} current - Current reset time
+ * @param {string|undefined} next - Next reset time
+ * @returns {string|undefined} Earlier reset time
+ */
+function pickEarlierResetTime(current, next) {
+  if (!current) return next;
+  if (!next) return current;
+  const currentTime = new Date(current).getTime();
+  const nextTime = new Date(next).getTime();
+  if (isNaN(currentTime)) return next;
+  if (isNaN(nextTime)) return current;
+  return currentTime <= nextTime ? current : next;
+}
+
+/**
+ * Get minimum of two nullable numbers
+ * @param {number|null} current - Current value
+ * @param {number|null} next - Next value
+ * @returns {number|null} Minimum value
+ */
+function minNullableNumber(current, next) {
+  if (current === null) return next;
+  if (next === null) return current;
+  return Math.min(current, next);
+}
+
+/**
+ * Build grouped Gemini CLI quota buckets
+ * @param {Array} buckets - Parsed buckets
+ * @returns {Array} Grouped buckets
+ */
+function buildGeminiCliQuotaBuckets(buckets) {
+  if (buckets.length === 0) return [];
+  
+  const grouped = new Map();
+  
+  const groupLookup = new Map();
+  for (const groupDef of GEMINI_CLI_QUOTA_GROUPS) {
+    for (const modelId of groupDef.modelIds) {
+      groupLookup.set(modelId, groupDef);
+    }
+  }
+  
+  buckets.forEach(bucket => {
+    if (isIgnoredGeminiCliModel(bucket.modelId)) return;
+    
+    const groupDef = groupLookup.get(bucket.modelId);
+    const groupId = groupDef?.id || bucket.modelId;
+    const label = groupDef?.label || bucket.modelId;
+    const tokenKey = bucket.tokenType || '';
+    const mapKey = `${groupId}::${tokenKey}`;
+    
+    const existing = grouped.get(mapKey);
+    
+    if (!existing) {
+      grouped.set(mapKey, {
+        id: `${groupId}${tokenKey ? `-${tokenKey}` : ''}`,
+        label: label,
+        remainingFraction: bucket.remainingFraction,
+        remainingAmount: bucket.remainingAmount,
+        resetTime: bucket.resetTime,
+        tokenType: bucket.tokenType,
+        modelIds: [bucket.modelId],
+        percentage: bucket.remainingFraction !== null 
+          ? Math.round(Math.max(0, Math.min(1, bucket.remainingFraction)) * 100) 
+          : null
+      });
+      return;
+    }
+    
+    existing.remainingFraction = minNullableNumber(existing.remainingFraction, bucket.remainingFraction);
+    existing.remainingAmount = minNullableNumber(existing.remainingAmount, bucket.remainingAmount);
+    existing.resetTime = pickEarlierResetTime(existing.resetTime, bucket.resetTime);
+    existing.modelIds.push(bucket.modelId);
+    existing.percentage = existing.remainingFraction !== null
+      ? Math.round(Math.max(0, Math.min(1, existing.remainingFraction)) * 100)
+      : null;
+  });
+  
+  return Array.from(grouped.values()).map(bucket => ({
+    ...bucket,
+    modelIds: [...new Set(bucket.modelIds)]
+  }));
+}
+
+/**
  * Fetch quota for Gemini CLI provider
  * @param {object} authFile - Auth file object
  * @returns {Promise<object>} Quota data
  */
 export async function fetchGeminiCliQuota(authFile) {
-  const url = 'https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota';
+  const projectId = resolveGeminiCliProjectId(authFile);
   
-  const headers = {
-    'Authorization': 'Bearer $TOKEN$',
-    'Content-Type': 'application/json'
-  };
-
-  const requestData = {};
-  if (authFile.attributes?.project) {
-    requestData.project = authFile.attributes.project;
+  if (!projectId) {
+    throw new Error('Missing project ID - check account field in auth file');
   }
 
-  const response = await callQuotaAPI(authFile.auth_index, url, 'POST', headers, requestData);
+  const response = await callQuotaAPI(
+    authFile.auth_index, 
+    GEMINI_CLI_QUOTA_URL, 
+    'POST', 
+    GEMINI_CLI_REQUEST_HEADERS, 
+    JSON.stringify({ project: projectId })
+  );
 
-  if (response.status_code !== 200) {
-    throw new Error(`HTTP ${response.status_code}: ${response.body || 'Unknown error'}`);
+  if (response.status_code < 200 || response.status_code >= 300) {
+    const err = new Error(getApiCallErrorMessage(response));
+    err.status = response.status_code;
+    throw err;
   }
 
   const data = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
+  const rawBuckets = Array.isArray(data?.buckets) ? data.buckets : [];
   
-  const quotaGroups = [];
-  let resetTime = null;
-
-  if (data.quotas && Array.isArray(data.quotas)) {
-    for (const quota of data.quotas) {
-      const label = quota.quotaGroupName || quota.quotaGroup || quota.modelGroup || 'Unknown';
-      const remainingFraction = quota.remainingFraction ?? quota.remaining_fraction ?? 1;
-      const remainingAmount = quota.remainingAmount ?? quota.remaining_amount ?? null;
-      const percentage = Math.round(remainingFraction * 100);
-      const tokenType = quota.tokenType || quota.token_type || null;
-      
-      quotaGroups.push({
-        name: label,
-        percentage: percentage,
-        remainingFraction: remainingFraction,
-        remainingAmount: remainingAmount,
-        tokenType: tokenType
-      });
-
-      if (quota.resetTime || quota.reset_time) {
-        resetTime = quota.resetTime || quota.reset_time;
-      }
-    }
+  if (rawBuckets.length === 0) {
+    return {
+      provider: 'gemini-cli',
+      quotaGroups: [],
+      resetTime: null,
+      fetchedAt: new Date().toISOString()
+    };
   }
+
+  const parsedBuckets = rawBuckets
+    .map(bucket => {
+      const modelId = (bucket.modelId || bucket.model_id || '').trim();
+      if (!modelId) return null;
+      
+      const tokenType = (bucket.tokenType || bucket.token_type || '').trim() || null;
+      const remainingFractionRaw = normalizeQuotaFraction(
+        bucket.remainingFraction ?? bucket.remaining_fraction
+      );
+      const remainingAmount = normalizeNumberValue(
+        bucket.remainingAmount ?? bucket.remaining_amount
+      );
+      const resetTime = (bucket.resetTime || bucket.reset_time || '').trim() || null;
+      
+      let fallbackFraction = null;
+      if (remainingAmount !== null) {
+        fallbackFraction = remainingAmount <= 0 ? 0 : null;
+      } else if (resetTime) {
+        fallbackFraction = 0;
+      }
+      
+      const remainingFraction = remainingFractionRaw ?? fallbackFraction;
+      
+      return {
+        modelId,
+        tokenType,
+        remainingFraction,
+        remainingAmount,
+        resetTime
+      };
+    })
+    .filter(Boolean);
+
+  const quotaGroups = buildGeminiCliQuotaBuckets(parsedBuckets);
+  const resetTime = quotaGroups.find(g => g.resetTime)?.resetTime;
 
   return {
     provider: 'gemini-cli',
@@ -475,35 +1057,31 @@ export async function fetchGeminiCliQuota(authFile) {
  */
 export function renderAntigravityQuotaCard(authFile, data) {
   const groupsHtml = (data.quotaGroups || []).map(group => {
-    const colorClass = getQuotaColorClass(group.percentage);
+    const percentage = group.percentage ?? 0;
+    const colorClass = getQuotaColorClass(percentage);
+    const label = group.label || group.name || 'Unknown';
+    const resetTimeFormatted = group.resetTime ? formatResetTime(group.resetTime) : '';
+    
     return `
       <div class="quota-group">
         <div class="quota-group-header">
-          <span class="quota-group-name">${escapeHtml(group.name)}</span>
-          <span class="quota-group-value ${colorClass}">${group.percentage}%</span>
+          <span class="quota-group-name" title="${escapeHtml((group.models || []).join(', '))}">${escapeHtml(label)}</span>
+          <div class="quota-group-meta">
+            <span class="quota-group-value ${colorClass}">${percentage}%</span>
+            ${resetTimeFormatted ? `<span class="quota-group-reset">${resetTimeFormatted}</span>` : ''}
+          </div>
         </div>
         <div class="quota-progress-container">
-          <div class="quota-progress-bar ${colorClass}" style="width: ${group.percentage}%"></div>
+          <div class="quota-progress-bar ${colorClass}" style="width: ${percentage}%"></div>
         </div>
       </div>
     `;
   }).join('');
 
-  const resetTimeHtml = data.resetTime ? `
-    <div class="quota-reset-time">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"></circle>
-        <polyline points="12 6 12 12 16 14"></polyline>
-      </svg>
-      <span>Resets: ${formatResetTime(data.resetTime)}</span>
-    </div>
-  ` : '';
-
   return renderQuotaCardWrapper(authFile, 'antigravity', `
     <div class="quota-groups">
       ${groupsHtml || '<div class="quota-empty-state"><p>No quota data available</p></div>'}
     </div>
-    ${resetTimeHtml}
   `, data.fetchedAt);
 }
 
@@ -518,17 +1096,24 @@ export function renderCodexQuotaCard(authFile, data) {
   const planBadge = `<span class="quota-plan-badge ${planBadgeClass}">${escapeHtml(data.planType || 'Free')}</span>`;
 
   const windowsHtml = (data.rateLimitWindows || []).map(window => {
-    const colorClass = getQuotaColorClass(window.percentage);
+    const percentage = window.percentage ?? (window.usedPercent !== null ? Math.max(0, 100 - window.usedPercent) : null);
+    const percentLabel = percentage !== null ? `${Math.round(percentage)}%` : '--';
+    const colorClass = percentage !== null ? getQuotaColorClass(percentage) : 'quota-yellow';
+    const label = window.label || window.name || 'Unknown';
+    const resetLabel = window.resetLabel || (window.resetTime ? formatResetTime(window.resetTime) : '');
+    
     return `
       <div class="quota-group">
         <div class="quota-group-header">
-          <span class="quota-group-name">${escapeHtml(window.name)}</span>
-          <span class="quota-group-value ${colorClass}">${window.remaining}/${window.limit}</span>
+          <span class="quota-group-name">${escapeHtml(label)}</span>
+          <div class="quota-group-meta">
+            <span class="quota-group-value ${colorClass}">${percentLabel}</span>
+            ${resetLabel && resetLabel !== '-' ? `<span class="quota-group-reset">${resetLabel}</span>` : ''}
+          </div>
         </div>
         <div class="quota-progress-container">
-          <div class="quota-progress-bar ${colorClass}" style="width: ${window.percentage}%"></div>
+          <div class="quota-progress-bar ${colorClass}" style="width: ${percentage ?? 0}%"></div>
         </div>
-        ${window.resetTime ? `<div class="quota-reset-time"><span>Resets: ${formatResetTime(window.resetTime)}</span></div>` : ''}
       </div>
     `;
   }).join('');
@@ -561,38 +1146,39 @@ export function renderCodexQuotaCard(authFile, data) {
  */
 export function renderGeminiCliQuotaCard(authFile, data) {
   const groupsHtml = (data.quotaGroups || []).map(group => {
-    const colorClass = getQuotaColorClass(group.percentage);
-    const amountInfo = group.remainingAmount !== null ? ` (${group.remainingAmount} remaining)` : '';
+    const percentage = group.percentage ?? 0;
+    const percentLabel = group.percentage !== null ? `${percentage}%` : '--';
+    const colorClass = group.percentage !== null ? getQuotaColorClass(percentage) : 'quota-yellow';
+    const label = group.label || group.name || 'Unknown';
+    const amountInfo = group.remainingAmount !== null && group.remainingAmount !== undefined 
+      ? ` (${group.remainingAmount})` 
+      : '';
     const tokenInfo = group.tokenType ? ` [${group.tokenType}]` : '';
+    const resetTimeFormatted = group.resetTime ? formatResetTime(group.resetTime) : '';
+    const titleText = group.modelIds?.length > 0 
+      ? (group.tokenType ? `${group.modelIds.join(', ')} (${group.tokenType})` : group.modelIds.join(', '))
+      : label;
     
     return `
       <div class="quota-group">
         <div class="quota-group-header">
-          <span class="quota-group-name">${escapeHtml(group.name)}${tokenInfo}</span>
-          <span class="quota-group-value ${colorClass}">${group.percentage}%${amountInfo}</span>
+          <span class="quota-group-name" title="${escapeHtml(titleText)}">${escapeHtml(label)}${tokenInfo}</span>
+          <div class="quota-group-meta">
+            <span class="quota-group-value ${colorClass}">${percentLabel}${amountInfo}</span>
+            ${resetTimeFormatted ? `<span class="quota-group-reset">${resetTimeFormatted}</span>` : ''}
+          </div>
         </div>
         <div class="quota-progress-container">
-          <div class="quota-progress-bar ${colorClass}" style="width: ${group.percentage}%"></div>
+          <div class="quota-progress-bar ${colorClass}" style="width: ${percentage}%"></div>
         </div>
       </div>
     `;
   }).join('');
 
-  const resetTimeHtml = data.resetTime ? `
-    <div class="quota-reset-time">
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"></circle>
-        <polyline points="12 6 12 12 16 14"></polyline>
-      </svg>
-      <span>Resets: ${formatResetTime(data.resetTime)}</span>
-    </div>
-  ` : '';
-
   return renderQuotaCardWrapper(authFile, 'gemini-cli', `
     <div class="quota-groups">
       ${groupsHtml || '<div class="quota-empty-state"><p>No quota data available</p></div>'}
     </div>
-    ${resetTimeHtml}
   `, data.fetchedAt);
 }
 
@@ -800,7 +1386,7 @@ export function setQuotaFilter(filter) {
   
   applyFilter();
   renderQuotaPage();
-  fetchVisibleQuotas();
+  // Don't auto-fetch - user must click refresh manually
 }
 
 /**
@@ -811,7 +1397,7 @@ export function setQuotaPageSize(size) {
   pageSize = parseInt(size, 10);
   currentPage = 1;
   renderQuotaPage();
-  fetchVisibleQuotas();
+  // Don't auto-fetch - user must click refresh manually
 }
 
 /**
@@ -824,7 +1410,7 @@ export function setQuotaPage(page) {
   
   currentPage = page;
   renderQuotaPage();
-  fetchVisibleQuotas();
+  // Don't auto-fetch - user must click refresh manually
 }
 
 /**
