@@ -136,13 +136,14 @@ function applyFilter() {
 }
 
 /**
- * Get auth files for current page
+ * Get auth files for current page (sorted by urgency)
  * @returns {Array} Paginated auth files
  */
 function getPagedAuthFiles() {
+  const sortedFiles = sortByQuotaUrgency(filteredAuthFiles);
   const start = (currentPage - 1) * pageSize;
   const end = start + pageSize;
-  return filteredAuthFiles.slice(start, end);
+  return sortedFiles.slice(start, end);
 }
 
 /**
@@ -1509,6 +1510,34 @@ function renderSummaryBar() {
       🟢 <span class="quota-summary-count">${summary.healthy}</span> Healthy
     </button>
   `;
+  
+  renderStatusFilterChips();
+}
+
+/**
+ * Render status filter chips in the controls row
+ */
+function renderStatusFilterChips() {
+  const container = document.getElementById('quotaStatusFilter');
+  if (!container) return;
+  
+  container.innerHTML = `
+    <button class="quota-status-filter-btn critical ${currentStatusFilter === 'critical' ? 'active' : ''}" 
+            onclick="setStatusFilter('critical')" 
+            aria-pressed="${currentStatusFilter === 'critical'}">
+      🔴 Critical
+    </button>
+    <button class="quota-status-filter-btn warning ${currentStatusFilter === 'warning' ? 'active' : ''}" 
+            onclick="setStatusFilter('warning')"
+            aria-pressed="${currentStatusFilter === 'warning'}">
+      🟡 Warning
+    </button>
+    <button class="quota-status-filter-btn healthy ${currentStatusFilter === 'healthy' ? 'active' : ''}" 
+            onclick="setStatusFilter('healthy')"
+            aria-pressed="${currentStatusFilter === 'healthy'}">
+      🟢 Healthy
+    </button>
+  `;
 }
 
 /**
@@ -1597,6 +1626,37 @@ function getWorstQuotaGroup(quotaGroups, percentageKey = 'percentage') {
   });
   
   return { worstGroup: quotaGroups[worstIndex], worstIndex };
+}
+
+/**
+ * Sort auth files by quota urgency (critical first, then warning, then healthy)
+ * @param {Array} files - Array of auth files
+ * @returns {Array} Sorted array
+ */
+function sortByQuotaUrgency(files) {
+  return [...files].sort((a, b) => {
+    const dataA = quotaData.get(a.auth_index);
+    const dataB = quotaData.get(b.auth_index);
+    
+    const getPercentage = (authFile, data) => {
+      if (!data || data.error || data.loading) return 100;
+      if (!isQuotaSupported(authFile.provider)) return 100;
+      return getWorstQuotaPercentage(authFile, data);
+    };
+    
+    const pctA = getPercentage(a, dataA);
+    const pctB = getPercentage(b, dataB);
+    
+    const statusOrder = { 'critical': 0, 'warning': 1, 'healthy': 2 };
+    const statusA = getQuotaStatus(pctA);
+    const statusB = getQuotaStatus(pctB);
+    
+    if (statusA !== statusB) {
+      return statusOrder[statusA] - statusOrder[statusB];
+    }
+    
+    return pctA - pctB;
+  });
 }
 
 /**

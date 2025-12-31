@@ -216,6 +216,44 @@
 .quota-status-filter {
   display: flex;
   gap: 4px;
+  background: rgba(20, 20, 40, 0.6);
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.quota-status-filter-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.quota-status-filter-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.quota-status-filter-btn.active.critical {
+  background: var(--quota-critical-bg);
+  color: var(--quota-critical-text);
+}
+
+.quota-status-filter-btn.active.warning {
+  background: var(--quota-warning-bg);
+  color: var(--quota-warning-text);
+}
+
+.quota-status-filter-btn.active.healthy {
+  background: var(--quota-healthy-bg);
+  color: var(--quota-healthy-text);
 }
 
 .quota-view-toggle {
