@@ -250,8 +250,8 @@
 }
 
 .hamburger-btn {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   background: transparent;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
@@ -261,11 +261,19 @@
   align-items: center;
   justify-content: center;
   transition: all 0.2s;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
 }
 
 .hamburger-btn:hover {
   background: rgba(255, 255, 255, 0.05);
   border-color: var(--accent-cyan);
+}
+
+.hamburger-btn:active {
+  background: rgba(0, 229, 255, 0.15);
+  transform: scale(0.95);
 }
 
 .hamburger-btn svg {
