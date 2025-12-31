@@ -1071,7 +1071,11 @@ export async function fetchGeminiCliQuota(authFile) {
  * @returns {string} HTML string
  */
 export function renderAntigravityQuotaCard(authFile, data) {
-  const groupsHtml = (data.quotaGroups || []).map(group => {
+  const quotaGroups = data.quotaGroups || [];
+  const { worstGroup, worstIndex } = getWorstQuotaGroup(quotaGroups, 'percentage');
+  const worstPercentage = getWorstQuotaPercentage(authFile, data);
+  
+  const renderGroup = (group) => {
     const percentage = group.percentage ?? 0;
     const colorClass = getQuotaColorClass(percentage);
     const label = group.label || group.name || 'Unknown';
@@ -1091,13 +1095,35 @@ export function renderAntigravityQuotaCard(authFile, data) {
         </div>
       </div>
     `;
-  }).join('');
+  };
+  
+  let contentHtml = '';
+  if (quotaGroups.length === 0) {
+    contentHtml = '<div class="quota-empty-state"><p>No quota data available</p></div>';
+  } else if (quotaGroups.length === 1) {
+    contentHtml = `<div class="quota-groups">${renderGroup(quotaGroups[0])}</div>`;
+  } else {
+    const worstGroupHtml = worstGroup ? renderGroup(worstGroup) : '';
+    const otherGroups = quotaGroups.filter((_, i) => i !== worstIndex);
+    const otherGroupsHtml = otherGroups.map(renderGroup).join('');
+    
+    contentHtml = `
+      <div class="quota-groups-collapsible">
+        ${worstGroupHtml}
+        ${otherGroups.length > 0 ? `
+          <div class="quota-groups-collapsed" aria-hidden="true">
+            ${otherGroupsHtml}
+          </div>
+          <button class="quota-show-more-btn" onclick="toggleQuotaGroups('${authFile.auth_index}')" aria-expanded="false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+            Show ${otherGroups.length} more
+          </button>
+        ` : ''}
+      </div>
+    `;
+  }
 
-  return renderQuotaCardWrapper(authFile, 'antigravity', `
-    <div class="quota-groups">
-      ${groupsHtml || '<div class="quota-empty-state"><p>No quota data available</p></div>'}
-    </div>
-  `, data.fetchedAt);
+  return renderQuotaCardWrapper(authFile, 'antigravity', contentHtml, data.fetchedAt, worstPercentage);
 }
 
 /**
@@ -1109,9 +1135,12 @@ export function renderAntigravityQuotaCard(authFile, data) {
 export function renderCodexQuotaCard(authFile, data) {
   const planBadgeClass = data.planType === 'plus' ? 'plus' : data.planType === 'team' ? 'team' : 'free';
   const planBadge = `<span class="quota-plan-badge ${planBadgeClass}">${escapeHtml(data.planType || 'Free')}</span>`;
+  const quotaGroups = data.quotaGroups || data.rateLimitWindows || [];
+  const worstPercentage = getWorstQuotaPercentage(authFile, data);
+  const { worstGroup, worstIndex } = getWorstQuotaGroup(quotaGroups, 'remainingPercentage');
 
-  const windowsHtml = (data.rateLimitWindows || []).map(window => {
-    const percentage = window.percentage ?? (window.usedPercent !== null ? Math.max(0, 100 - window.usedPercent) : null);
+  const renderWindow = (window) => {
+    const percentage = window.remainingPercentage ?? window.percentage ?? (window.usedPercent !== null ? Math.max(0, 100 - window.usedPercent) : null);
     const percentLabel = percentage !== null ? `${Math.round(percentage)}%` : '--';
     const colorClass = percentage !== null ? getQuotaColorClass(percentage) : 'quota-yellow';
     const label = window.label || window.name || 'Unknown';
@@ -1131,7 +1160,7 @@ export function renderCodexQuotaCard(authFile, data) {
         </div>
       </div>
     `;
-  }).join('');
+  };
 
   const freeWarningHtml = data.isFreePlan ? `
     <div class="quota-free-warning">
@@ -1144,13 +1173,37 @@ export function renderCodexQuotaCard(authFile, data) {
     </div>
   ` : '';
 
+  let groupsHtml = '';
+  if (quotaGroups.length === 0) {
+    groupsHtml = '<div class="quota-empty-state"><p>No rate limit data available</p></div>';
+  } else if (quotaGroups.length === 1) {
+    groupsHtml = `<div class="quota-groups">${renderWindow(quotaGroups[0])}</div>`;
+  } else {
+    const worstWindowHtml = worstGroup ? renderWindow(worstGroup) : '';
+    const otherWindows = quotaGroups.filter((_, i) => i !== worstIndex);
+    const otherWindowsHtml = otherWindows.map(renderWindow).join('');
+    
+    groupsHtml = `
+      <div class="quota-groups-collapsible">
+        ${worstWindowHtml}
+        ${otherWindows.length > 0 ? `
+          <div class="quota-groups-collapsed" aria-hidden="true">
+            ${otherWindowsHtml}
+          </div>
+          <button class="quota-show-more-btn" onclick="toggleQuotaGroups('${authFile.auth_index}')" aria-expanded="false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+            Show ${otherWindows.length} more
+          </button>
+        ` : ''}
+      </div>
+    `;
+  }
+
   return renderQuotaCardWrapper(authFile, 'codex', `
     <div style="margin-bottom: 12px;">${planBadge}</div>
-    <div class="quota-groups">
-      ${windowsHtml || '<div class="quota-empty-state"><p>No rate limit data available</p></div>'}
-    </div>
+    ${groupsHtml}
     ${freeWarningHtml}
-  `, data.fetchedAt);
+  `, data.fetchedAt, worstPercentage);
 }
 
 /**
@@ -1160,10 +1213,14 @@ export function renderCodexQuotaCard(authFile, data) {
  * @returns {string} HTML string
  */
 export function renderGeminiCliQuotaCard(authFile, data) {
-  const groupsHtml = (data.quotaGroups || []).map(group => {
-    const percentage = group.percentage ?? 0;
-    const percentLabel = group.percentage !== null ? `${percentage}%` : '--';
-    const colorClass = group.percentage !== null ? getQuotaColorClass(percentage) : 'quota-yellow';
+  const quotaGroups = data.quotaGroups || [];
+  const { worstGroup, worstIndex } = getWorstQuotaGroup(quotaGroups, 'remainingPercentage');
+  const worstPercentage = getWorstQuotaPercentage(authFile, data);
+  
+  const renderGroup = (group) => {
+    const percentage = group.remainingPercentage ?? group.percentage ?? 0;
+    const percentLabel = percentage !== null ? `${Math.round(percentage)}%` : '--';
+    const colorClass = percentage !== null ? getQuotaColorClass(percentage) : 'quota-yellow';
     const label = group.label || group.name || 'Unknown';
     const amountInfo = group.remainingAmount !== null && group.remainingAmount !== undefined 
       ? ` (${group.remainingAmount})` 
@@ -1188,13 +1245,35 @@ export function renderGeminiCliQuotaCard(authFile, data) {
         </div>
       </div>
     `;
-  }).join('');
+  };
 
-  return renderQuotaCardWrapper(authFile, 'gemini-cli', `
-    <div class="quota-groups">
-      ${groupsHtml || '<div class="quota-empty-state"><p>No quota data available</p></div>'}
-    </div>
-  `, data.fetchedAt);
+  let contentHtml = '';
+  if (quotaGroups.length === 0) {
+    contentHtml = '<div class="quota-empty-state"><p>No quota data available</p></div>';
+  } else if (quotaGroups.length === 1) {
+    contentHtml = `<div class="quota-groups">${renderGroup(quotaGroups[0])}</div>`;
+  } else {
+    const worstGroupHtml = worstGroup ? renderGroup(worstGroup) : '';
+    const otherGroups = quotaGroups.filter((_, i) => i !== worstIndex);
+    const otherGroupsHtml = otherGroups.map(renderGroup).join('');
+    
+    contentHtml = `
+      <div class="quota-groups-collapsible">
+        ${worstGroupHtml}
+        ${otherGroups.length > 0 ? `
+          <div class="quota-groups-collapsed" aria-hidden="true">
+            ${otherGroupsHtml}
+          </div>
+          <button class="quota-show-more-btn" onclick="toggleQuotaGroups('${authFile.auth_index}')" aria-expanded="false">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+            Show ${otherGroups.length} more
+          </button>
+        ` : ''}
+      </div>
+    `;
+  }
+
+  return renderQuotaCardWrapper(authFile, 'gemini-cli', contentHtml, data.fetchedAt, worstPercentage);
 }
 
 /**
@@ -1262,25 +1341,30 @@ export function renderQuotaUnavailableCard(authFile) {
 }
 
 /**
- * Wrapper function to create consistent card structure
+ * Wrapper function to create consistent card structure with circular progress and status border
  * @param {object} authFile - Auth file object
  * @param {string} providerClass - CSS class for provider styling
  * @param {string} contentHtml - Inner content HTML
  * @param {string} fetchedAt - Timestamp when data was fetched
+ * @param {number} worstPercentage - Worst quota percentage for circular indicator
  * @returns {string} HTML string
  */
-function renderQuotaCardWrapper(authFile, providerClass, contentHtml, fetchedAt) {
+function renderQuotaCardWrapper(authFile, providerClass, contentHtml, fetchedAt, worstPercentage = null) {
   const updatedAgo = fetchedAt ? getTimeAgo(fetchedAt) : '';
   const isStale = fetchedAt ? (Date.now() - new Date(fetchedAt).getTime()) > 10 * 60 * 1000 : false;
+  const status = worstPercentage !== null ? getQuotaStatus(worstPercentage) : '';
+  const statusClass = status ? `status-${status}` : '';
+  const circularHtml = worstPercentage !== null ? renderCircularProgress(worstPercentage, status) : '';
 
   return `
-    <div class="quota-card" data-auth-index="${authFile.auth_index}">
+    <div class="quota-card ${statusClass}" data-auth-index="${authFile.auth_index}">
       <div class="quota-card-header">
         <div class="quota-card-info">
           <div class="quota-card-name">${escapeHtml(authFile.file_name || authFile.name)}</div>
           <span class="quota-card-provider ${providerClass}">${escapeHtml(authFile.provider || 'Unknown')}</span>
         </div>
         <div class="quota-card-actions">
+          ${circularHtml}
           <button class="quota-refresh-btn" onclick="refreshQuota('${authFile.auth_index}')" title="Refresh">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M23 4v6h-6"></path>
@@ -1441,6 +1525,78 @@ export function setStatusFilter(status) {
   applyFilter();
   renderQuotaPage();
   renderSummaryBar();
+}
+
+/**
+ * Render a circular progress indicator SVG
+ * @param {number} percentage - Percentage (0-100)
+ * @param {string} status - 'critical' | 'warning' | 'healthy'
+ * @returns {string} HTML string for circular progress
+ */
+function renderCircularProgress(percentage, status) {
+  const radius = 20;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (percentage / 100) * circumference;
+  
+  return `
+    <div class="quota-circular-progress" role="progressbar" aria-valuenow="${percentage}" aria-valuemin="0" aria-valuemax="100" aria-label="${percentage}% quota remaining">
+      <svg viewBox="0 0 52 52">
+        <circle class="progress-bg" cx="26" cy="26" r="${radius}"></circle>
+        <circle class="progress-bar ${status}" cx="26" cy="26" r="${radius}" 
+                stroke-dasharray="${circumference}" 
+                stroke-dashoffset="${offset}"></circle>
+      </svg>
+      <div class="progress-text">${Math.round(percentage)}%</div>
+    </div>
+  `;
+}
+
+/**
+ * Toggle expanded state of quota groups for a card
+ * @param {string} authIndex - Auth index of the card
+ */
+export function toggleQuotaGroups(authIndex) {
+  const card = document.querySelector(`[data-auth-index="${authIndex}"]`);
+  if (!card) return;
+  
+  const collapsedSection = card.querySelector('.quota-groups-collapsed');
+  const toggleBtn = card.querySelector('.quota-show-more-btn');
+  
+  if (collapsedSection && toggleBtn) {
+    const isExpanded = collapsedSection.classList.toggle('expanded');
+    toggleBtn.classList.toggle('expanded', isExpanded);
+    toggleBtn.setAttribute('aria-expanded', isExpanded);
+    
+    const count = collapsedSection.querySelectorAll('.quota-group').length;
+    toggleBtn.innerHTML = isExpanded 
+      ? `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m18 15-6-6-6 6"/></svg> Show less`
+      : `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg> Show ${count} more`;
+  }
+}
+
+/**
+ * Get the worst (lowest percentage) quota group from data
+ * @param {Array} quotaGroups - Array of quota groups
+ * @param {string} percentageKey - Key for percentage value ('percentage' or 'remainingPercentage')
+ * @returns {{ worstGroup: object|null, worstIndex: number }}
+ */
+function getWorstQuotaGroup(quotaGroups, percentageKey = 'percentage') {
+  if (!quotaGroups || quotaGroups.length === 0) {
+    return { worstGroup: null, worstIndex: -1 };
+  }
+  
+  let worstIndex = 0;
+  let worstPercentage = quotaGroups[0]?.[percentageKey] ?? 100;
+  
+  quotaGroups.forEach((group, index) => {
+    const pct = group[percentageKey] ?? 100;
+    if (pct < worstPercentage) {
+      worstPercentage = pct;
+      worstIndex = index;
+    }
+  });
+  
+  return { worstGroup: quotaGroups[worstIndex], worstIndex };
 }
 
 /**
@@ -1619,3 +1775,4 @@ window.setQuotaPageSize = setQuotaPageSize;
 window.setQuotaPage = setQuotaPage;
 window.getQuotaStatus = getQuotaStatus;
 window.setStatusFilter = setStatusFilter;
+window.toggleQuotaGroups = toggleQuotaGroups;
