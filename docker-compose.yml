@@ -28,4 +28,5 @@ services:
       - ./auths:/root/.cli-proxy-api
       - ./logs:/CLIProxyAPI/logs
       - ./static:/CLIProxyAPI/static
+      - /root/.backups:/backups
     restart: unless-stopped
