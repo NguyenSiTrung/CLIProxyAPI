@@ -9607,8 +9607,8 @@
     }
 
     // ========== Model Pricing System ==========
-    const PRICING_STORAGE_KEY = 'cli-proxy-model-pricing';
     let modelPricingConfig = {};
+    let pricingConfigLoaded = false;
 
     // Default pricing for well-known models (prices per 1M tokens in USD)
     const DEFAULT_MODEL_PRICING = {
@@ -9681,11 +9681,19 @@
       'llama-3-8b': { input: 0.20, output: 0.20 },
     };
 
-    function loadPricingConfig() {
+    async function loadPricingConfig() {
+      if (pricingConfigLoaded) return;
       try {
-        const stored = localStorage.getItem(PRICING_STORAGE_KEY);
-        if (stored) {
-          modelPricingConfig = JSON.parse(stored);
+        const res = await fetch(`${API_BASE}/management/model-pricing`, {
+          headers: { 'Authorization': `Bearer ${apiKey}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          modelPricingConfig = data.pricing || {};
+          pricingConfigLoaded = true;
+        } else {
+          console.error('Failed to load pricing config from server:', res.status);
+          modelPricingConfig = {};
         }
       } catch (e) {
         console.error('Failed to load pricing config:', e);
@@ -9693,16 +9701,26 @@
       }
     }
 
-    function savePricingConfig() {
+    async function savePricingConfig() {
       try {
-        localStorage.setItem(PRICING_STORAGE_KEY, JSON.stringify(modelPricingConfig));
+        const res = await fetch(`${API_BASE}/management/model-pricing`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ pricing: modelPricingConfig })
+        });
+        if (!res.ok) {
+          throw new Error(`Server returned ${res.status}`);
+        }
       } catch (e) {
         console.error('Failed to save pricing config:', e);
         toast('Failed to save pricing configuration', 'error');
       }
     }
 
-    function switchModelsTab(tabId) {
+    async function switchModelsTab(tabId) {
       document.querySelectorAll('.models-tab').forEach(tab => {
         tab.classList.toggle('active', tab.dataset.tab === tabId);
       });
@@ -9711,6 +9729,7 @@
       });
       
       if (tabId === 'models-pricing') {
+        await loadPricingConfig();
         renderPricingModels();
       }
     }
@@ -9902,7 +9921,7 @@
       }
     }
 
-    function savePricingForModel(modelId) {
+    async function savePricingForModel(modelId) {
       const input = parseFloat(document.getElementById('pricingInput').value) || 0;
       const output = parseFloat(document.getElementById('pricingOutput').value) || 0;
       const cached = parseFloat(document.getElementById('pricingCached').value) || 0;
@@ -9920,22 +9939,22 @@
         cache_write: cacheWrite || undefined
       };
       
-      savePricingConfig();
+      await savePricingConfig();
       closeModal();
       renderPricingModels();
       toast(`Pricing saved for ${modelId}`, 'success');
     }
 
-    function removePricing(modelId) {
+    async function removePricing(modelId) {
       if (confirm(`Remove pricing configuration for ${modelId}?`)) {
         delete modelPricingConfig[modelId];
-        savePricingConfig();
+        await savePricingConfig();
         renderPricingModels();
         toast(`Pricing removed for ${modelId}`, 'success');
       }
     }
 
-    function applyDefaultPricing() {
+    async function applyDefaultPricing() {
       if (!allModels || allModels.length === 0) {
         toast('No models loaded', 'error');
         return;
@@ -9954,7 +9973,7 @@
       });
       
       if (applied > 0) {
-        savePricingConfig();
+        await savePricingConfig();
         renderPricingModels();
         toast(`Applied default pricing to ${applied} models`, 'success');
       } else {
@@ -9962,10 +9981,10 @@
       }
     }
 
-    function clearAllPricing() {
+    async function clearAllPricing() {
       if (confirm('Clear all pricing configurations? This cannot be undone.')) {
         modelPricingConfig = {};
-        savePricingConfig();
+        await savePricingConfig();
         renderPricingModels();
         toast('All pricing configurations cleared', 'success');
       }
@@ -9994,7 +10013,7 @@
             const text = await file.text();
             const imported = JSON.parse(text);
             modelPricingConfig = { ...modelPricingConfig, ...imported };
-            savePricingConfig();
+            await savePricingConfig();
             renderPricingModels();
             toast(`Imported pricing for ${Object.keys(imported).length} models`, 'success');
           } catch (err) {
@@ -10040,8 +10059,8 @@
       return { total: totalCost, breakdown };
     }
 
-    // Initialize pricing on load
-    loadPricingConfig();
+    // Pricing config is now loaded on-demand from server when needed
+    // (in loadUsageStats and switchModelsTab)
 
     async function checkLatestVersion() {
       const checkBtn = document.getElementById('checkUpdateBtn');
@@ -10170,6 +10189,9 @@
         refreshBtn.classList.add('loading');
         refreshBtn.disabled = true;
       }
+
+      // Ensure pricing config is loaded for cost calculation
+      await loadPricingConfig();
 
       try {
         const d = await api('GET', '/usage');
