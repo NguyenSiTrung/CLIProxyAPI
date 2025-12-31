@@ -11074,43 +11074,27 @@
       return filtered;
     }
 
-    function exportUsageData() {
-      if (!usageState.rawData) {
-        toast('No usage data available to export', 'info');
-        return;
+    async function exportUsageData() {
+      try {
+        const response = await fetch('/mgmt/usage/export');
+        if (!response.ok) {
+          throw new Error('Failed to fetch export data');
+        }
+        const exportObj = await response.json();
+        
+        const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `cliproxy-usage-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        toast('Usage data exported successfully', 'success');
+      } catch (err) {
+        toast('Export failed: ' + err.message, 'error');
       }
-      
-      const range = usageState.dateRange;
-      const data = usageState.rawData;
-      
-      // Export filtered data based on current range
-      const filteredReqByDay = filterDataByDateRange(data.requests_by_day || {}, range);
-      const filteredTokByDay = filterDataByDateRange(data.tokens_by_day || {}, range);
-      
-      const exportObj = {
-        exported_at: new Date().toISOString(),
-        date_range: getPeriodLabel(range),
-        summary: {
-          total_requests: data.total_requests || 0,
-          success_count: data.success_count || 0,
-          failure_count: data.failure_count || 0,
-          total_tokens: data.total_tokens || 0
-        },
-        requests_by_day: filteredReqByDay,
-        tokens_by_day: filteredTokByDay,
-        apis: data.apis || {}
-      };
-      
-      const blob = new Blob([JSON.stringify(exportObj, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `cliproxy-usage-${new Date().toISOString().slice(0, 10)}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      toast('Usage data exported successfully', 'success');
     }
 
     function triggerUsageImport() {
@@ -11127,18 +11111,27 @@
         
         try {
           const parsed = JSON.parse(text);
-          // Support both direct export format and server export format
+          // Support multiple export formats
           if (parsed.usage) {
             // Server export format: { version, exported_at, usage: {...} }
             payload = { version: parsed.version || 1, usage: parsed.usage };
           } else if (parsed.apis) {
-            // Direct usage data format
+            // Direct usage data format (has apis at root)
             payload = { version: 1, usage: parsed };
+          } else if (parsed.summary && parsed.apis === undefined) {
+            // Old frontend export format with summary - cannot import
+            toast('This export format is not compatible. Please re-export using the new Export button.', 'warning');
+            event.target.value = '';
+            return;
           } else {
             throw new Error('Unrecognized format');
           }
         } catch (e) {
-          toast('Invalid JSON file format', 'error');
+          if (e.message === 'Unrecognized format') {
+            toast('Unrecognized file format', 'error');
+          } else {
+            toast('Invalid JSON file: ' + e.message, 'error');
+          }
           event.target.value = '';
           return;
         }
