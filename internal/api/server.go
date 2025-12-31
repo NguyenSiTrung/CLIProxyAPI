@@ -630,6 +630,10 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.POST("/iflow-auth-url", s.mgmt.RequestIFlowCookieToken)
 		mgmt.POST("/oauth-callback", s.mgmt.PostOAuthCallback)
 		mgmt.GET("/get-auth-status", s.mgmt.GetAuthStatus)
+
+		mgmt.GET("/model-pricing", s.mgmt.GetModelPricing)
+		mgmt.PUT("/model-pricing", s.mgmt.PutModelPricing)
+		mgmt.DELETE("/model-pricing", s.mgmt.DeleteModelPricing)
 	}
 }
 
