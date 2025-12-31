@@ -28,6 +28,7 @@ import { loadAnalytics } from './pages/analytics.js';
 import { loadAmpSettings } from './pages/amp.js';
 import { loadLogs } from './pages/logs.js';
 import { stopLogAutoRefresh } from './pages/logs.js';
+import { loadQuotaPage, stopAutoRefresh as stopQuotaAutoRefresh } from './pages/quota.js';
 
 // Wire up dashboard's fetchModels dependency
 setFetchModelsFunc(fetchModels);
@@ -40,6 +41,10 @@ function onBeforeNavigate(page) {
   // Stop log auto-refresh when leaving logs page
   if (page !== 'logs') {
     stopLogAutoRefresh();
+  }
+  // Stop quota auto-refresh when leaving quota page
+  if (page !== 'quota') {
+    stopQuotaAutoRefresh();
   }
 }
 
@@ -64,6 +69,7 @@ function init() {
   registerPageHandler('analytics', loadAnalytics);
   registerPageHandler('amp', loadAmpSettings);
   registerPageHandler('logs', loadLogs);
+  registerPageHandler('quota', loadQuotaPage);
 
   // Setup navigation
   setupNavigation(onBeforeNavigate);
