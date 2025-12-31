@@ -347,21 +347,190 @@ func (b *Bot) handleUserStats(apiKey string) string {
 	}
 
 	var sb strings.Builder
-	sb.WriteString(fmt.Sprintf("👤 <b>User Statistics</b>\n\n"))
-	sb.WriteString(fmt.Sprintf("🔑 <b>API Key:</b> %s\n\n", truncateString(apiKey, 20)))
-	sb.WriteString(fmt.Sprintf("📊 <b>Usage:</b>\n"))
-	sb.WriteString(fmt.Sprintf("   • Total Requests: %d\n", apiStats.TotalRequests))
-	sb.WriteString(fmt.Sprintf("   • Total Tokens: %s\n\n", formatTokens(apiStats.TotalTokens)))
+	sb.WriteString(fmt.Sprintf("👤 <b>User Usage Details</b>\n\n"))
+	sb.WriteString(fmt.Sprintf("🔑 <b>API Key:</b> %s\n\n", truncateString(apiKey, 25)))
 
-	if len(apiStats.Models) > 0 {
-		sb.WriteString("🤖 <b>Models Used:</b>\n")
-		for model, modelStats := range apiStats.Models {
-			sb.WriteString(fmt.Sprintf("   • %s: %d reqs, %s tokens\n",
-				model, modelStats.TotalRequests, formatTokens(modelStats.TotalTokens)))
+	var totalInput, totalOutput, totalReasoning, totalCached int64
+	var totalCost float64
+	var lastCallTime *time.Time
+
+	type modelEntry struct {
+		name      string
+		requests  int64
+		tokens    int64
+		input     int64
+		output    int64
+		reasoning int64
+		cached    int64
+		cost      float64
+		lastCall  *time.Time
+	}
+	var modelEntries []modelEntry
+
+	for modelName, modelData := range apiStats.Models {
+		var mInput, mOutput, mReasoning, mCached int64
+		var mLastCall *time.Time
+
+		for _, d := range modelData.Details {
+			mInput += d.Tokens.InputTokens
+			mOutput += d.Tokens.OutputTokens
+			mReasoning += d.Tokens.ReasoningTokens
+			mCached += d.Tokens.CachedTokens
+			if !d.Timestamp.IsZero() {
+				t := d.Timestamp
+				if mLastCall == nil || t.After(*mLastCall) {
+					mLastCall = &t
+				}
+			}
+		}
+
+		totalInput += mInput
+		totalOutput += mOutput
+		totalReasoning += mReasoning
+		totalCached += mCached
+
+		if mLastCall != nil && (lastCallTime == nil || mLastCall.After(*lastCallTime)) {
+			lastCallTime = mLastCall
+		}
+
+		mCost := calculateModelCost(modelName, mInput, mOutput, mReasoning, mCached)
+		totalCost += mCost
+
+		modelEntries = append(modelEntries, modelEntry{
+			name:      modelName,
+			requests:  modelData.TotalRequests,
+			tokens:    modelData.TotalTokens,
+			input:     mInput,
+			output:    mOutput,
+			reasoning: mReasoning,
+			cached:    mCached,
+			cost:      mCost,
+			lastCall:  mLastCall,
+		})
+	}
+
+	sort.Slice(modelEntries, func(i, j int) bool {
+		return modelEntries[i].requests > modelEntries[j].requests
+	})
+
+	sb.WriteString(fmt.Sprintf("📊 <b>Summary:</b>\n"))
+	sb.WriteString(fmt.Sprintf("   • Total Requests: %d\n", apiStats.TotalRequests))
+	sb.WriteString(fmt.Sprintf("   • Total Tokens: %s\n", formatTokens(apiStats.TotalTokens)))
+	sb.WriteString(fmt.Sprintf("   • Est. Cost: $%.4f\n", totalCost))
+	if lastCallTime != nil {
+		sb.WriteString(fmt.Sprintf("   • Last Call: %s\n", formatRelativeTime(*lastCallTime)))
+	}
+
+	sb.WriteString(fmt.Sprintf("\n🔢 <b>Token Breakdown:</b>\n"))
+	sb.WriteString(fmt.Sprintf("   • Input: %s\n", formatTokens(totalInput)))
+	sb.WriteString(fmt.Sprintf("   • Output: %s\n", formatTokens(totalOutput)))
+	if totalReasoning > 0 {
+		sb.WriteString(fmt.Sprintf("   • Reasoning: %s\n", formatTokens(totalReasoning)))
+	}
+	if totalCached > 0 {
+		sb.WriteString(fmt.Sprintf("   • Cache Read: %s\n", formatTokens(totalCached)))
+	}
+
+	if len(modelEntries) > 0 {
+		sb.WriteString(fmt.Sprintf("\n🤖 <b>Models (%d):</b>\n", len(modelEntries)))
+		for i, m := range modelEntries {
+			if i >= 10 {
+				sb.WriteString(fmt.Sprintf("   <i>... and %d more</i>\n", len(modelEntries)-10))
+				break
+			}
+			sb.WriteString(fmt.Sprintf("\n• <code>%s</code>\n", truncateString(m.name, 35)))
+			sb.WriteString(fmt.Sprintf("  Reqs: %d | Tokens: %s\n", m.requests, formatTokens(m.tokens)))
+			sb.WriteString(fmt.Sprintf("  In: %s | Out: %s", formatTokens(m.input), formatTokens(m.output)))
+			if m.reasoning > 0 {
+				sb.WriteString(fmt.Sprintf(" | Rsn: %s", formatTokens(m.reasoning)))
+			}
+			if m.cached > 0 {
+				sb.WriteString(fmt.Sprintf(" | Cache: %s", formatTokens(m.cached)))
+			}
+			sb.WriteString("\n")
+			sb.WriteString(fmt.Sprintf("  Cost: $%.4f", m.cost))
+			if m.lastCall != nil {
+				sb.WriteString(fmt.Sprintf(" | Last: %s", formatRelativeTime(*m.lastCall)))
+			}
+			sb.WriteString("\n")
 		}
 	}
 
 	return sb.String()
+}
+
+var modelPricing = map[string]struct{ input, output, cached float64 }{
+	"claude-sonnet-4-20250514":     {3.0, 15.0, 0.3},
+	"claude-sonnet-4-5-20250514":   {3.0, 15.0, 0.3},
+	"claude-sonnet-4-5-20250929":   {3.0, 15.0, 0.3},
+	"claude-3-5-sonnet-20241022":   {3.0, 15.0, 0.3},
+	"claude-3-5-haiku-20241022":    {0.80, 4.0, 0.08},
+	"claude-3-opus-20240229":       {15.0, 75.0, 1.5},
+	"gemini-2.5-pro":               {1.25, 10.0, 0.3125},
+	"gemini-2.5-flash":             {0.15, 0.60, 0.0375},
+	"gemini-2.0-flash":             {0.10, 0.40, 0.025},
+	"gpt-4.1":                      {2.0, 8.0, 0.5},
+	"gpt-4.1-mini":                 {0.4, 1.6, 0.1},
+	"gpt-4.1-nano":                 {0.1, 0.4, 0.025},
+	"gpt-4o":                       {2.5, 10.0, 1.25},
+	"gpt-4o-mini":                  {0.15, 0.60, 0.075},
+	"o1":                           {15.0, 60.0, 7.5},
+	"o1-pro":                       {150.0, 600.0, 75.0},
+	"o3":                           {10.0, 40.0, 2.5},
+	"o4-mini":                      {1.10, 4.40, 0.275},
+}
+
+func calculateModelCost(modelName string, input, output, reasoning, cached int64) float64 {
+	pricing, ok := modelPricing[modelName]
+	if !ok {
+		for prefix, p := range modelPricing {
+			if strings.HasPrefix(modelName, prefix) {
+				pricing = p
+				ok = true
+				break
+			}
+		}
+	}
+	if !ok {
+		if strings.Contains(modelName, "claude") {
+			pricing = struct{ input, output, cached float64 }{3.0, 15.0, 0.3}
+		} else if strings.Contains(modelName, "gemini") {
+			pricing = struct{ input, output, cached float64 }{0.15, 0.60, 0.0375}
+		} else if strings.Contains(modelName, "gpt") || strings.Contains(modelName, "o1") || strings.Contains(modelName, "o3") || strings.Contains(modelName, "o4") {
+			pricing = struct{ input, output, cached float64 }{2.0, 8.0, 0.5}
+		} else {
+			pricing = struct{ input, output, cached float64 }{1.0, 4.0, 0.25}
+		}
+	}
+
+	nonCachedInput := input - cached
+	if nonCachedInput < 0 {
+		nonCachedInput = 0
+	}
+	inputCost := float64(nonCachedInput) / 1_000_000 * pricing.input
+	outputCost := float64(output+reasoning) / 1_000_000 * pricing.output
+	cachedCost := float64(cached) / 1_000_000 * pricing.cached
+
+	return inputCost + outputCost + cachedCost
+}
+
+func formatRelativeTime(t time.Time) string {
+	diff := time.Since(t)
+	seconds := int(diff.Seconds())
+	minutes := seconds / 60
+	hours := minutes / 60
+	days := hours / 24
+
+	if days > 0 {
+		return fmt.Sprintf("%dd ago", days)
+	}
+	if hours > 0 {
+		return fmt.Sprintf("%dh ago", hours)
+	}
+	if minutes > 0 {
+		return fmt.Sprintf("%dm ago", minutes)
+	}
+	return "Just now"
 }
 
 func (b *Bot) handleModels() string {
