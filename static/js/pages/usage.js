@@ -5,6 +5,7 @@
 
 import { api } from '../core/api.js';
 import { toast } from '../core/toast.js';
+import { showModal } from '../core/modal.js';
 import { 
   getUsageState, 
   updateUsageState,
@@ -441,7 +442,7 @@ function renderProviderStats(providerUsage) {
   }
 
   providerContainer.innerHTML = '<div class="config-settings-list">' + pEntries.map(([name, stats], idx) => `
-    <div class="config-setting-item provider-clickable" style="padding:12px 16px;transition:all 0.2s" data-provider-key="${escapeHtml(name)}" data-provider-idx="${idx}">
+    <div class="config-setting-item provider-clickable" style="padding:12px 16px;transition:all 0.2s;cursor:pointer" data-provider-key="${escapeHtml(name)}" data-provider-idx="${idx}">
       <div class="config-setting-info">
         <div class="config-setting-text">
           <h4 style="font-family:monospace;font-size:13px" title="${escapeHtml(name)}">${escapeHtml(name.length > 25 ? name.slice(0, 22) + '...' : name)}</h4>
@@ -451,9 +452,143 @@ function renderProviderStats(providerUsage) {
       <div style="display:flex;align-items:center;gap:12px">
         <span class="badge" style="background:rgba(251,191,36,0.15);color:var(--accent-yellow);font-weight:600">$${stats.cost.toFixed(4)}</span>
         <span class="badge badge-purple">${stats.requests.toLocaleString()}</span>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
       </div>
     </div>
   `).join('') + '</div>';
+
+  providerContainer.querySelectorAll('.provider-clickable').forEach(el => {
+    el.addEventListener('click', () => {
+      const providerKey = el.dataset.providerKey;
+      showProviderDetail(providerKey);
+    });
+  });
+}
+
+/**
+ * Show provider detail modal
+ */
+function showProviderDetail(providerKey) {
+  const state = getUsageState();
+  const usageData = state.rawData;
+  if (!usageData || !usageData.apis) return;
+
+  const apiStats = usageData.apis[providerKey];
+  if (!apiStats) {
+    toast('Provider data not found', 'error');
+    return;
+  }
+
+  const pricingConfig = getModelPricingConfig();
+  const models = apiStats.models || {};
+  const modelEntries = Object.entries(models);
+
+  let totalInput = 0, totalOutput = 0, totalCached = 0, totalCost = 0;
+  const modelDetails = [];
+
+  for (const [modelName, modelStats] of modelEntries) {
+    if (!modelStats || typeof modelStats !== 'object') continue;
+    
+    let modelInput = 0, modelOutput = 0, modelCached = 0, modelReasoning = 0;
+    const details = modelStats.details || [];
+    
+    for (const detail of details) {
+      const t = detail.tokens || {};
+      modelInput += (t.input_tokens || 0);
+      modelOutput += (t.output_tokens || 0);
+      modelCached += (t.cached_tokens || t.cache_read_input_tokens || 0);
+      modelReasoning += (t.reasoning_tokens || 0);
+    }
+
+    totalInput += modelInput;
+    totalOutput += modelOutput;
+    totalCached += modelCached;
+
+    const pricing = pricingConfig[modelName] || getDefaultPricing(modelName);
+    let modelCost = 0;
+    if (pricing) {
+      const nonCachedInput = Math.max(0, modelInput - modelCached);
+      const inputCost = (nonCachedInput / 1000000) * (pricing.input || 0);
+      const outputCost = (modelOutput / 1000000) * (pricing.output || 0);
+      const cachedCost = (modelCached / 1000000) * (pricing.cached_input || pricing.input * 0.1 || 0);
+      modelCost = inputCost + outputCost + cachedCost;
+      totalCost += modelCost;
+    }
+
+    modelDetails.push({
+      name: modelName,
+      requests: modelStats.total_requests || 0,
+      tokens: modelStats.total_tokens || 0,
+      input: modelInput,
+      output: modelOutput,
+      cached: modelCached,
+      reasoning: modelReasoning,
+      cost: modelCost,
+      hasPricing: !!pricing
+    });
+  }
+
+  modelDetails.sort((a, b) => b.requests - a.requests);
+
+  const content = `
+    <div class="provider-detail-content">
+      <div class="provider-detail-summary">
+        <div class="provider-stat-grid">
+          <div class="provider-stat-item">
+            <div class="provider-stat-value">${(apiStats.total_requests || 0).toLocaleString()}</div>
+            <div class="provider-stat-label">Total Requests</div>
+          </div>
+          <div class="provider-stat-item">
+            <div class="provider-stat-value">${formatNumber(totalInput + totalOutput)}</div>
+            <div class="provider-stat-label">Total Tokens</div>
+          </div>
+          <div class="provider-stat-item">
+            <div class="provider-stat-value" style="color:var(--accent-yellow)">$${totalCost.toFixed(4)}</div>
+            <div class="provider-stat-label">Est. Cost</div>
+          </div>
+          <div class="provider-stat-item">
+            <div class="provider-stat-value">${modelDetails.length}</div>
+            <div class="provider-stat-label">Models Used</div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="provider-detail-tokens">
+        <h4 style="margin:0 0 12px;font-size:12px;text-transform:uppercase;color:var(--text-muted)">Token Breakdown</h4>
+        <div class="token-breakdown-grid">
+          <div class="token-item"><span class="token-label">Input</span><span class="token-value">${formatNumber(totalInput)}</span></div>
+          <div class="token-item"><span class="token-label">Output</span><span class="token-value">${formatNumber(totalOutput)}</span></div>
+          <div class="token-item"><span class="token-label">Cached</span><span class="token-value">${totalCached > 0 ? formatNumber(totalCached) : '-'}</span></div>
+        </div>
+      </div>
+
+      <div class="provider-detail-models">
+        <h4 style="margin:0 0 12px;font-size:12px;text-transform:uppercase;color:var(--text-muted)">Models (${modelDetails.length})</h4>
+        <div class="provider-models-list" style="max-height:300px;overflow-y:auto">
+          ${modelDetails.length === 0 ? '<div style="padding:16px;text-align:center;color:var(--text-secondary)">No model data</div>' : 
+            modelDetails.map(m => `
+              <div class="provider-model-item">
+                <div class="provider-model-info">
+                  <span class="provider-model-name">${escapeHtml(m.name)}</span>
+                  <span class="provider-model-tokens">${formatNumber(m.tokens)} tokens</span>
+                </div>
+                <div class="provider-model-stats">
+                  ${m.hasPricing ? `<span class="badge" style="background:rgba(251,191,36,0.15);color:var(--accent-yellow)">$${m.cost.toFixed(4)}</span>` : ''}
+                  <span class="badge badge-purple">${m.requests.toLocaleString()}</span>
+                </div>
+              </div>
+            `).join('')}
+        </div>
+      </div>
+    </div>
+  `;
+
+  const modalInner = document.querySelector('#modal .modal');
+  if (modalInner) modalInner.classList.add('provider-detail-modal');
+
+  showModal(`Provider: ${providerKey.length > 30 ? providerKey.slice(0, 27) + '...' : providerKey}`, content, `
+    <button class="btn btn-secondary" onclick="window.closeModal()">Close</button>
+  `);
 }
 
 /**
