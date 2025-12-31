@@ -11,6 +11,7 @@ let quotaData = new Map();
 let authFiles = [];
 let filteredAuthFiles = [];
 let currentFilter = 'all';
+let currentStatusFilter = null; // 'critical' | 'warning' | 'healthy' | null
 let currentPage = 1;
 let pageSize = 9;
 let autoRefreshInterval = null;
@@ -108,7 +109,7 @@ export async function loadQuotaPage() {
 }
 
 /**
- * Apply current filter to auth files
+ * Apply current filter to auth files (provider + status)
  */
 function applyFilter() {
   if (currentFilter === 'all') {
@@ -118,6 +119,19 @@ function applyFilter() {
       f.provider?.toLowerCase() === currentFilter
     );
   }
+  
+  if (currentStatusFilter) {
+    filteredAuthFiles = filteredAuthFiles.filter(f => {
+      const data = quotaData.get(f.auth_index);
+      if (!data || data.error || data.loading) return false;
+      if (!isQuotaSupported(f.provider)) return false;
+      
+      const worstPercentage = getWorstQuotaPercentage(f, data);
+      const status = getQuotaStatus(worstPercentage);
+      return status === currentStatusFilter;
+    });
+  }
+  
   currentPage = 1;
 }
 
@@ -189,6 +203,7 @@ function renderQuotaPage() {
 
   container.innerHTML = cardsHtml;
   renderPagination();
+  renderSummaryBar();
 }
 
 /**
@@ -1310,6 +1325,125 @@ function escapeHtml(str) {
 }
 
 /**
+ * Calculate quota summary from current quota data
+ * @returns {{ critical: number, warning: number, healthy: number, total: number }}
+ */
+function calculateQuotaSummary() {
+  const summary = { critical: 0, warning: 0, healthy: 0, total: 0 };
+  
+  for (const authFile of authFiles) {
+    if (!isQuotaSupported(authFile.provider)) continue;
+    
+    const data = quotaData.get(authFile.auth_index);
+    if (!data || data.error || data.loading) continue;
+    
+    summary.total++;
+    const worstPercentage = getWorstQuotaPercentage(authFile, data);
+    const status = getQuotaStatus(worstPercentage);
+    summary[status]++;
+  }
+  
+  return summary;
+}
+
+/**
+ * Get the worst (lowest) quota percentage for an auth file
+ * @param {object} authFile - Auth file object
+ * @param {object} data - Quota data
+ * @returns {number} Worst percentage (0-100)
+ */
+function getWorstQuotaPercentage(authFile, data) {
+  let worstPercentage = 100;
+  
+  switch (authFile.provider?.toLowerCase()) {
+    case 'antigravity':
+      if (data.quotaGroups) {
+        for (const group of data.quotaGroups) {
+          if (group.percentage !== undefined && group.percentage < worstPercentage) {
+            worstPercentage = group.percentage;
+          }
+        }
+      }
+      break;
+      
+    case 'codex':
+      if (data.quotaGroups) {
+        for (const group of data.quotaGroups) {
+          if (group.remainingPercentage !== undefined && group.remainingPercentage < worstPercentage) {
+            worstPercentage = group.remainingPercentage;
+          }
+        }
+      }
+      break;
+      
+    case 'gemini-cli':
+      if (data.quotaGroups) {
+        for (const group of data.quotaGroups) {
+          if (group.remainingPercentage !== undefined && group.remainingPercentage < worstPercentage) {
+            worstPercentage = group.remainingPercentage;
+          }
+        }
+      }
+      break;
+  }
+  
+  return Math.max(0, Math.min(100, worstPercentage));
+}
+
+/**
+ * Render the summary bar with status counts
+ */
+function renderSummaryBar() {
+  const container = document.getElementById('quotaSummaryBar');
+  if (!container) return;
+  
+  const summary = calculateQuotaSummary();
+  
+  if (summary.total === 0) {
+    container.innerHTML = '';
+    return;
+  }
+  
+  container.innerHTML = `
+    <div class="quota-summary-total">
+      <span class="quota-summary-count">${summary.total}</span> monitored
+    </div>
+    <span class="quota-summary-divider"></span>
+    <button class="quota-summary-badge critical ${currentStatusFilter === 'critical' ? 'active' : ''}" 
+            onclick="setStatusFilter('critical')" 
+            aria-pressed="${currentStatusFilter === 'critical'}">
+      🔴 <span class="quota-summary-count">${summary.critical}</span> Critical
+    </button>
+    <button class="quota-summary-badge warning ${currentStatusFilter === 'warning' ? 'active' : ''}" 
+            onclick="setStatusFilter('warning')"
+            aria-pressed="${currentStatusFilter === 'warning'}">
+      🟡 <span class="quota-summary-count">${summary.warning}</span> Warning
+    </button>
+    <button class="quota-summary-badge healthy ${currentStatusFilter === 'healthy' ? 'active' : ''}" 
+            onclick="setStatusFilter('healthy')"
+            aria-pressed="${currentStatusFilter === 'healthy'}">
+      🟢 <span class="quota-summary-count">${summary.healthy}</span> Healthy
+    </button>
+  `;
+}
+
+/**
+ * Set status filter and re-render
+ * @param {string|null} status - 'critical' | 'warning' | 'healthy' | null
+ */
+export function setStatusFilter(status) {
+  if (currentStatusFilter === status) {
+    currentStatusFilter = null;
+  } else {
+    currentStatusFilter = status;
+  }
+  
+  applyFilter();
+  renderQuotaPage();
+  renderSummaryBar();
+}
+
+/**
  * Refresh quota for a single auth file
  * @param {string} authIndex - Auth index
  */
@@ -1484,3 +1618,4 @@ window.setQuotaFilter = setQuotaFilter;
 window.setQuotaPageSize = setQuotaPageSize;
 window.setQuotaPage = setQuotaPage;
 window.getQuotaStatus = getQuotaStatus;
+window.setStatusFilter = setStatusFilter;
