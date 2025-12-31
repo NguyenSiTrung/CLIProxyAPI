@@ -484,12 +484,14 @@ function showProviderDetail(providerKey) {
   const modelEntries = Object.entries(models);
 
   let totalInput = 0, totalOutput = 0, totalCached = 0, totalCost = 0;
+  let providerLastCall = null;
   const modelDetails = [];
 
   for (const [modelName, modelStats] of modelEntries) {
     if (!modelStats || typeof modelStats !== 'object') continue;
     
     let modelInput = 0, modelOutput = 0, modelCached = 0, modelReasoning = 0;
+    let modelLastCall = null;
     const details = modelStats.details || [];
     
     for (const detail of details) {
@@ -498,6 +500,12 @@ function showProviderDetail(providerKey) {
       modelOutput += (t.output_tokens || 0);
       modelCached += (t.cached_tokens || t.cache_read_input_tokens || 0);
       modelReasoning += (t.reasoning_tokens || 0);
+      
+      if (detail.timestamp) {
+        const ts = new Date(detail.timestamp);
+        if (!modelLastCall || ts > modelLastCall) modelLastCall = ts;
+        if (!providerLastCall || ts > providerLastCall) providerLastCall = ts;
+      }
     }
 
     totalInput += modelInput;
@@ -524,57 +532,169 @@ function showProviderDetail(providerKey) {
       cached: modelCached,
       reasoning: modelReasoning,
       cost: modelCost,
-      hasPricing: !!pricing
+      hasPricing: !!pricing,
+      lastCall: modelLastCall
     });
   }
 
   modelDetails.sort((a, b) => b.requests - a.requests);
 
+  const formatRelativeTime = (date) => {
+    if (!date) return 'Never';
+    const now = new Date();
+    const diff = now - date;
+    const seconds = Math.floor(diff / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    
+    if (seconds < 60) return 'Just now';
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    if (days < 7) return `${days}d ago`;
+    return date.toLocaleDateString();
+  };
+
   const content = `
-    <div class="provider-detail-content">
-      <div class="provider-detail-summary">
-        <div class="provider-stat-grid">
-          <div class="provider-stat-item">
-            <div class="provider-stat-value">${(apiStats.total_requests || 0).toLocaleString()}</div>
-            <div class="provider-stat-label">Total Requests</div>
+    <div class="provider-detail-content-v2">
+      <div class="provider-detail-header">
+        <div class="provider-detail-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="9" cy="7" r="4"></circle>
+            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+          </svg>
+        </div>
+        <div class="provider-detail-title">
+          <h3>${escapeHtml(providerKey.length > 40 ? providerKey.slice(0, 37) + '...' : providerKey)}</h3>
+          <div class="provider-last-activity">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="12 6 12 12 16 14"></polyline>
+            </svg>
+            Last activity: <span class="last-time">${formatRelativeTime(providerLastCall)}</span>
           </div>
-          <div class="provider-stat-item">
-            <div class="provider-stat-value">${formatNumber(totalInput + totalOutput)}</div>
-            <div class="provider-stat-label">Total Tokens</div>
+        </div>
+      </div>
+
+      <div class="provider-stats-grid-v2">
+        <div class="provider-stat-card-v2 requests">
+          <div class="stat-icon-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+            </svg>
           </div>
-          <div class="provider-stat-item">
-            <div class="provider-stat-value" style="color:var(--accent-yellow)">$${totalCost.toFixed(4)}</div>
-            <div class="provider-stat-label">Est. Cost</div>
+          <div class="stat-info">
+            <span class="stat-value">${(apiStats.total_requests || 0).toLocaleString()}</span>
+            <span class="stat-label">Total Requests</span>
           </div>
-          <div class="provider-stat-item">
-            <div class="provider-stat-value">${modelDetails.length}</div>
-            <div class="provider-stat-label">Models Used</div>
+        </div>
+        <div class="provider-stat-card-v2 tokens">
+          <div class="stat-icon-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M12 6v6l4 2"></path>
+            </svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value">${formatNumber(totalInput + totalOutput)}</span>
+            <span class="stat-label">Total Tokens</span>
+          </div>
+        </div>
+        <div class="provider-stat-card-v2 cost">
+          <div class="stat-icon-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="1" x2="12" y2="23"></line>
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+            </svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value">$${totalCost.toFixed(4)}</span>
+            <span class="stat-label">Est. Cost</span>
+          </div>
+        </div>
+        <div class="provider-stat-card-v2 models-count">
+          <div class="stat-icon-wrapper">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+            </svg>
+          </div>
+          <div class="stat-info">
+            <span class="stat-value">${modelDetails.length}</span>
+            <span class="stat-label">Models Used</span>
           </div>
         </div>
       </div>
       
-      <div class="provider-detail-tokens">
-        <h4 style="margin:0 0 12px;font-size:12px;text-transform:uppercase;color:var(--text-muted)">Token Breakdown</h4>
-        <div class="token-breakdown-grid">
-          <div class="token-item"><span class="token-label">Input</span><span class="token-value">${formatNumber(totalInput)}</span></div>
-          <div class="token-item"><span class="token-label">Output</span><span class="token-value">${formatNumber(totalOutput)}</span></div>
-          <div class="token-item"><span class="token-label">Cached</span><span class="token-value">${totalCached > 0 ? formatNumber(totalCached) : '-'}</span></div>
+      <div class="provider-token-breakdown-v2">
+        <div class="section-header">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <path d="M18 20V10"></path>
+            <path d="M12 20V4"></path>
+            <path d="M6 20v-6"></path>
+          </svg>
+          <span>Token Breakdown</span>
+        </div>
+        <div class="token-bars">
+          <div class="token-bar-item">
+            <div class="token-bar-header">
+              <span class="token-bar-label">Input Tokens</span>
+              <span class="token-bar-value">${formatNumber(totalInput)}</span>
+            </div>
+            <div class="token-bar-track"><div class="token-bar-fill input" style="width:${totalInput + totalOutput > 0 ? (totalInput / (totalInput + totalOutput) * 100) : 0}%"></div></div>
+          </div>
+          <div class="token-bar-item">
+            <div class="token-bar-header">
+              <span class="token-bar-label">Output Tokens</span>
+              <span class="token-bar-value">${formatNumber(totalOutput)}</span>
+            </div>
+            <div class="token-bar-track"><div class="token-bar-fill output" style="width:${totalInput + totalOutput > 0 ? (totalOutput / (totalInput + totalOutput) * 100) : 0}%"></div></div>
+          </div>
+          ${totalCached > 0 ? `
+          <div class="token-bar-item">
+            <div class="token-bar-header">
+              <span class="token-bar-label">Cached Tokens</span>
+              <span class="token-bar-value">${formatNumber(totalCached)}</span>
+            </div>
+            <div class="token-bar-track"><div class="token-bar-fill cached" style="width:${totalInput > 0 ? Math.min((totalCached / totalInput * 100), 100) : 0}%"></div></div>
+          </div>
+          ` : ''}
         </div>
       </div>
 
-      <div class="provider-detail-models">
-        <h4 style="margin:0 0 12px;font-size:12px;text-transform:uppercase;color:var(--text-muted)">Models (${modelDetails.length})</h4>
-        <div class="provider-models-list" style="max-height:300px;overflow-y:auto">
-          ${modelDetails.length === 0 ? '<div style="padding:16px;text-align:center;color:var(--text-secondary)">No model data</div>' : 
+      <div class="provider-models-section-v2">
+        <div class="section-header">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+          </svg>
+          <span>Models (${modelDetails.length})</span>
+        </div>
+        <div class="provider-models-list-v2">
+          ${modelDetails.length === 0 ? '<div class="no-models">No model data available</div>' : 
             modelDetails.map(m => `
-              <div class="provider-model-item">
-                <div class="provider-model-info">
-                  <span class="provider-model-name">${escapeHtml(m.name)}</span>
-                  <span class="provider-model-tokens">${formatNumber(m.tokens)} tokens</span>
+              <div class="provider-model-card">
+                <div class="model-card-main">
+                  <div class="model-card-name">${escapeHtml(m.name)}</div>
+                  <div class="model-card-meta">
+                    <span class="model-requests">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10" height="10">
+                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                      </svg>
+                      ${m.requests.toLocaleString()} requests
+                    </span>
+                    <span class="model-tokens">${formatNumber(m.tokens)} tokens</span>
+                  </div>
                 </div>
-                <div class="provider-model-stats">
-                  ${m.hasPricing ? `<span class="badge" style="background:rgba(251,191,36,0.15);color:var(--accent-yellow)">$${m.cost.toFixed(4)}</span>` : ''}
-                  <span class="badge badge-purple">${m.requests.toLocaleString()}</span>
+                <div class="model-card-stats">
+                  <div class="model-last-call">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="10" height="10">
+                      <circle cx="12" cy="12" r="10"></circle>
+                      <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                    ${formatRelativeTime(m.lastCall)}
+                  </div>
+                  ${m.hasPricing ? `<span class="model-cost">$${m.cost.toFixed(4)}</span>` : ''}
                 </div>
               </div>
             `).join('')}
@@ -584,9 +704,9 @@ function showProviderDetail(providerKey) {
   `;
 
   const modalInner = document.querySelector('#modal .modal');
-  if (modalInner) modalInner.classList.add('provider-detail-modal');
+  if (modalInner) modalInner.classList.add('provider-detail-modal-v2');
 
-  showModal(`Provider: ${providerKey.length > 30 ? providerKey.slice(0, 27) + '...' : providerKey}`, content, `
+  showModal(``, content, `
     <button class="btn btn-secondary" onclick="window.closeModal()">Close</button>
   `);
 }
