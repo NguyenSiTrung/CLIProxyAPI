@@ -1443,13 +1443,25 @@ export function isQuotaSupported(provider) {
 }
 
 /**
+ * Get quota status based on remaining percentage
+ * @param {number} percentage - Remaining percentage (0-100)
+ * @returns {'critical'|'warning'|'healthy'} Status string
+ */
+export function getQuotaStatus(percentage) {
+  if (percentage >= 60) return 'healthy';
+  if (percentage >= 30) return 'warning';
+  return 'critical';
+}
+
+/**
  * Get color class based on remaining percentage
+ * Thresholds: Critical < 30%, Warning 30-59%, Healthy >= 60%
  * @param {number} percentage - Remaining percentage (0-100)
  * @returns {string} CSS color class
  */
 export function getQuotaColorClass(percentage) {
-  if (percentage > 60) return 'quota-green';
-  if (percentage >= 20) return 'quota-yellow';
+  if (percentage >= 60) return 'quota-green';
+  if (percentage >= 30) return 'quota-yellow';
   return 'quota-red';
 }
 
@@ -1471,3 +1483,4 @@ window.fetchAllQuotas = fetchAllQuotas;
 window.setQuotaFilter = setQuotaFilter;
 window.setQuotaPageSize = setQuotaPageSize;
 window.setQuotaPage = setQuotaPage;
+window.getQuotaStatus = getQuotaStatus;
