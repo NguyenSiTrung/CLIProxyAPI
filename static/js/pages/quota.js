@@ -212,20 +212,23 @@ async function fetchVisibleQuotas() {
 async function fetchQuotaForAuth(authFile) {
   try {
     let data;
-    switch (authFile.provider?.toLowerCase()) {
-      case 'antigravity':
-        data = await fetchAntigravityQuota(authFile);
-        break;
-      case 'codex':
-        data = await fetchCodexQuota(authFile);
-        break;
-      case 'gemini-cli':
-        data = await fetchGeminiCliQuota(authFile);
-        break;
-      default:
-        return;
+    const fetchFn = async () => {
+      switch (authFile.provider?.toLowerCase()) {
+        case 'antigravity':
+          return await fetchAntigravityQuota(authFile);
+        case 'codex':
+          return await fetchCodexQuota(authFile);
+        case 'gemini-cli':
+          return await fetchGeminiCliQuota(authFile);
+        default:
+          return null;
+      }
+    };
+    
+    data = await retryWithBackoff(fetchFn, 3, 1000);
+    if (data) {
+      quotaData.set(authFile.auth_index, data);
     }
-    quotaData.set(authFile.auth_index, data);
   } catch (e) {
     quotaData.set(authFile.auth_index, { error: e });
   }
@@ -239,6 +242,29 @@ function updateLastUpdated() {
   if (el) {
     el.textContent = 'Updated ' + new Date().toLocaleTimeString();
   }
+}
+
+/**
+ * Retry a function with exponential backoff
+ * @param {Function} fn - Async function to retry
+ * @param {number} maxAttempts - Maximum number of attempts
+ * @param {number} baseDelay - Base delay in milliseconds
+ * @returns {Promise<any>} Result of the function
+ */
+async function retryWithBackoff(fn, maxAttempts = 3, baseDelay = 1000) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastError = e;
+      if (attempt < maxAttempts) {
+        const delay = baseDelay * Math.pow(2, attempt - 1);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw lastError;
 }
 
 /**
