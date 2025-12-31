@@ -316,6 +316,8 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 // It defines the endpoints and associates them with their respective handlers.
 func (s *Server) setupRoutes() {
 	s.engine.GET("/management.html", s.serveManagementControlPanel)
+	s.engine.GET("/css/*filepath", s.serveManagementStaticAsset)
+	s.engine.GET("/js/*filepath", s.serveManagementStaticAsset)
 	openaiHandlers := openai.NewOpenAIAPIHandler(s.handlers)
 	geminiHandlers := gemini.NewGeminiAPIHandler(s.handlers)
 	geminiCLIHandlers := gemini.NewGeminiCLIAPIHandler(s.handlers)
@@ -692,6 +694,74 @@ func (s *Server) serveManagementControlPanel(c *gin.Context) {
 	}
 
 	c.File(filePath)
+}
+
+// serveManagementStaticAsset serves static CSS and JS files for the management panel.
+func (s *Server) serveManagementStaticAsset(c *gin.Context) {
+	cfg := s.cfg
+	if cfg == nil || cfg.RemoteManagement.DisableControlPanel {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+
+	// Get the file path from the URL
+	filePath := c.Param("filepath")
+	if filePath == "" {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+
+	// Determine the asset type (css or js) from the URL path
+	var assetDir string
+	if strings.HasPrefix(c.Request.URL.Path, "/css/") {
+		assetDir = "css"
+	} else if strings.HasPrefix(c.Request.URL.Path, "/js/") {
+		assetDir = "js"
+	} else {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+
+	// Build the full file path
+	var staticDir string
+	if cfg.RemoteManagement.UseCustomManagementPanel {
+		customPath := cfg.RemoteManagement.CustomManagementPanelPath
+		if customPath == "" {
+			customPath = "static/custom-management.html"
+		}
+		if !filepath.IsAbs(customPath) {
+			customPath = filepath.Join(filepath.Dir(s.configFilePath), customPath)
+		}
+		staticDir = filepath.Dir(customPath)
+	} else {
+		staticDir = managementasset.StaticDir(s.configFilePath)
+	}
+
+	// Security: clean the path to prevent directory traversal
+	cleanPath := filepath.Clean(filePath)
+	if strings.Contains(cleanPath, "..") {
+		c.AbortWithStatus(http.StatusForbidden)
+		return
+	}
+
+	fullPath := filepath.Join(staticDir, assetDir, cleanPath)
+
+	// Check if file exists
+	if _, err := os.Stat(fullPath); err != nil {
+		c.AbortWithStatus(http.StatusNotFound)
+		return
+	}
+
+	// Set appropriate content type
+	ext := filepath.Ext(fullPath)
+	switch ext {
+	case ".css":
+		c.Header("Content-Type", "text/css; charset=utf-8")
+	case ".js":
+		c.Header("Content-Type", "application/javascript; charset=utf-8")
+	}
+
+	c.File(fullPath)
 }
 
 func (s *Server) enableKeepAlive(timeout time.Duration, onTimeout func()) {
