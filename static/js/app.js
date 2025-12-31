@@ -93,12 +93,20 @@ function init() {
   const hamburgerBtn = document.querySelector('.hamburger-btn');
   if (hamburgerBtn) {
     hamburgerBtn.addEventListener('click', toggleMobileSidebar);
+    hamburgerBtn.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      toggleMobileSidebar();
+    });
   }
 
   // Setup sidebar overlay click to close
   const sidebarOverlay = document.querySelector('.sidebar-overlay');
   if (sidebarOverlay) {
     sidebarOverlay.addEventListener('click', closeMobileSidebar);
+    sidebarOverlay.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      closeMobileSidebar();
+    });
   }
 
   // Check authentication and load dashboard if authenticated

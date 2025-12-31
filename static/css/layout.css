@@ -343,6 +343,7 @@
 
   .sidebar.mobile-open {
     transform: translateX(0);
+    z-index: 102;
   }
 
   .sidebar.mobile-open .sidebar-logo-text,
