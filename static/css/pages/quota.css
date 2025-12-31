@@ -160,14 +160,48 @@
    Original Styles
    ========================================================================== */
 
-/* Quota Page Header */
+/* Quota Page Header - Two-row layout */
 .quota-page-header {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.quota-header-row-1 {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
-  margin-bottom: 24px;
   flex-wrap: wrap;
+}
+
+.quota-header-row-2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-color);
+}
+
+.quota-filters-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.quota-status-filter {
+  display: flex;
+  gap: 4px;
+}
+
+.quota-view-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .quota-header-left {
