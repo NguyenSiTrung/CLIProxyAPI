@@ -10354,8 +10354,11 @@
       let totalOutputCost = 0;
       let totalCachedCost = 0;
       let pricedModelCount = 0;
+      let totalModelsUsed = 0;
+      const modelsWithoutPricing = [];
       
       const apis = usageData.apis || {};
+      const seenModels = new Set();
       
       // Iterate through all models and calculate costs
       for (const [apiKey, apiStats] of Object.entries(apis)) {
@@ -10367,6 +10370,9 @@
           
           const pricing = modelPricingConfig[modelName] || getDefaultPricing(modelName);
           if (!pricing) continue;
+          
+          // Check if this model has actual pricing configured (not just default/empty)
+          const hasPricingConfig = modelPricingConfig[modelName] !== undefined;
           
           let modelInput = 0, modelOutput = 0, modelCached = 0;
           
@@ -10390,8 +10396,15 @@
           totalOutputCost += outputCost;
           totalCachedCost += cachedCost;
           
-          if (modelInput > 0 || modelOutput > 0) {
-            pricedModelCount++;
+          // Count unique models with usage
+          if ((modelInput > 0 || modelOutput > 0) && !seenModels.has(modelName)) {
+            seenModels.add(modelName);
+            totalModelsUsed++;
+            if (hasPricingConfig) {
+              pricedModelCount++;
+            } else {
+              modelsWithoutPricing.push(modelName);
+            }
           }
         }
       }
@@ -10411,17 +10424,44 @@
       document.getElementById('usageInputCost').textContent = formatCost(totalInputCost);
       document.getElementById('usageOutputCost').textContent = formatCost(totalOutputCost);
       document.getElementById('usageCachedCost').textContent = formatCost(totalCachedCost);
-      document.getElementById('usagePricedModels').textContent = pricedModelCount.toString();
+      
+      // Show ratio: priced/total models
+      const pricedModelsEl = document.getElementById('usagePricedModels');
+      if (totalModelsUsed > 0) {
+        pricedModelsEl.textContent = `${pricedModelCount}/${totalModelsUsed}`;
+        // Color based on coverage
+        if (pricedModelCount === totalModelsUsed) {
+          pricedModelsEl.className = 'badge badge-green';
+        } else if (pricedModelCount > 0) {
+          pricedModelsEl.className = 'badge badge-yellow';
+        } else {
+          pricedModelsEl.className = 'badge badge-red';
+        }
+      } else {
+        pricedModelsEl.textContent = '0';
+        pricedModelsEl.className = 'badge badge-green';
+      }
       
       // Show/hide note based on whether we have pricing
       const noteEl = document.getElementById('usageCostNote');
       if (noteEl) {
-        if (pricedModelCount > 0 && totalCost > 0) {
+        if (pricedModelCount === totalModelsUsed && totalModelsUsed > 0) {
           noteEl.innerHTML = `
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="20 6 9 17 4 12"/>
             </svg>
-            <span style="color:var(--accent-green)">Estimated cost based on ${pricedModelCount} model(s) with pricing configured.</span>
+            <span style="color:var(--accent-green)">All ${totalModelsUsed} model(s) have pricing configured.</span>
+          `;
+        } else if (pricedModelCount > 0) {
+          const missingCount = totalModelsUsed - pricedModelCount;
+          const missingList = modelsWithoutPricing.slice(0, 3).join(', ') + (modelsWithoutPricing.length > 3 ? ` +${modelsWithoutPricing.length - 3} more` : '');
+          noteEl.innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            <span style="color:var(--accent-yellow)">${missingCount} model(s) missing pricing: ${missingList}. <a href="#" onclick="navigateTo('models');setTimeout(()=>switchModelsTab('models-pricing'),100);return false" style="color:var(--accent-cyan)">Configure in Models → Model Pricing</a></span>
           `;
         } else {
           noteEl.innerHTML = `
