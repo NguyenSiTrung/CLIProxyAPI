@@ -25,16 +25,30 @@ export async function loadQuotaPage() {
 
 /**
  * Call external quota API through the proxy endpoint
- * @param {number} authIndex - Auth file index
- * @param {string} provider - Provider name
+ * @param {string} authIndex - Auth file index
  * @param {string} url - External API URL
  * @param {string} method - HTTP method
+ * @param {object|null} headers - Request headers
  * @param {object|null} data - Request body
- * @returns {Promise<object>} API response
+ * @returns {Promise<object>} API response with status_code, header, body
  */
-export async function callQuotaAPI(authIndex, provider, url, method, data = null) {
-  // TODO: Implement in Phase 2
-  return {};
+export async function callQuotaAPI(authIndex, url, method, headers = null, data = null) {
+  const requestBody = {
+    auth_index: authIndex,
+    method: method,
+    url: url
+  };
+
+  if (headers) {
+    requestBody.header = headers;
+  }
+
+  if (data) {
+    requestBody.data = typeof data === 'string' ? data : JSON.stringify(data);
+  }
+
+  const response = await api('POST', '/api-call', requestBody);
+  return response;
 }
 
 /**
@@ -43,8 +57,54 @@ export async function callQuotaAPI(authIndex, provider, url, method, data = null
  * @returns {Promise<object>} Quota data
  */
 export async function fetchAntigravityQuota(authFile) {
-  // TODO: Implement in Phase 2
-  return {};
+  const primaryUrl = 'https://daily-cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels';
+  const fallbackUrl = 'https://cloudcode-pa.googleapis.com/v1internal:fetchAvailableModels';
+  
+  const headers = {
+    'Authorization': 'Bearer $TOKEN$',
+    'Content-Type': 'application/json'
+  };
+
+  let response;
+  try {
+    response = await callQuotaAPI(authFile.auth_index, primaryUrl, 'POST', headers, {});
+  } catch (e) {
+    response = await callQuotaAPI(authFile.auth_index, fallbackUrl, 'POST', headers, {});
+  }
+
+  if (response.status_code !== 200) {
+    throw new Error(`HTTP ${response.status_code}: ${response.body || 'Unknown error'}`);
+  }
+
+  const data = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
+  
+  const quotaGroups = [];
+  let resetTime = null;
+
+  if (data.quotas && Array.isArray(data.quotas)) {
+    for (const quota of data.quotas) {
+      const label = quota.quotaGroupName || quota.quotaGroup || 'Unknown';
+      const remainingFraction = quota.remainingFraction ?? quota.remaining_fraction ?? 1;
+      const percentage = Math.round(remainingFraction * 100);
+      
+      quotaGroups.push({
+        name: label,
+        percentage: percentage,
+        remainingFraction: remainingFraction
+      });
+
+      if (quota.resetTime || quota.reset_time) {
+        resetTime = quota.resetTime || quota.reset_time;
+      }
+    }
+  }
+
+  return {
+    provider: 'antigravity',
+    quotaGroups: quotaGroups,
+    resetTime: resetTime,
+    fetchedAt: new Date().toISOString()
+  };
 }
 
 /**
@@ -53,8 +113,56 @@ export async function fetchAntigravityQuota(authFile) {
  * @returns {Promise<object>} Quota data
  */
 export async function fetchCodexQuota(authFile) {
-  // TODO: Implement in Phase 2
-  return {};
+  const url = 'https://chatgpt.com/backend-api/wham/usage';
+  
+  const headers = {
+    'Authorization': 'Bearer $TOKEN$',
+    'Content-Type': 'application/json'
+  };
+
+  const response = await callQuotaAPI(authFile.auth_index, url, 'GET', headers);
+
+  if (response.status_code !== 200) {
+    throw new Error(`HTTP ${response.status_code}: ${response.body || 'Unknown error'}`);
+  }
+
+  const data = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
+  
+  let planType = 'free';
+  const rateLimitWindows = [];
+
+  if (data.plan_type || data.planType) {
+    planType = (data.plan_type || data.planType).toLowerCase();
+  }
+
+  if (data.rate_limit_windows || data.rateLimitWindows) {
+    const windows = data.rate_limit_windows || data.rateLimitWindows;
+    for (const window of Object.values(windows)) {
+      const name = window.name || window.windowName || 'Unknown';
+      const used = window.used || window.current || 0;
+      const limit = window.limit || window.max || 100;
+      const remaining = limit - used;
+      const percentage = limit > 0 ? Math.round((remaining / limit) * 100) : 0;
+      const resetTime = window.reset_time || window.resetTime || null;
+
+      rateLimitWindows.push({
+        name: name,
+        used: used,
+        limit: limit,
+        remaining: remaining,
+        percentage: percentage,
+        resetTime: resetTime
+      });
+    }
+  }
+
+  return {
+    provider: 'codex',
+    planType: planType,
+    rateLimitWindows: rateLimitWindows,
+    isFreePlan: planType === 'free',
+    fetchedAt: new Date().toISOString()
+  };
 }
 
 /**
@@ -63,8 +171,57 @@ export async function fetchCodexQuota(authFile) {
  * @returns {Promise<object>} Quota data
  */
 export async function fetchGeminiCliQuota(authFile) {
-  // TODO: Implement in Phase 2
-  return {};
+  const url = 'https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota';
+  
+  const headers = {
+    'Authorization': 'Bearer $TOKEN$',
+    'Content-Type': 'application/json'
+  };
+
+  const requestData = {};
+  if (authFile.attributes?.project) {
+    requestData.project = authFile.attributes.project;
+  }
+
+  const response = await callQuotaAPI(authFile.auth_index, url, 'POST', headers, requestData);
+
+  if (response.status_code !== 200) {
+    throw new Error(`HTTP ${response.status_code}: ${response.body || 'Unknown error'}`);
+  }
+
+  const data = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
+  
+  const quotaGroups = [];
+  let resetTime = null;
+
+  if (data.quotas && Array.isArray(data.quotas)) {
+    for (const quota of data.quotas) {
+      const label = quota.quotaGroupName || quota.quotaGroup || quota.modelGroup || 'Unknown';
+      const remainingFraction = quota.remainingFraction ?? quota.remaining_fraction ?? 1;
+      const remainingAmount = quota.remainingAmount ?? quota.remaining_amount ?? null;
+      const percentage = Math.round(remainingFraction * 100);
+      const tokenType = quota.tokenType || quota.token_type || null;
+      
+      quotaGroups.push({
+        name: label,
+        percentage: percentage,
+        remainingFraction: remainingFraction,
+        remainingAmount: remainingAmount,
+        tokenType: tokenType
+      });
+
+      if (quota.resetTime || quota.reset_time) {
+        resetTime = quota.resetTime || quota.reset_time;
+      }
+    }
+  }
+
+  return {
+    provider: 'gemini-cli',
+    quotaGroups: quotaGroups,
+    resetTime: resetTime,
+    fetchedAt: new Date().toISOString()
+  };
 }
 
 /**
