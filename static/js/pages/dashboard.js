@@ -274,3 +274,7 @@ export function compareVersions(v1, v2) {
   }
   return 0;
 }
+
+// Expose functions to window for HTML onclick handlers
+window.loadDashboard = loadDashboard;
+window.checkLatestVersion = checkLatestVersion;

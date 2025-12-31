@@ -819,3 +819,12 @@ export const usageModule = {
   importUsageData,
   triggerUsageImport
 };
+
+// Expose functions to window for HTML onclick handlers
+window.usageModule = usageModule;
+window.loadUsageStats = loadUsageStats;
+window.setUsageDateRange = setUsageDateRange;
+window.setChartView = setChartView;
+window.exportUsageData = exportUsageData;
+window.triggerUsageImport = triggerUsageImport;
+window.importUsageData = importUsageData;

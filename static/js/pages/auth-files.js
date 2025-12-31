@@ -499,3 +499,15 @@ export async function refreshAuthToken(name) {
     toast('Failed to refresh: ' + e.message, 'error');
   }
 }
+
+// Expose functions to window for HTML onclick handlers
+window.loadAuthFiles = loadAuthFiles;
+window.viewAuthFile = viewAuthFile;
+window.downloadAuth = downloadAuth;
+window.deleteAuth = deleteAuth;
+window.deleteAllAuthFiles = deleteAllAuthFiles;
+window.startOAuth = startOAuth;
+window.showManualCallback = showManualCallback;
+window.hideManualCallback = hideManualCallback;
+window.submitManualCallback = submitManualCallback;
+window.refreshAuthToken = refreshAuthToken;
