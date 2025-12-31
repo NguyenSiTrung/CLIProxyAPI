@@ -2,6 +2,164 @@
  * quota.css - Quota page styles: header, cards, progress bars, filters
  */
 
+/* ==========================================================================
+   Status Color Variables
+   ========================================================================== */
+:root {
+  /* Quota Status Colors */
+  --quota-critical-bg: rgba(239, 68, 68, 0.15);
+  --quota-critical-border: rgba(239, 68, 68, 0.6);
+  --quota-critical-text: #ef4444;
+  
+  --quota-warning-bg: rgba(251, 191, 36, 0.15);
+  --quota-warning-border: rgba(251, 191, 36, 0.6);
+  --quota-warning-text: #fbbf24;
+  
+  --quota-healthy-bg: rgba(34, 197, 94, 0.15);
+  --quota-healthy-border: rgba(34, 197, 94, 0.6);
+  --quota-healthy-text: #22c55e;
+}
+
+/* ==========================================================================
+   Circular Progress Indicator (Base)
+   ========================================================================== */
+.quota-circular-progress {
+  position: relative;
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+}
+
+.quota-circular-progress svg {
+  transform: rotate(-90deg);
+  width: 100%;
+  height: 100%;
+}
+
+.quota-circular-progress .progress-bg {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.1);
+  stroke-width: 6;
+}
+
+.quota-circular-progress .progress-bar {
+  fill: none;
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.5s ease-out, stroke 0.3s ease;
+}
+
+.quota-circular-progress .progress-bar.critical {
+  stroke: var(--quota-critical-text);
+}
+
+.quota-circular-progress .progress-bar.warning {
+  stroke: var(--quota-warning-text);
+}
+
+.quota-circular-progress .progress-bar.healthy {
+  stroke: var(--quota-healthy-text);
+}
+
+.quota-circular-progress .progress-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+/* ==========================================================================
+   Card Border Status Styles
+   ========================================================================== */
+.quota-card.status-critical {
+  border-left: 4px solid var(--quota-critical-border);
+  background: linear-gradient(135deg, var(--quota-critical-bg), var(--bg-card));
+}
+
+.quota-card.status-warning {
+  border-left: 4px solid var(--quota-warning-border);
+  background: linear-gradient(135deg, var(--quota-warning-bg), var(--bg-card));
+}
+
+.quota-card.status-healthy {
+  border-left: 4px solid var(--quota-healthy-border);
+  background: linear-gradient(135deg, var(--quota-healthy-bg), var(--bg-card));
+}
+
+/* ==========================================================================
+   Summary Bar (Placeholder)
+   ========================================================================== */
+.quota-summary-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.quota-summary-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.quota-summary-badge:hover {
+  transform: translateY(-1px);
+}
+
+.quota-summary-badge.critical {
+  background: var(--quota-critical-bg);
+  color: var(--quota-critical-text);
+  border-color: var(--quota-critical-border);
+}
+
+.quota-summary-badge.critical:hover {
+  background: rgba(239, 68, 68, 0.25);
+}
+
+.quota-summary-badge.warning {
+  background: var(--quota-warning-bg);
+  color: var(--quota-warning-text);
+  border-color: var(--quota-warning-border);
+}
+
+.quota-summary-badge.warning:hover {
+  background: rgba(251, 191, 36, 0.25);
+}
+
+.quota-summary-badge.healthy {
+  background: var(--quota-healthy-bg);
+  color: var(--quota-healthy-text);
+  border-color: var(--quota-healthy-border);
+}
+
+.quota-summary-badge.healthy:hover {
+  background: rgba(34, 197, 94, 0.25);
+}
+
+.quota-summary-badge.active {
+  box-shadow: 0 0 0 2px currentColor;
+}
+
+.quota-summary-count {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* ==========================================================================
+   Original Styles
+   ========================================================================== */
+
 /* Quota Page Header */
 .quota-page-header {
   display: flex;
