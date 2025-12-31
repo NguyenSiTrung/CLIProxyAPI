@@ -11076,7 +11076,7 @@
 
     async function exportUsageData() {
       try {
-        const response = await fetch('/mgmt/usage/export');
+        const response = await fetch('/v0/management/usage/export');
         if (!response.ok) {
           throw new Error('Failed to fetch export data');
         }
@@ -11136,7 +11136,7 @@
           return;
         }
         
-        const response = await fetch('/mgmt/usage/import', {
+        const response = await fetch('/v0/management/usage/import', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
