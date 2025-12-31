@@ -945,6 +945,194 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+// ============================================================================
+// AUTO-BACKUP STATUS (Server-Side)
+// ============================================================================
+
+/**
+ * Toggle auto-backup settings panel visibility
+ */
+export function toggleAutoBackupSettings() {
+  const panel = document.getElementById('autoBackupPanel');
+  if (panel) {
+    const isVisible = panel.style.display !== 'none';
+    panel.style.display = isVisible ? 'none' : 'block';
+    if (!isVisible) {
+      loadAutoBackupStatus();
+      loadBackupFiles();
+    }
+  }
+}
+
+/**
+ * Initialize auto-backup status display
+ */
+export function initAutoBackup() {
+  loadAutoBackupStatus();
+}
+
+/**
+ * Load auto-backup status from server config
+ */
+async function loadAutoBackupStatus() {
+  const statusEl = document.getElementById('autoBackupStatus');
+  const btnEl = document.getElementById('autoBackupBtn');
+  const intervalRow = document.getElementById('autoBackupIntervalRow');
+  const intervalDisplay = document.getElementById('autoBackupIntervalDisplay');
+  const folderRow = document.getElementById('autoBackupFolderRow');
+  const folderDisplay = document.getElementById('autoBackupFolderDisplay');
+  
+  try {
+    const config = await api('GET', '/config');
+    const autoBackup = config?.['usage-auto-backup'] || {};
+    const enabled = autoBackup.enabled === true;
+    
+    if (statusEl) {
+      statusEl.textContent = enabled ? 'Enabled' : 'Disabled';
+      statusEl.classList.toggle('active', enabled);
+    }
+    
+    if (btnEl) {
+      btnEl.classList.toggle('active', enabled);
+      const label = btnEl.querySelector('#autoBackupBtnLabel');
+      if (label) label.textContent = enabled ? 'Auto ✓' : 'Auto';
+    }
+    
+    if (enabled) {
+      if (intervalRow && intervalDisplay) {
+        const minutes = autoBackup['interval-minutes'] || 60;
+        intervalDisplay.textContent = formatInterval(minutes);
+        intervalRow.style.display = 'flex';
+      }
+      
+      if (folderRow && folderDisplay) {
+        const folder = autoBackup['folder-path'] || '(current directory)';
+        folderDisplay.textContent = folder;
+        folderRow.style.display = 'flex';
+      }
+    } else {
+      if (intervalRow) intervalRow.style.display = 'none';
+      if (folderRow) folderRow.style.display = 'none';
+    }
+  } catch (err) {
+    console.warn('Failed to load auto-backup status:', err);
+    if (statusEl) {
+      statusEl.textContent = 'Unknown';
+    }
+  }
+}
+
+function formatInterval(minutes) {
+  if (minutes < 60) return `Every ${minutes} minutes`;
+  if (minutes === 60) return 'Every 1 hour';
+  if (minutes < 1440) return `Every ${Math.floor(minutes / 60)} hours`;
+  return `Every ${Math.floor(minutes / 1440)} days`;
+}
+
+/**
+ * Load and display backup files list
+ */
+export async function loadBackupFiles() {
+  const listEl = document.getElementById('autoBackupFilesList');
+  if (!listEl) return;
+  
+  listEl.innerHTML = '<div class="auto-backup-files-loading">Loading...</div>';
+  
+  try {
+    const result = await api('GET', '/usage/backups');
+    
+    if (!result.enabled) {
+      listEl.innerHTML = '<div class="auto-backup-files-empty">Auto-backup not enabled in config.yaml</div>';
+      return;
+    }
+    
+    const files = result.files || [];
+    
+    if (files.length === 0) {
+      listEl.innerHTML = '<div class="auto-backup-files-empty">No backup files found</div>';
+      return;
+    }
+    
+    listEl.innerHTML = files.map(file => `
+      <div class="auto-backup-file-item">
+        <div class="auto-backup-file-info">
+          <div class="auto-backup-file-name" title="${escapeHtmlAttr(file.filename)}">${escapeHtml(file.filename)}</div>
+          <div class="auto-backup-file-meta">
+            <span class="auto-backup-file-type ${file.backup_type}">${file.backup_type}</span>
+            <span>${formatFileSize(file.size)}</span>
+            <span>${formatBackupTime(file.mod_time)}</span>
+          </div>
+        </div>
+        <button class="auto-backup-file-import" onclick="importBackupFile('${escapeHtmlAttr(file.filename)}')">
+          Import
+        </button>
+      </div>
+    `).join('');
+  } catch (err) {
+    console.error('Failed to load backup files:', err);
+    listEl.innerHTML = '<div class="auto-backup-files-empty">Failed to load backup files</div>';
+  }
+}
+
+/**
+ * Refresh backup files list
+ */
+export function refreshBackupFiles() {
+  loadBackupFiles();
+}
+
+/**
+ * Import a backup file from server
+ */
+export async function importBackupFile(filename) {
+  if (!confirm(`Import usage data from "${filename}"?\n\nThis will merge the backup data with current statistics.`)) {
+    return;
+  }
+  
+  try {
+    const result = await api('POST', `/usage/backups/import?filename=${encodeURIComponent(filename)}`);
+    toast(`Imported ${result.added} records (${result.skipped} skipped)`, 'success');
+    loadUsageStats();
+  } catch (err) {
+    toast('Import failed: ' + err.message, 'error');
+  }
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function formatBackupTime(isoString) {
+  try {
+    const date = new Date(isoString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    
+    return date.toLocaleDateString();
+  } catch {
+    return isoString;
+  }
+}
+
+function escapeHtmlAttr(str) {
+  if (!str) return '';
+  return str.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// ============================================================================
+// MODULE EXPORTS
+// ============================================================================
+
 // Export module interface for global access
 export const usageModule = {
   loadUsageStats,
@@ -952,7 +1140,12 @@ export const usageModule = {
   setChartView,
   exportUsageData,
   importUsageData,
-  triggerUsageImport
+  triggerUsageImport,
+  toggleAutoBackupSettings,
+  initAutoBackup,
+  loadBackupFiles,
+  refreshBackupFiles,
+  importBackupFile
 };
 
 // Expose functions to window for HTML onclick handlers
@@ -963,3 +1156,7 @@ window.setChartView = setChartView;
 window.exportUsageData = exportUsageData;
 window.triggerUsageImport = triggerUsageImport;
 window.importUsageData = importUsageData;
+window.toggleAutoBackupSettings = toggleAutoBackupSettings;
+window.initAutoBackup = initAutoBackup;
+window.refreshBackupFiles = refreshBackupFiles;
+window.importBackupFile = importBackupFile;

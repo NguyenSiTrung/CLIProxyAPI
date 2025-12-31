@@ -54,6 +54,9 @@ type Config struct {
 	// UsageStatisticsEnabled toggles in-memory usage aggregation; when false, usage data is discarded.
 	UsageStatisticsEnabled bool `yaml:"usage-statistics-enabled" json:"usage-statistics-enabled"`
 
+	// UsageAutoBackup configures automatic backup of usage statistics to a file.
+	UsageAutoBackup UsageAutoBackupConfig `yaml:"usage-auto-backup" json:"usage-auto-backup"`
+
 	// DisableCooling disables quota cooldown scheduling when true.
 	DisableCooling bool `yaml:"disable-cooling" json:"disable-cooling"`
 
@@ -125,6 +128,23 @@ type TelegramConfig struct {
 	AllowedChatIDs []int64 `yaml:"allowed-chat-ids" json:"allowed-chat-ids"`
 	// ServerURL is the public URL of your proxy server (for docs links).
 	ServerURL string `yaml:"server-url" json:"server-url"`
+}
+
+// UsageAutoBackupConfig holds the usage statistics auto-backup configuration.
+type UsageAutoBackupConfig struct {
+	// Enabled controls whether automatic backup is active.
+	Enabled bool `yaml:"enabled" json:"enabled"`
+	// IntervalMinutes is the backup interval in minutes (default: 60).
+	IntervalMinutes int `yaml:"interval-minutes" json:"interval-minutes"`
+	// FolderPath is the directory where backup files are saved.
+	// Supports ~ for home directory. Default: current working directory.
+	FolderPath string `yaml:"folder-path" json:"folder-path"`
+	// FilenamePrefix is the prefix for backup filenames (default: cliproxy-usage-backup).
+	FilenamePrefix string `yaml:"filename-prefix" json:"filename-prefix"`
+	// BackupOnShutdown triggers a backup when the server receives a shutdown signal.
+	BackupOnShutdown bool `yaml:"backup-on-shutdown" json:"backup-on-shutdown"`
+	// MaxBackupFiles limits the number of backup files to keep (0 = unlimited).
+	MaxBackupFiles int `yaml:"max-backup-files" json:"max-backup-files"`
 }
 
 // TLSConfig holds HTTPS server settings.
