@@ -262,6 +262,53 @@
   gap: 8px;
 }
 
+.quota-view-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.quota-view-toggle-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  border-color: var(--border-glow);
+}
+
+.quota-view-toggle-btn.active {
+  background: var(--accent-cyan);
+  color: #0d0d1a;
+  border-color: var(--accent-cyan);
+}
+
+/* Compact View Mode */
+.quota-cards-grid.compact-view .quota-card {
+  padding: 12px 16px;
+}
+
+.quota-cards-grid.compact-view .quota-groups,
+.quota-cards-grid.compact-view .quota-groups-collapsible,
+.quota-cards-grid.compact-view .quota-free-warning,
+.quota-cards-grid.compact-view .quota-card-updated {
+  display: none;
+}
+
+.quota-cards-grid.compact-view .quota-card-header {
+  margin-bottom: 0;
+}
+
+.quota-cards-grid.compact-view .quota-plan-badge {
+  display: none;
+}
+
 .quota-header-left {
   flex: 1;
   min-width: 200px;

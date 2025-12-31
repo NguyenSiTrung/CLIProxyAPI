@@ -12,6 +12,7 @@ let authFiles = [];
 let filteredAuthFiles = [];
 let currentFilter = 'all';
 let currentStatusFilter = null; // 'critical' | 'warning' | 'healthy' | null
+let currentViewMode = 'detailed'; // 'compact' | 'detailed'
 let currentPage = 1;
 let pageSize = 9;
 let autoRefreshInterval = null;
@@ -76,6 +77,8 @@ export async function loadQuotaPage() {
   const container = document.getElementById('quotaContainer');
   if (!container) return;
 
+  currentViewMode = localStorage.getItem('quotaViewMode') || 'detailed';
+  
   container.innerHTML = `
     <div class="quota-empty-state">
       <div class="quota-loading-spinner"></div>
@@ -89,6 +92,7 @@ export async function loadQuotaPage() {
     
     applyFilter();
     renderQuotaPage();
+    renderViewToggle();
     
     // Don't auto-fetch quotas - user must click "Fetch All" or individual refresh
     // Show a hint message
@@ -1541,6 +1545,58 @@ function renderStatusFilterChips() {
 }
 
 /**
+ * Render view toggle button
+ */
+function renderViewToggle() {
+  const container = document.getElementById('quotaViewToggle');
+  if (!container) return;
+  
+  const isCompact = currentViewMode === 'compact';
+  
+  container.innerHTML = `
+    <button class="quota-view-toggle-btn ${isCompact ? '' : 'active'}" 
+            onclick="setViewMode('detailed')"
+            aria-pressed="${!isCompact}">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="7" height="7"></rect>
+        <rect x="14" y="3" width="7" height="7"></rect>
+        <rect x="14" y="14" width="7" height="7"></rect>
+        <rect x="3" y="14" width="7" height="7"></rect>
+      </svg>
+      Detailed
+    </button>
+    <button class="quota-view-toggle-btn ${isCompact ? 'active' : ''}" 
+            onclick="setViewMode('compact')"
+            aria-pressed="${isCompact}">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="8" y1="6" x2="21" y2="6"></line>
+        <line x1="8" y1="12" x2="21" y2="12"></line>
+        <line x1="8" y1="18" x2="21" y2="18"></line>
+        <line x1="3" y1="6" x2="3.01" y2="6"></line>
+        <line x1="3" y1="12" x2="3.01" y2="12"></line>
+        <line x1="3" y1="18" x2="3.01" y2="18"></line>
+      </svg>
+      Compact
+    </button>
+  `;
+  
+  const quotaContainer = document.getElementById('quotaContainer');
+  if (quotaContainer) {
+    quotaContainer.classList.toggle('compact-view', isCompact);
+  }
+}
+
+/**
+ * Set view mode and persist preference
+ * @param {string} mode - 'compact' | 'detailed'
+ */
+export function setViewMode(mode) {
+  currentViewMode = mode;
+  localStorage.setItem('quotaViewMode', mode);
+  renderViewToggle();
+}
+
+/**
  * Set status filter and re-render
  * @param {string|null} status - 'critical' | 'warning' | 'healthy' | null
  */
@@ -1836,3 +1892,4 @@ window.setQuotaPage = setQuotaPage;
 window.getQuotaStatus = getQuotaStatus;
 window.setStatusFilter = setStatusFilter;
 window.toggleQuotaGroups = toggleQuotaGroups;
+window.setViewMode = setViewMode;
