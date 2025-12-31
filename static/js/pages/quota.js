@@ -5,7 +5,6 @@
 
 import { api } from '../core/api.js';
 import { toast } from '../core/toast.js';
-import { showModal, hideModal } from '../core/modal.js';
 
 // Module state
 let quotaData = new Map();
