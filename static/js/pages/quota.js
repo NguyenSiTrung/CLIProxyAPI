@@ -227,34 +227,130 @@ export async function fetchGeminiCliQuota(authFile) {
 /**
  * Render quota card for Antigravity provider
  * @param {object} authFile - Auth file object
- * @param {object} quotaData - Quota data
+ * @param {object} data - Quota data
  * @returns {string} HTML string
  */
-export function renderAntigravityQuotaCard(authFile, quotaData) {
-  // TODO: Implement in Phase 3
-  return '';
+export function renderAntigravityQuotaCard(authFile, data) {
+  const groupsHtml = (data.quotaGroups || []).map(group => {
+    const colorClass = getQuotaColorClass(group.percentage);
+    return `
+      <div class="quota-group">
+        <div class="quota-group-header">
+          <span class="quota-group-name">${escapeHtml(group.name)}</span>
+          <span class="quota-group-value ${colorClass}">${group.percentage}%</span>
+        </div>
+        <div class="quota-progress-container">
+          <div class="quota-progress-bar ${colorClass}" style="width: ${group.percentage}%"></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const resetTimeHtml = data.resetTime ? `
+    <div class="quota-reset-time">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"></circle>
+        <polyline points="12 6 12 12 16 14"></polyline>
+      </svg>
+      <span>Resets: ${formatResetTime(data.resetTime)}</span>
+    </div>
+  ` : '';
+
+  return renderQuotaCardWrapper(authFile, 'antigravity', `
+    <div class="quota-groups">
+      ${groupsHtml || '<div class="quota-empty-state"><p>No quota data available</p></div>'}
+    </div>
+    ${resetTimeHtml}
+  `, data.fetchedAt);
 }
 
 /**
  * Render quota card for Codex provider
  * @param {object} authFile - Auth file object
- * @param {object} quotaData - Quota data
+ * @param {object} data - Quota data
  * @returns {string} HTML string
  */
-export function renderCodexQuotaCard(authFile, quotaData) {
-  // TODO: Implement in Phase 3
-  return '';
+export function renderCodexQuotaCard(authFile, data) {
+  const planBadgeClass = data.planType === 'plus' ? 'plus' : data.planType === 'team' ? 'team' : 'free';
+  const planBadge = `<span class="quota-plan-badge ${planBadgeClass}">${escapeHtml(data.planType || 'Free')}</span>`;
+
+  const windowsHtml = (data.rateLimitWindows || []).map(window => {
+    const colorClass = getQuotaColorClass(window.percentage);
+    return `
+      <div class="quota-group">
+        <div class="quota-group-header">
+          <span class="quota-group-name">${escapeHtml(window.name)}</span>
+          <span class="quota-group-value ${colorClass}">${window.remaining}/${window.limit}</span>
+        </div>
+        <div class="quota-progress-container">
+          <div class="quota-progress-bar ${colorClass}" style="width: ${window.percentage}%"></div>
+        </div>
+        ${window.resetTime ? `<div class="quota-reset-time"><span>Resets: ${formatResetTime(window.resetTime)}</span></div>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  const freeWarningHtml = data.isFreePlan ? `
+    <div class="quota-free-warning">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+        <line x1="12" y1="9" x2="12" y2="13"></line>
+        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+      </svg>
+      <span>Free plan has limited quota</span>
+    </div>
+  ` : '';
+
+  return renderQuotaCardWrapper(authFile, 'codex', `
+    <div style="margin-bottom: 12px;">${planBadge}</div>
+    <div class="quota-groups">
+      ${windowsHtml || '<div class="quota-empty-state"><p>No rate limit data available</p></div>'}
+    </div>
+    ${freeWarningHtml}
+  `, data.fetchedAt);
 }
 
 /**
  * Render quota card for Gemini CLI provider
  * @param {object} authFile - Auth file object
- * @param {object} quotaData - Quota data
+ * @param {object} data - Quota data
  * @returns {string} HTML string
  */
-export function renderGeminiCliQuotaCard(authFile, quotaData) {
-  // TODO: Implement in Phase 3
-  return '';
+export function renderGeminiCliQuotaCard(authFile, data) {
+  const groupsHtml = (data.quotaGroups || []).map(group => {
+    const colorClass = getQuotaColorClass(group.percentage);
+    const amountInfo = group.remainingAmount !== null ? ` (${group.remainingAmount} remaining)` : '';
+    const tokenInfo = group.tokenType ? ` [${group.tokenType}]` : '';
+    
+    return `
+      <div class="quota-group">
+        <div class="quota-group-header">
+          <span class="quota-group-name">${escapeHtml(group.name)}${tokenInfo}</span>
+          <span class="quota-group-value ${colorClass}">${group.percentage}%${amountInfo}</span>
+        </div>
+        <div class="quota-progress-container">
+          <div class="quota-progress-bar ${colorClass}" style="width: ${group.percentage}%"></div>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const resetTimeHtml = data.resetTime ? `
+    <div class="quota-reset-time">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"></circle>
+        <polyline points="12 6 12 12 16 14"></polyline>
+      </svg>
+      <span>Resets: ${formatResetTime(data.resetTime)}</span>
+    </div>
+  ` : '';
+
+  return renderQuotaCardWrapper(authFile, 'gemini-cli', `
+    <div class="quota-groups">
+      ${groupsHtml || '<div class="quota-empty-state"><p>No quota data available</p></div>'}
+    </div>
+    ${resetTimeHtml}
+  `, data.fetchedAt);
 }
 
 /**
@@ -264,8 +360,39 @@ export function renderGeminiCliQuotaCard(authFile, quotaData) {
  * @returns {string} HTML string
  */
 export function renderQuotaErrorCard(authFile, error) {
-  // TODO: Implement in Phase 3
-  return '';
+  const statusMatch = error.message?.match(/HTTP (\d+)/);
+  const statusCode = statusMatch ? statusMatch[1] : 'Error';
+  const errorMessage = error.message || 'Unknown error occurred';
+
+  return `
+    <div class="quota-card error" data-auth-index="${authFile.auth_index}">
+      <div class="quota-card-header">
+        <div class="quota-card-info">
+          <div class="quota-card-name">${escapeHtml(authFile.file_name || authFile.name)}</div>
+          <span class="quota-card-provider ${authFile.provider?.toLowerCase()}">${escapeHtml(authFile.provider || 'Unknown')}</span>
+        </div>
+        <div class="quota-card-actions">
+          <button class="quota-refresh-btn" onclick="refreshQuota('${authFile.auth_index}')" title="Retry">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 4v6h-6"></path>
+              <path d="M1 20v-6h6"></path>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="quota-error-content">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="15" y1="9" x2="9" y2="15"></line>
+          <line x1="9" y1="9" x2="15" y2="15"></line>
+        </svg>
+        <div class="quota-error-message">
+          <span class="quota-error-status">${statusCode}</span> - ${escapeHtml(errorMessage)}
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 /**
@@ -274,8 +401,83 @@ export function renderQuotaErrorCard(authFile, error) {
  * @returns {string} HTML string
  */
 export function renderQuotaUnavailableCard(authFile) {
-  // TODO: Implement in Phase 3
-  return '';
+  return `
+    <div class="quota-card unavailable" data-auth-index="${authFile.auth_index}">
+      <div class="quota-card-header">
+        <div class="quota-card-info">
+          <div class="quota-card-name">${escapeHtml(authFile.file_name || authFile.name)}</div>
+          <span class="quota-card-provider">${escapeHtml(authFile.provider || 'Unknown')}</span>
+        </div>
+      </div>
+      <div class="quota-unavailable-content">
+        <span class="quota-na-badge">Quota N/A</span>
+        <span>Quota checking not supported for this provider</span>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Wrapper function to create consistent card structure
+ * @param {object} authFile - Auth file object
+ * @param {string} providerClass - CSS class for provider styling
+ * @param {string} contentHtml - Inner content HTML
+ * @param {string} fetchedAt - Timestamp when data was fetched
+ * @returns {string} HTML string
+ */
+function renderQuotaCardWrapper(authFile, providerClass, contentHtml, fetchedAt) {
+  const updatedAgo = fetchedAt ? getTimeAgo(fetchedAt) : '';
+  const isStale = fetchedAt ? (Date.now() - new Date(fetchedAt).getTime()) > 10 * 60 * 1000 : false;
+
+  return `
+    <div class="quota-card" data-auth-index="${authFile.auth_index}">
+      <div class="quota-card-header">
+        <div class="quota-card-info">
+          <div class="quota-card-name">${escapeHtml(authFile.file_name || authFile.name)}</div>
+          <span class="quota-card-provider ${providerClass}">${escapeHtml(authFile.provider || 'Unknown')}</span>
+        </div>
+        <div class="quota-card-actions">
+          <button class="quota-refresh-btn" onclick="refreshQuota('${authFile.auth_index}')" title="Refresh">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 4v6h-6"></path>
+              <path d="M1 20v-6h6"></path>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+      ${contentHtml}
+      ${updatedAgo ? `<div class="quota-card-updated ${isStale ? 'stale' : ''}">Last updated: ${updatedAgo}</div>` : ''}
+    </div>
+  `;
+}
+
+/**
+ * Get time ago string from timestamp
+ * @param {string} timestamp - ISO timestamp
+ * @returns {string} Time ago string
+ */
+function getTimeAgo(timestamp) {
+  const seconds = Math.floor((Date.now() - new Date(timestamp).getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+/**
+ * Escape HTML special characters
+ * @param {string} str - String to escape
+ * @returns {string} Escaped string
+ */
+function escapeHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
 }
 
 /**
