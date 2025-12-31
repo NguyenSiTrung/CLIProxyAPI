@@ -9,6 +9,11 @@ import { showModal, hideModal } from '../core/modal.js';
 
 // Module state
 let quotaData = new Map();
+let authFiles = [];
+let filteredAuthFiles = [];
+let currentFilter = 'all';
+let currentPage = 1;
+let pageSize = 9;
 let autoRefreshInterval = null;
 const AUTO_REFRESH_DELAY = 5 * 60 * 1000; // 5 minutes
 
@@ -19,8 +24,221 @@ const SUPPORTED_PROVIDERS = ['antigravity', 'codex', 'gemini-cli'];
  * Load the quota page
  */
 export async function loadQuotaPage() {
-  // TODO: Implement in Phase 4
-  console.log('Quota page loading...');
+  const container = document.getElementById('quotaContainer');
+  if (!container) return;
+
+  container.innerHTML = `
+    <div class="quota-empty-state">
+      <div class="quota-loading-spinner"></div>
+      <p>Loading quota information...</p>
+    </div>
+  `;
+
+  try {
+    const response = await api('GET', '/auth-files');
+    authFiles = response.files || [];
+    
+    applyFilter();
+    renderQuotaPage();
+    
+    await fetchVisibleQuotas();
+    
+    startAutoRefresh();
+    
+    updateLastUpdated();
+  } catch (e) {
+    toast('Failed to load auth files: ' + e.message, 'error');
+    container.innerHTML = `
+      <div class="quota-empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="15" y1="9" x2="9" y2="15"></line>
+          <line x1="9" y1="9" x2="15" y2="15"></line>
+        </svg>
+        <p>Failed to load auth files</p>
+      </div>
+    `;
+  }
+}
+
+/**
+ * Apply current filter to auth files
+ */
+function applyFilter() {
+  if (currentFilter === 'all') {
+    filteredAuthFiles = [...authFiles];
+  } else {
+    filteredAuthFiles = authFiles.filter(f => 
+      f.provider?.toLowerCase() === currentFilter
+    );
+  }
+  currentPage = 1;
+}
+
+/**
+ * Get auth files for current page
+ * @returns {Array} Paginated auth files
+ */
+function getPagedAuthFiles() {
+  const start = (currentPage - 1) * pageSize;
+  const end = start + pageSize;
+  return filteredAuthFiles.slice(start, end);
+}
+
+/**
+ * Render the quota page with cards
+ */
+function renderQuotaPage() {
+  const container = document.getElementById('quotaContainer');
+  if (!container) return;
+
+  const pagedFiles = getPagedAuthFiles();
+  
+  if (pagedFiles.length === 0) {
+    container.innerHTML = `
+      <div class="quota-empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M12 6v6l4 2"></path>
+        </svg>
+        <p>No auth files found${currentFilter !== 'all' ? ' for ' + currentFilter : ''}</p>
+      </div>
+    `;
+    renderPagination();
+    return;
+  }
+
+  const cardsHtml = pagedFiles.map(authFile => {
+    const data = quotaData.get(authFile.auth_index);
+    
+    if (data?.error) {
+      return renderQuotaErrorCard(authFile, data.error);
+    }
+    
+    if (!isQuotaSupported(authFile.provider)) {
+      return renderQuotaUnavailableCard(authFile);
+    }
+    
+    if (!data) {
+      return renderLoadingCard(authFile);
+    }
+    
+    switch (authFile.provider?.toLowerCase()) {
+      case 'antigravity':
+        return renderAntigravityQuotaCard(authFile, data);
+      case 'codex':
+        return renderCodexQuotaCard(authFile, data);
+      case 'gemini-cli':
+        return renderGeminiCliQuotaCard(authFile, data);
+      default:
+        return renderQuotaUnavailableCard(authFile);
+    }
+  }).join('');
+
+  container.innerHTML = cardsHtml;
+  renderPagination();
+}
+
+/**
+ * Render loading card for auth file
+ * @param {object} authFile - Auth file object
+ * @returns {string} HTML string
+ */
+function renderLoadingCard(authFile) {
+  return `
+    <div class="quota-card loading" data-auth-index="${authFile.auth_index}">
+      <div class="quota-card-header">
+        <div class="quota-card-info">
+          <div class="quota-card-name">${escapeHtml(authFile.file_name || authFile.name)}</div>
+          <span class="quota-card-provider ${authFile.provider?.toLowerCase()}">${escapeHtml(authFile.provider || 'Unknown')}</span>
+        </div>
+      </div>
+      <div class="quota-loading-overlay">
+        <div class="quota-loading-spinner"></div>
+      </div>
+    </div>
+  `;
+}
+
+/**
+ * Render pagination controls
+ */
+function renderPagination() {
+  const container = document.getElementById('quotaPageControls');
+  if (!container) return;
+
+  const totalPages = Math.ceil(filteredAuthFiles.length / pageSize);
+  
+  if (totalPages <= 1) {
+    container.innerHTML = '';
+    return;
+  }
+
+  let html = '';
+  
+  html += `<button class="quota-page-btn" onclick="setQuotaPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>‹</button>`;
+  
+  for (let i = 1; i <= totalPages; i++) {
+    if (i === 1 || i === totalPages || (i >= currentPage - 1 && i <= currentPage + 1)) {
+      html += `<button class="quota-page-btn ${i === currentPage ? 'active' : ''}" onclick="setQuotaPage(${i})">${i}</button>`;
+    } else if (i === currentPage - 2 || i === currentPage + 2) {
+      html += '<span style="padding: 0 4px;">...</span>';
+    }
+  }
+  
+  html += `<button class="quota-page-btn" onclick="setQuotaPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>›</button>`;
+  
+  container.innerHTML = html;
+}
+
+/**
+ * Fetch quota for visible auth files
+ */
+async function fetchVisibleQuotas() {
+  const pagedFiles = getPagedAuthFiles();
+  const supportedFiles = pagedFiles.filter(f => isQuotaSupported(f.provider));
+  
+  await Promise.all(supportedFiles.map(async (authFile) => {
+    await fetchQuotaForAuth(authFile);
+  }));
+  
+  renderQuotaPage();
+}
+
+/**
+ * Fetch quota for a single auth file
+ * @param {object} authFile - Auth file object
+ */
+async function fetchQuotaForAuth(authFile) {
+  try {
+    let data;
+    switch (authFile.provider?.toLowerCase()) {
+      case 'antigravity':
+        data = await fetchAntigravityQuota(authFile);
+        break;
+      case 'codex':
+        data = await fetchCodexQuota(authFile);
+        break;
+      case 'gemini-cli':
+        data = await fetchGeminiCliQuota(authFile);
+        break;
+      default:
+        return;
+    }
+    quotaData.set(authFile.auth_index, data);
+  } catch (e) {
+    quotaData.set(authFile.auth_index, { error: e });
+  }
+}
+
+/**
+ * Update the last updated timestamp
+ */
+function updateLastUpdated() {
+  const el = document.getElementById('quotaUpdateTime');
+  if (el) {
+    el.textContent = 'Updated ' + new Date().toLocaleTimeString();
+  }
 }
 
 /**
@@ -482,17 +700,106 @@ function escapeHtml(str) {
 
 /**
  * Refresh quota for a single auth file
- * @param {string} authFileName - Auth file name
+ * @param {string} authIndex - Auth index
  */
-export async function refreshQuota(authFileName) {
-  // TODO: Implement in Phase 4
+export async function refreshQuota(authIndex) {
+  const authFile = authFiles.find(f => f.auth_index === authIndex);
+  if (!authFile) return;
+
+  const card = document.querySelector(`[data-auth-index="${authIndex}"]`);
+  const refreshBtn = card?.querySelector('.quota-refresh-btn');
+  
+  if (refreshBtn) {
+    refreshBtn.classList.add('loading');
+  }
+
+  try {
+    quotaData.delete(authIndex);
+    await fetchQuotaForAuth(authFile);
+    renderQuotaPage();
+    updateLastUpdated();
+    toast('Quota refreshed', 'success');
+  } catch (e) {
+    toast('Failed to refresh: ' + e.message, 'error');
+  } finally {
+    if (refreshBtn) {
+      refreshBtn.classList.remove('loading');
+    }
+  }
 }
 
 /**
  * Fetch all quotas for current page
  */
 export async function fetchAllQuotas() {
-  // TODO: Implement in Phase 4
+  const btn = document.getElementById('quotaFetchAllBtn');
+  if (btn) {
+    btn.classList.add('loading');
+    btn.disabled = true;
+  }
+
+  try {
+    const pagedFiles = getPagedAuthFiles();
+    const supportedFiles = pagedFiles.filter(f => isQuotaSupported(f.provider));
+    
+    for (const authFile of supportedFiles) {
+      quotaData.delete(authFile.auth_index);
+    }
+    
+    await Promise.all(supportedFiles.map(authFile => fetchQuotaForAuth(authFile)));
+    
+    renderQuotaPage();
+    updateLastUpdated();
+    toast(`Refreshed ${supportedFiles.length} quota(s)`, 'success');
+  } catch (e) {
+    toast('Failed to fetch all: ' + e.message, 'error');
+  } finally {
+    if (btn) {
+      btn.classList.remove('loading');
+      btn.disabled = false;
+    }
+  }
+}
+
+/**
+ * Set quota filter
+ * @param {string} filter - Filter value (all, antigravity, codex, gemini-cli)
+ */
+export function setQuotaFilter(filter) {
+  currentFilter = filter;
+  
+  document.querySelectorAll('.quota-filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.filter === filter);
+    btn.setAttribute('aria-pressed', btn.dataset.filter === filter);
+  });
+  
+  applyFilter();
+  renderQuotaPage();
+  fetchVisibleQuotas();
+}
+
+/**
+ * Set page size
+ * @param {number|string} size - Page size
+ */
+export function setQuotaPageSize(size) {
+  pageSize = parseInt(size, 10);
+  currentPage = 1;
+  renderQuotaPage();
+  fetchVisibleQuotas();
+}
+
+/**
+ * Set current page
+ * @param {number} page - Page number
+ */
+export function setQuotaPage(page) {
+  const totalPages = Math.ceil(filteredAuthFiles.length / pageSize);
+  if (page < 1 || page > totalPages) return;
+  
+  currentPage = page;
+  renderQuotaPage();
+  fetchVisibleQuotas();
 }
 
 /**
@@ -550,3 +857,6 @@ export function formatResetTime(resetTime) {
 window.loadQuotaPage = loadQuotaPage;
 window.refreshQuota = refreshQuota;
 window.fetchAllQuotas = fetchAllQuotas;
+window.setQuotaFilter = setQuotaFilter;
+window.setQuotaPageSize = setQuotaPageSize;
+window.setQuotaPage = setQuotaPage;
