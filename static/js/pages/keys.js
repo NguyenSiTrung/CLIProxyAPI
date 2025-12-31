@@ -289,3 +289,8 @@ export const keysModule = {
   copyKey,
   setupKeysTabHandlers
 };
+
+// Expose functions to window for HTML onclick handlers
+window.keysModule = keysModule;
+window.loadKeys = loadKeys;
+window.openAddKeyModal = openAddKeyModal;

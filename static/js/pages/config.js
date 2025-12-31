@@ -345,3 +345,11 @@ export const configModule = {
   onConfigEditorInput,
   setupConfigKeyboardShortcuts
 };
+
+// Expose functions to window for HTML onclick handlers
+window.configModule = configModule;
+window.loadConfig = loadConfig;
+window.saveConfigEnhanced = saveConfigEnhanced;
+window.reloadConfig = reloadConfig;
+window.toggleSettingEnhanced = toggleSettingEnhanced;
+window.onConfigEditorInput = onConfigEditorInput;

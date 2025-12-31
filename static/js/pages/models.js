@@ -750,3 +750,44 @@ export function importPricingPrompt() {
   };
   input.click();
 }
+
+// Expose functions to window for HTML onclick handlers
+window.modelsModule = {
+  loadModels,
+  fetchModels,
+  filterModels,
+  filterModelsByProvider,
+  toggleProviderCard,
+  copyModelId,
+  clearModelSearch,
+  switchModelsTab,
+  loadPricingConfig,
+  savePricingConfig,
+  renderPricingModels,
+  filterPricingModels,
+  openPricingModal,
+  applyPresetPricing,
+  savePricingForModel,
+  removePricing,
+  applyDefaultPricing,
+  clearAllPricing,
+  exportPricing,
+  importPricingPrompt
+};
+
+// Also expose directly for simpler onclick handlers
+window.loadModels = loadModels;
+window.filterModels = filterModels;
+window.filterModelsByProvider = filterModelsByProvider;
+window.toggleProviderCard = toggleProviderCard;
+window.copyModelId = copyModelId;
+window.clearModelSearch = clearModelSearch;
+window.switchModelsTab = switchModelsTab;
+window.openPricingModal = openPricingModal;
+window.applyPresetPricing = applyPresetPricing;
+window.savePricingForModel = savePricingForModel;
+window.removePricing = removePricing;
+window.applyDefaultPricing = applyDefaultPricing;
+window.clearAllPricing = clearAllPricing;
+window.exportPricing = exportPricing;
+window.importPricingPrompt = importPricingPrompt;
