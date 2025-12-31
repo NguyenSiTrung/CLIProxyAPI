@@ -9684,17 +9684,9 @@
     async function loadPricingConfig() {
       if (pricingConfigLoaded) return;
       try {
-        const res = await fetch(`${API_BASE}/management/model-pricing`, {
-          headers: { 'Authorization': `Bearer ${apiKey}` }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          modelPricingConfig = data.pricing || {};
-          pricingConfigLoaded = true;
-        } else {
-          console.error('Failed to load pricing config from server:', res.status);
-          modelPricingConfig = {};
-        }
+        const data = await api('GET', '/model-pricing');
+        modelPricingConfig = data.pricing || {};
+        pricingConfigLoaded = true;
       } catch (e) {
         console.error('Failed to load pricing config:', e);
         modelPricingConfig = {};
@@ -9703,17 +9695,7 @@
 
     async function savePricingConfig() {
       try {
-        const res = await fetch(`${API_BASE}/management/model-pricing`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ pricing: modelPricingConfig })
-        });
-        if (!res.ok) {
-          throw new Error(`Server returned ${res.status}`);
-        }
+        await api('PUT', '/model-pricing', { pricing: modelPricingConfig });
       } catch (e) {
         console.error('Failed to save pricing config:', e);
         toast('Failed to save pricing configuration', 'error');
