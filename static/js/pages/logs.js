@@ -604,3 +604,15 @@ window.logsModule = {
   copyLogEntry,
   closeModal
 };
+
+// Also expose directly for HTML onclick handlers
+window.loadLogs = loadLogs;
+window.filterLogs = filterLogs;
+window.setLogFilter = setLogFilter;
+window.clearLogs = clearLogs;
+window.clearLogFilters = clearLogFilters;
+window.toggleAutoRefresh = toggleAutoRefresh;
+window.stopLogAutoRefresh = stopLogAutoRefresh;
+window.scrollLogsToBottom = scrollLogsToBottom;
+window.jumpToNextError = jumpToNextError;
+window.exportLogs = exportLogs;

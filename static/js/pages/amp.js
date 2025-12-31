@@ -1059,3 +1059,13 @@ window.ampModule = {
   updateReasoningEffortVisibility: null,
   modelSupportsReasoning: null
 };
+
+// Also expose directly for HTML onclick handlers
+window.loadAmpSettings = loadAmpSettings;
+window.saveAmpSettings = saveAmpSettings;
+window.testAmpConnection = testAmpConnection;
+window.toggleAmpSetting = toggleAmpSetting;
+window.toggleAmpKeyVisibility = toggleAmpKeyVisibility;
+window.openAddMappingModal = openAddMappingModal;
+window.openManageCombosModal = openManageCombosModal;
+window.openAddComboModal = openAddComboModal;

@@ -861,3 +861,11 @@ window.analyticsModule = {
   copyFailureToClipboard,
   closeModal
 };
+
+// Also expose directly for HTML onclick handlers
+window.loadAnalytics = loadAnalytics;
+window.filterAnalytics = filterAnalytics;
+window.clearAnalyticsFilters = clearAnalyticsFilters;
+window.sortAnalyticsTable = sortAnalyticsTable;
+window.changeAnalyticsPage = changeAnalyticsPage;
+window.exportAnalytics = exportAnalytics;
