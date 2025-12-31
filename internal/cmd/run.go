@@ -61,13 +61,15 @@ func StartService(cfg *config.Config, configPath string, localPassword string) {
 
 	// Start usage auto-backup service if configured
 	var autoBackupService *usage.AutoBackupService
-	if cfg.UsageStatisticsEnabled && cfg.UsageAutoBackup.Enabled {
+	if cfg.UsageStatisticsEnabled {
 		autoBackupService = usage.NewAutoBackupService(cfg.UsageAutoBackup, usage.GetRequestStatistics())
-		if err := autoBackupService.Start(); err != nil {
-			log.Errorf("Failed to start auto-backup service: %v", err)
-		} else {
-			usage.SetGlobalAutoBackupService(autoBackupService)
-			defer autoBackupService.Stop()
+		usage.SetGlobalAutoBackupService(autoBackupService)
+		if cfg.UsageAutoBackup.Enabled {
+			if err := autoBackupService.Start(); err != nil {
+				log.Errorf("Failed to start auto-backup service: %v", err)
+			} else {
+				defer autoBackupService.Stop()
+			}
 		}
 	}
 
