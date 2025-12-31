@@ -8001,6 +8001,15 @@
               </svg>
               Export
             </button>
+            <button class="btn btn-secondary btn-sm" onclick="triggerUsageImport()" title="Import usage data">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+              Import
+            </button>
+            <input type="file" id="usageImportInput" accept=".json" style="display: none" onchange="importUsageData(event)" />
             <button class="btn btn-secondary btn-sm" onclick="loadUsageStats()" id="usageRefreshBtn">
               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M23 4v6h-6" />
@@ -11079,6 +11088,57 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       toast('Usage data exported successfully', 'success');
+    }
+
+    function triggerUsageImport() {
+      document.getElementById('usageImportInput').click();
+    }
+
+    async function importUsageData(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      
+      try {
+        const text = await file.text();
+        let payload;
+        
+        try {
+          const parsed = JSON.parse(text);
+          // Support both direct export format and server export format
+          if (parsed.usage) {
+            // Server export format: { version, exported_at, usage: {...} }
+            payload = { version: parsed.version || 1, usage: parsed.usage };
+          } else if (parsed.apis) {
+            // Direct usage data format
+            payload = { version: 1, usage: parsed };
+          } else {
+            throw new Error('Unrecognized format');
+          }
+        } catch (e) {
+          toast('Invalid JSON file format', 'error');
+          event.target.value = '';
+          return;
+        }
+        
+        const response = await fetch('/mgmt/usage/import', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          throw new Error(err.error || 'Import failed');
+        }
+        
+        const result = await response.json();
+        toast(`Imported ${result.added} records (${result.skipped} skipped)`, 'success');
+        loadUsageStats(); // Refresh the display
+      } catch (err) {
+        toast('Import failed: ' + err.message, 'error');
+      } finally {
+        event.target.value = ''; // Reset file input
+      }
     }
 
     // Analytics page state
