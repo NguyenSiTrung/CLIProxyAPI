@@ -250,6 +250,19 @@
   color: var(--text-secondary);
 }
 
+.quota-group-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.quota-group-reset {
+  font-size: 11px;
+  color: var(--text-muted);
+  opacity: 0.8;
+}
+
 /* Progress Bar */
 .quota-progress-container {
   height: 6px;
@@ -375,6 +388,25 @@
   font-size: 12px;
   font-weight: 500;
   color: var(--text-muted);
+}
+
+/* Idle Card (not yet fetched) */
+.quota-card.idle {
+  opacity: 0.85;
+}
+
+.quota-idle-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 24px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.quota-idle-content svg {
+  opacity: 0.5;
 }
 
 /* Empty State */
