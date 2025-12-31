@@ -31,10 +31,19 @@ export function toggleMobileSidebar() {
   const sidebar = document.querySelector('.sidebar');
   const overlay = document.querySelector('.sidebar-overlay');
   
-  if (sidebar) sidebar.classList.toggle('mobile-open');
-  if (overlay) overlay.classList.toggle('active');
+  if (!sidebar) return;
   
-  document.body.style.overflow = sidebar?.classList.contains('mobile-open') ? 'hidden' : '';
+  const isOpen = sidebar.classList.contains('mobile-open');
+  
+  if (isOpen) {
+    sidebar.classList.remove('mobile-open');
+    if (overlay) overlay.classList.remove('active');
+    document.body.style.overflow = '';
+  } else {
+    sidebar.classList.add('mobile-open');
+    if (overlay) overlay.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
 }
 
 /**
