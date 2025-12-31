@@ -1,0 +1,537 @@
+/**
+ * usage.css - Usage statistics page styles: date range, charts, cost display
+ */
+
+/* Date Range Controls */
+.date-range-btn {
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.date-range-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.date-range-btn.active {
+  background: var(--accent-cyan);
+  color: #0d0d1a;
+}
+
+.date-range-selector {
+  display: flex;
+  gap: 4px;
+  background: rgba(20, 20, 40, 0.6);
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+/* Chart View Controls */
+.chart-view-btn {
+  padding: 4px 10px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.chart-view-btn:hover {
+  color: var(--text-primary);
+}
+
+.chart-view-btn.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.chart-view-toggle {
+  display: flex;
+  gap: 2px;
+  background: rgba(20, 20, 40, 0.8);
+  padding: 3px;
+  border-radius: 6px;
+}
+
+/* Usage Page Header */
+.usage-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.usage-header-left {
+  flex: 1;
+  min-width: 200px;
+}
+
+.usage-header-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.usage-header-title svg {
+  color: var(--accent-cyan);
+}
+
+.usage-header-title h1 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.usage-header-subtitle {
+  color: var(--text-secondary);
+  font-size: 14px;
+  margin: 0;
+}
+
+.usage-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.usage-last-updated {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 8px 12px;
+  background: rgba(20, 20, 40, 0.6);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.usage-last-updated svg {
+  opacity: 0.7;
+}
+
+/* Usage Stats Grid */
+.usage-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.usage-stat-card {
+  background: var(--bg-card);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.usage-stat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  opacity: 0.06;
+  transform: translate(40%, -40%);
+  transition: all 0.3s;
+}
+
+.usage-stat-card:hover {
+  border-color: var(--border-glow);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+}
+
+.usage-stat-card:hover::before {
+  opacity: 0.1;
+  transform: translate(35%, -35%) scale(1.1);
+}
+
+.usage-stat-card.cyan::before { background: var(--accent-cyan); }
+.usage-stat-card.cyan .usage-stat-value { color: var(--accent-cyan); }
+.usage-stat-card.cyan .usage-stat-icon { background: rgba(0, 229, 255, 0.12); color: var(--accent-cyan); }
+
+.usage-stat-card.green::before { background: var(--accent-green); }
+.usage-stat-card.green .usage-stat-value { color: var(--accent-green); }
+.usage-stat-card.green .usage-stat-icon { background: rgba(34, 211, 160, 0.12); color: var(--accent-green); }
+
+.usage-stat-card.red::before { background: var(--accent-red); }
+.usage-stat-card.red .usage-stat-value { color: var(--accent-red); }
+.usage-stat-card.red .usage-stat-icon { background: rgba(248, 113, 113, 0.12); color: var(--accent-red); }
+
+.usage-stat-card.purple::before { background: var(--accent-purple); }
+.usage-stat-card.purple .usage-stat-value { color: var(--accent-purple); }
+.usage-stat-card.purple .usage-stat-icon { background: rgba(167, 139, 250, 0.12); color: var(--accent-purple); }
+
+.usage-stat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.usage-stat-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.usage-stat-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.usage-stat-badge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 8px;
+  border-radius: 12px;
+  background: rgba(0, 229, 255, 0.1);
+  color: var(--accent-cyan);
+}
+
+.usage-rate-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(34, 211, 160, 0.15);
+  color: var(--accent-green);
+}
+
+.usage-rate-indicator.down {
+  background: rgba(248, 113, 113, 0.15);
+  color: var(--accent-red);
+  transform: rotate(180deg);
+}
+
+.usage-stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.2;
+  margin-bottom: 4px;
+}
+
+.usage-stat-label {
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.usage-stat-sublabel {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+/* Usage Charts Grid */
+.usage-charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.usage-chart-card {
+  background: linear-gradient(145deg, rgba(20, 20, 40, 0.7) 0%, rgba(10, 10, 25, 0.85) 100%);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  transition: all 0.3s;
+}
+
+.usage-chart-card:hover {
+  border-color: var(--border-glow);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.usage-chart-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  gap: 12px;
+}
+
+.usage-chart-info {
+  flex: 1;
+}
+
+.usage-chart-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.usage-chart-title svg {
+  color: var(--accent-cyan);
+}
+
+.usage-chart-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  line-height: 1.2;
+}
+
+.usage-chart-value.purple {
+  color: var(--accent-purple);
+}
+
+.usage-chart-sublabel {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.usage-chart-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.usage-chart-icon {
+  padding: 8px;
+  background: rgba(0, 229, 255, 0.1);
+  border-radius: 8px;
+  color: var(--accent-cyan);
+}
+
+.usage-chart-icon.purple {
+  background: rgba(167, 139, 250, 0.1);
+  color: var(--accent-purple);
+}
+
+.usage-chart-container {
+  height: 220px;
+  width: 100%;
+  position: relative;
+}
+
+.usage-chart-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  text-align: center;
+  background: rgba(10, 10, 25, 0.5);
+  border-radius: 8px;
+  z-index: 10;
+}
+
+.usage-chart-empty svg {
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+.usage-chart-empty p {
+  font-size: 13px;
+  margin: 0;
+}
+
+/* Usage Cost Card */
+.usage-cost-card {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.1), rgba(167, 139, 250, 0.1));
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.usage-cost-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.usage-cost-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--accent-yellow);
+}
+
+.usage-cost-title svg {
+  width: 20px;
+  height: 20px;
+}
+
+.usage-cost-total {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--accent-yellow);
+}
+
+.usage-cost-breakdown {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(251, 191, 36, 0.2);
+}
+
+.usage-cost-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: var(--radius-sm);
+}
+
+.usage-cost-item-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.usage-cost-item-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.usage-cost-note {
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.usage-cost-note svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .usage-page-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .usage-header-actions {
+    justify-content: flex-start;
+  }
+
+  .usage-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .usage-charts-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .usage-stat-value {
+    font-size: 26px;
+  }
+
+  .usage-chart-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .usage-chart-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+  
+  .usage-chart-value {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .usage-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .usage-header-actions {
+    flex-wrap: wrap;
+  }
+
+  .date-range-selector {
+    order: -1;
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .date-range-btn {
+    min-height: 40px;
+    padding: 8px 14px;
+  }
+  
+  .chart-view-btn {
+    min-height: 36px;
+    padding: 6px 12px;
+  }
+
+  .date-range-selector {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
+  }
+  
+  .date-range-btn {
+    text-align: center;
+  }
+
+  .usage-stat-card {
+    padding: 16px;
+  }
+  
+  .usage-stat-value {
+    font-size: 22px;
+  }
+  
+  .usage-stat-icon {
+    width: 36px;
+    height: 36px;
+  }
+  
+  .usage-chart-container {
+    height: 180px;
+  }
+}
