@@ -21,6 +21,8 @@ objectstore/*
 # Static assets
 static/*
 !static/custom-management.html
+!static/css/
+!static/js/
 
 # Authentication data
 auths/*

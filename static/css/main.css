@@ -1,0 +1,17 @@
+/**
+ * main.css - Index file for CLI Proxy API Management CSS
+ * Imports all modular CSS files in the correct order
+ */
+
+@import 'base.css';
+@import 'components.css';
+@import 'layout.css';
+@import 'pages/dashboard.css';
+@import 'pages/models.css';
+@import 'pages/auth.css';
+@import 'pages/keys.css';
+@import 'pages/config.css';
+@import 'pages/usage.css';
+@import 'pages/analytics.css';
+@import 'pages/amp.css';
+@import 'pages/logs.css';
