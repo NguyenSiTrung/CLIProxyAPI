@@ -18,6 +18,7 @@ let pricingConfigLoaded = false;
 
 // Dashboard state
 let dashboardStartTime = Date.now();
+let serverStartTime = null; // Server's actual start time from X-CPA-START-TIME header
 let currentServerVersion = '-';
 
 // Usage stats state
@@ -77,6 +78,14 @@ export function isPricingConfigLoaded() {
 
 export function getDashboardStartTime() {
   return dashboardStartTime;
+}
+
+export function getServerStartTime() {
+  return serverStartTime;
+}
+
+export function setServerStartTime(time) {
+  serverStartTime = time;
 }
 
 export function getCurrentServerVersion() {
