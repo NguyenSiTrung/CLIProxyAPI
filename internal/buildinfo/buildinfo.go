@@ -1,6 +1,8 @@
 // Package buildinfo exposes compile-time metadata shared across the server.
 package buildinfo
 
+import "time"
+
 // The following variables are overridden via ldflags during release builds.
 // Defaults cover local development builds.
 var (
@@ -12,4 +14,7 @@ var (
 
 	// BuildDate records when the binary was built in UTC.
 	BuildDate = "unknown"
+
+	// ServerStartTime is set when the server starts and used to calculate uptime.
+	ServerStartTime = time.Now()
 )

@@ -11,6 +11,8 @@ import {
   setCurrentServerVersion,
   getCurrentServerVersion,
   getDashboardStartTime,
+  getServerStartTime,
+  setServerStartTime,
   setAllModels
 } from '../core/state.js';
 
@@ -56,6 +58,7 @@ export async function loadDashboard() {
     const version = configRes.headers.get('X-CPA-VERSION') || '-';
     const commit = configRes.headers.get('X-CPA-COMMIT') || '-';
     const buildDate = configRes.headers.get('X-CPA-BUILD-DATE') || '-';
+    const serverStartTime = configRes.headers.get('X-CPA-START-TIME') || null;
     const config = await configRes.json();
 
     setServerInfo(config);
@@ -86,7 +89,7 @@ export async function loadDashboard() {
     }
 
     // Update uptime
-    updateServerUptime(buildDate);
+    updateServerUptime(serverStartTime);
 
     // Load auth files count
     api('GET', '/auth-files')
@@ -132,14 +135,27 @@ export async function loadDashboard() {
 
 /**
  * Update the server uptime display
- * @param {string} buildDate - The build date string
+ * @param {string} serverStartTimeStr - The server start time in ISO format (optional, uses cached value if not provided)
  */
-export function updateServerUptime(buildDate) {
+export function updateServerUptime(serverStartTimeStr) {
   const uptimeEl = document.getElementById('serverUptime');
   if (!uptimeEl) return;
 
+  if (serverStartTimeStr) {
+    const parsedTime = new Date(serverStartTimeStr).getTime();
+    if (!isNaN(parsedTime)) {
+      setServerStartTime(parsedTime);
+    }
+  }
+
+  const startTime = getServerStartTime();
+  if (!startTime) {
+    uptimeEl.textContent = '-';
+    return;
+  }
+
   const now = Date.now();
-  const uptimeMs = now - getDashboardStartTime();
+  const uptimeMs = now - startTime;
 
   const seconds = Math.floor(uptimeMs / 1000);
   const minutes = Math.floor(seconds / 60);
@@ -152,7 +168,7 @@ export function updateServerUptime(buildDate) {
   else if (minutes > 0) uptimeStr = `${minutes}m ${seconds % 60}s`;
   else uptimeStr = `${seconds}s`;
 
-  uptimeEl.textContent = uptimeStr + ' (session)';
+  uptimeEl.textContent = uptimeStr;
 }
 
 /**
