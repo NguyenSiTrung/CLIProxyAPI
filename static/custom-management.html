@@ -486,12 +486,7 @@
                 <p>Import JSON credentials</p>
               </div>
             </div>
-            <div id="uploadDropzone" class="auth-dropzone" role="button" tabindex="0" aria-label="Upload auth JSON file"
-              onclick="document.getElementById('authFileInput').click()"
-              onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('authFileInput').click();}"
-              ondragover="event.preventDefault();this.classList.add('dragover');"
-              ondragleave="this.classList.remove('dragover');"
-              ondrop="this.classList.remove('dragover');handleFileDrop(event)">
+            <div id="uploadDropzone" class="auth-dropzone" role="button" tabindex="0" aria-label="Upload auth JSON file">
               <div class="auth-dropzone-icon">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -509,7 +504,7 @@
                 Choose File
               </div>
               <div class="auth-dropzone-formats">claude.json, gemini.json, codex.json</div>
-              <input type="file" id="authFileInput" accept=".json" style="display:none" onchange="handleFileSelect(this.files[0])">
+              <input type="file" id="authFileInput" accept=".json" style="display:none">
             </div>
             <div id="uploadStatus" class="auth-upload-status" role="status" aria-live="polite"></div>
           </div>

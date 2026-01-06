@@ -7,10 +7,13 @@ import { api, getApiKey } from '../core/api.js';
 import { toast } from '../core/toast.js';
 import { closeModal } from '../core/modal.js';
 
+let uploadHandlersBound = false;
+
 /**
  * Load the auth files page
  */
 export async function loadAuthFiles() {
+  setupAuthFileUploadHandlers();
   const refreshBtn = document.getElementById('authFilesRefreshBtn');
   if (refreshBtn) {
     refreshBtn.classList.add('loading');
@@ -270,9 +273,11 @@ export async function deleteAllAuthFiles() {
  */
 export function handleFileDrop(e) {
   e.preventDefault();
-  e.target.style.borderColor = 'var(--border-color)';
-  e.target.style.background = 'transparent';
-  const file = e.dataTransfer.files[0];
+  const dropzone = e.currentTarget || document.getElementById('uploadDropzone');
+  if (dropzone) {
+    dropzone.classList.remove('dragover');
+  }
+  const file = e.dataTransfer?.files?.[0];
   if (file) handleFileSelect(file);
 }
 
@@ -283,7 +288,7 @@ export function handleFileDrop(e) {
 export async function handleFileSelect(file) {
   if (!file) return;
 
-  if (!file.name.endsWith('.json')) {
+  if (!file.name.toLowerCase().endsWith('.json')) {
     toast('Please upload a JSON file', 'error');
     return;
   }
@@ -308,7 +313,6 @@ export async function handleFileSelect(file) {
     `;
     toast('Auth file uploaded', 'success');
     loadAuthFiles();
-    document.getElementById('authFileInput').value = '';
     setTimeout(() => {
       status.className = 'auth-upload-status';
       status.innerHTML = '';
@@ -324,7 +328,51 @@ export async function handleFileSelect(file) {
       <span>Failed: ${e.message}</span>
     `;
     toast('Upload failed: ' + e.message, 'error');
+  } finally {
+    const input = document.getElementById('authFileInput');
+    if (input) input.value = '';
   }
+}
+
+/**
+ * Wire up auth file upload dropzone and input handlers
+ */
+export function setupAuthFileUploadHandlers() {
+  if (uploadHandlersBound) return;
+
+  const dropzone = document.getElementById('uploadDropzone');
+  const input = document.getElementById('authFileInput');
+  if (!dropzone || !input) return;
+
+  const openFilePicker = () => {
+    input.value = '';
+    input.click();
+  };
+
+  dropzone.addEventListener('click', openFilePicker);
+  dropzone.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      openFilePicker();
+    }
+  });
+  dropzone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropzone.classList.add('dragover');
+  });
+  dropzone.addEventListener('dragleave', () => {
+    dropzone.classList.remove('dragover');
+  });
+  dropzone.addEventListener('drop', e => {
+    dropzone.classList.remove('dragover');
+    handleFileDrop(e);
+  });
+  input.addEventListener('change', () => {
+    const file = input.files?.[0];
+    if (file) handleFileSelect(file);
+  });
+
+  uploadHandlersBound = true;
 }
 
 /**
