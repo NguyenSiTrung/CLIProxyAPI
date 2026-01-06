@@ -502,3 +502,507 @@
     width: 100%;
   }
 }
+
+/* ===================================
+   Enhanced Code Editor Styles
+   =================================== */
+
+/* Editor Toolbar */
+.config-editor-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(20, 20, 45, 0.8);
+  border-bottom: 1px solid var(--border-color);
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.config-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.editor-toolbar-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: rgba(60, 60, 100, 0.3);
+  border: 1px solid rgba(120, 120, 180, 0.2);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.editor-toolbar-btn:hover {
+  background: rgba(80, 80, 140, 0.4);
+  border-color: var(--accent-cyan);
+  color: var(--text-primary);
+}
+
+.editor-toolbar-btn:active {
+  transform: scale(0.97);
+}
+
+.editor-toolbar-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.editor-toolbar-separator {
+  width: 1px;
+  height: 20px;
+  background: rgba(120, 120, 180, 0.3);
+  margin: 0 4px;
+}
+
+.config-editor-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.config-editor-info span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+}
+
+.config-editor-info svg {
+  width: 12px;
+  height: 12px;
+  opacity: 0.7;
+}
+
+.editor-cursor-pos {
+  padding: 3px 8px;
+  background: rgba(40, 40, 80, 0.5);
+  border-radius: 4px;
+  color: var(--accent-cyan) !important;
+}
+
+/* Code Editor Wrapper with Line Numbers */
+.code-editor-wrapper {
+  display: flex;
+  position: relative;
+  height: 440px;
+  min-height: 440px;
+  background: rgba(5, 5, 15, 0.7);
+  overflow: hidden;
+}
+
+.code-editor-line-numbers {
+  width: 48px;
+  min-width: 48px;
+  padding: 16px 8px 16px 12px;
+  background: rgba(15, 15, 35, 0.8);
+  border-right: 1px solid rgba(120, 120, 180, 0.15);
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: rgba(140, 140, 180, 0.6);
+  text-align: right;
+  user-select: none;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.code-editor-line-numbers .line-number {
+  height: calc(13px * 1.6);
+  line-height: 1.6;
+  transition: color 0.15s ease;
+}
+
+.code-editor-line-numbers .line-number:hover {
+  color: var(--accent-cyan);
+}
+
+.code-editor-with-lines {
+  flex: 1;
+  border: none !important;
+  border-radius: 0 !important;
+  resize: none !important;
+  height: 100% !important;
+  min-height: unset !important;
+  position: relative;
+  z-index: 2;
+  background: transparent !important;
+  color: transparent;
+  caret-color: #fff;
+}
+
+/* Make text visible when syntax highlight layer is not ready */
+.code-editor-with-lines::selection {
+  background: rgba(0, 150, 255, 0.3);
+}
+
+/* Code Editor Focus State */
+.code-editor-wrapper:focus-within {
+  box-shadow: inset 0 0 0 1px var(--accent-cyan), 0 0 20px rgba(0, 229, 255, 0.1);
+}
+
+.code-editor-wrapper:focus-within .code-editor-line-numbers {
+  background: rgba(20, 20, 50, 0.9);
+  border-right-color: rgba(0, 229, 255, 0.2);
+}
+
+/* Responsive for toolbar */
+@media (max-width: 768px) {
+  .config-editor-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  
+  .config-editor-actions {
+    justify-content: flex-start;
+  }
+  
+  .config-editor-info {
+    justify-content: flex-end;
+    border-top: 1px solid rgba(120, 120, 180, 0.15);
+    padding-top: 8px;
+  }
+  
+  .editor-toolbar-btn span {
+    display: none;
+  }
+  
+  .editor-toolbar-btn {
+    padding: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .code-editor-line-numbers {
+    width: 36px;
+    min-width: 36px;
+    padding: 16px 4px 16px 8px;
+    font-size: 11px;
+  }
+  
+  .code-editor-wrapper {
+    height: 350px;
+    min-height: 350px;
+  }
+}
+
+/* ===================================
+   Syntax Highlighting
+   =================================== */
+
+.code-editor-highlight-layer {
+  position: absolute;
+  top: 0;
+  left: 48px;
+  right: 0;
+  bottom: 0;
+  padding: 16px;
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre;
+  overflow: hidden;
+  pointer-events: none;
+  color: transparent;
+  z-index: 1;
+}
+
+/* YAML Syntax Colors */
+.yaml-key {
+  color: #7dd3fc; /* cyan-300 */
+}
+
+.yaml-colon {
+  color: #94a3b8; /* slate-400 */
+}
+
+.yaml-string {
+  color: #86efac; /* green-300 */
+}
+
+.yaml-number {
+  color: #fcd34d; /* amber-300 */
+}
+
+.yaml-boolean {
+  color: #c4b5fd; /* violet-300 */
+}
+
+.yaml-null {
+  color: #fb7185; /* rose-400 */
+  font-style: italic;
+}
+
+.yaml-comment {
+  color: #64748b; /* slate-500 */
+  font-style: italic;
+}
+
+.yaml-dash {
+  color: #f472b6; /* pink-400 */
+}
+
+/* Current Line Highlight */
+.code-editor-current-line {
+  position: absolute;
+  left: 48px;
+  right: 0;
+  background: rgba(100, 150, 255, 0.08);
+  border-left: 2px solid var(--accent-cyan);
+  pointer-events: none;
+  z-index: 0;
+  display: none;
+}
+
+/* Selection info */
+.editor-selection-info {
+  padding: 3px 8px;
+  background: rgba(192, 132, 252, 0.2);
+  border-radius: 4px;
+  color: #c084fc !important;
+}
+
+/* Word wrap active state */
+.editor-toolbar-btn.active {
+  background: rgba(0, 229, 255, 0.2);
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+/* ===================================
+   Find & Replace Bar
+   =================================== */
+
+.editor-find-bar {
+  background: rgba(25, 25, 55, 0.95);
+  border-bottom: 1px solid var(--border-color);
+  padding: 8px 12px;
+}
+
+.find-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.find-bar-row.replace-row {
+  margin-top: 8px;
+}
+
+.find-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  max-width: 400px;
+  padding: 6px 12px;
+  background: rgba(10, 10, 30, 0.8);
+  border: 1px solid rgba(120, 120, 180, 0.3);
+  border-radius: 6px;
+}
+
+.find-input-wrapper:focus-within {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.15);
+}
+
+.find-input-wrapper svg {
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.find-input-wrapper input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+}
+
+.find-input-wrapper input::placeholder {
+  color: var(--text-muted);
+}
+
+.find-match-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.find-match-count.has-matches {
+  color: var(--accent-cyan);
+}
+
+.find-bar-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: rgba(60, 60, 100, 0.4);
+  border: 1px solid rgba(120, 120, 180, 0.2);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.find-bar-btn:hover {
+  background: rgba(80, 80, 140, 0.5);
+  border-color: var(--accent-cyan);
+  color: var(--text-primary);
+}
+
+.find-bar-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.find-bar-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: rgba(60, 60, 100, 0.3);
+  border: 1px solid rgba(120, 120, 180, 0.2);
+  border-radius: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.find-bar-checkbox:hover {
+  border-color: rgba(120, 120, 180, 0.4);
+}
+
+.find-bar-checkbox input {
+  display: none;
+}
+
+.find-bar-checkbox:has(input:checked) {
+  background: rgba(0, 229, 255, 0.15);
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+.find-bar-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-left: auto;
+}
+
+.find-bar-close:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.find-bar-close svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ===================================
+   Go to Line Modal
+   =================================== */
+
+.editor-goto-modal {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 80px;
+  z-index: 100;
+}
+
+.goto-modal-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: rgba(30, 30, 60, 0.98);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.goto-modal-content label {
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.goto-modal-content input {
+  width: 120px;
+  padding: 8px 12px;
+  background: rgba(10, 10, 30, 0.8);
+  border: 1px solid rgba(120, 120, 180, 0.3);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 14px;
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  outline: none;
+}
+
+.goto-modal-content input:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.15);
+}
+
+.goto-modal-content input::-webkit-inner-spin-button,
+.goto-modal-content input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .find-input-wrapper {
+    max-width: none;
+  }
+  
+  .find-bar-btn span {
+    display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .code-editor-highlight-layer,
+  .code-editor-current-line {
+    left: 36px;
+  }
+}
