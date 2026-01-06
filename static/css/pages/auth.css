@@ -326,6 +326,11 @@
   pointer-events: none;
 }
 
+/* Allow file input to be clickable (required for Chrome) */
+.auth-dropzone input[type="file"] {
+  pointer-events: auto;
+}
+
 .auth-dropzone:hover {
   border-color: var(--accent-cyan);
   background: rgba(0, 229, 255, 0.03);
