@@ -511,3 +511,5 @@ window.showManualCallback = showManualCallback;
 window.hideManualCallback = hideManualCallback;
 window.submitManualCallback = submitManualCallback;
 window.refreshAuthToken = refreshAuthToken;
+window.handleFileSelect = handleFileSelect;
+window.handleFileDrop = handleFileDrop;
