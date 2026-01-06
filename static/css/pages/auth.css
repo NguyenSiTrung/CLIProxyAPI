@@ -125,12 +125,35 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.auth-provider-card.anthropic .auth-provider-icon { background: rgba(204, 119, 85, 0.15); border-color: rgba(204, 119, 85, 0.3); }
-.auth-provider-card.gemini .auth-provider-icon { background: rgba(66, 133, 244, 0.15); border-color: rgba(66, 133, 244, 0.3); }
-.auth-provider-card.codex .auth-provider-icon { background: rgba(16, 163, 127, 0.15); border-color: rgba(16, 163, 127, 0.3); }
-.auth-provider-card.antigravity .auth-provider-icon { background: rgba(167, 139, 250, 0.15); border-color: rgba(167, 139, 250, 0.3); }
-.auth-provider-card.qwen .auth-provider-icon { background: rgba(96, 165, 250, 0.15); border-color: rgba(96, 165, 250, 0.3); }
-.auth-provider-card.iflow .auth-provider-icon { background: rgba(34, 211, 160, 0.15); border-color: rgba(34, 211, 160, 0.3); }
+.auth-provider-card.anthropic .auth-provider-icon {
+  background: rgba(204, 119, 85, 0.15);
+  border-color: rgba(204, 119, 85, 0.3);
+}
+
+.auth-provider-card.gemini .auth-provider-icon {
+  background: rgba(66, 133, 244, 0.15);
+  border-color: rgba(66, 133, 244, 0.3);
+}
+
+.auth-provider-card.codex .auth-provider-icon {
+  background: rgba(16, 163, 127, 0.15);
+  border-color: rgba(16, 163, 127, 0.3);
+}
+
+.auth-provider-card.antigravity .auth-provider-icon {
+  background: rgba(167, 139, 250, 0.15);
+  border-color: rgba(167, 139, 250, 0.3);
+}
+
+.auth-provider-card.qwen .auth-provider-icon {
+  background: rgba(96, 165, 250, 0.15);
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
+.auth-provider-card.iflow .auth-provider-icon {
+  background: rgba(34, 211, 160, 0.15);
+  border-color: rgba(34, 211, 160, 0.3);
+}
 
 .auth-provider-name {
   font-size: 12px;
@@ -296,6 +319,11 @@
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   background: var(--bg-input);
   position: relative;
+}
+
+/* Ensure clicks on child elements propagate to parent dropzone */
+.auth-dropzone * {
+  pointer-events: none;
 }
 
 .auth-dropzone:hover {
@@ -666,7 +694,7 @@
     align-items: flex-start;
     gap: 12px;
   }
-  
+
   .auth-card-icon {
     width: 40px;
     height: 40px;
