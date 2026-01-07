@@ -889,121 +889,36 @@
               </div>
             </div>
             <div class="config-editor-toolbar">
-              <div class="config-editor-actions">
-                <button type="button" class="editor-toolbar-btn" onclick="editorUndo()" title="Undo (Ctrl+Z)">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M3 7v6h6"></path>
-                    <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
-                  </svg>
-                  <span>Undo</span>
-                </button>
-                <button type="button" class="editor-toolbar-btn" onclick="editorRedo()" title="Redo (Ctrl+Y)">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 7v6h-6"></path>
-                    <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"></path>
-                  </svg>
-                  <span>Redo</span>
-                </button>
-                <div class="editor-toolbar-separator"></div>
-                <button type="button" class="editor-toolbar-btn" onclick="editorToggleComment()" title="Toggle Comment (Ctrl+/)">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                  </svg>
-                  <span>Comment</span>
-                </button>
-                <button type="button" class="editor-toolbar-btn" onclick="editorIndent()" title="Indent (Tab)">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="9 18 15 12 9 6"></polyline>
-                  </svg>
-                  <span>Indent</span>
-                </button>
-                <button type="button" class="editor-toolbar-btn" onclick="editorOutdent()" title="Outdent (Shift+Tab)">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="15 18 9 12 15 6"></polyline>
-                  </svg>
-                  <span>Outdent</span>
-                </button>
-                <div class="editor-toolbar-separator"></div>
-                <button type="button" class="editor-toolbar-btn" onclick="editorDuplicateLine()" title="Duplicate Line (Ctrl+D)">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                  </svg>
-                  <span>Duplicate</span>
-                </button>
-                <button type="button" class="editor-toolbar-btn" onclick="editorDeleteLine()" title="Delete Line (Ctrl+Shift+K)">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                  </svg>
-                  <span>Delete</span>
-                </button>
-                <div class="editor-toolbar-separator"></div>
-                <button type="button" class="editor-toolbar-btn" onclick="editorOpenFind()" title="Find (Ctrl+F)">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                  </svg>
-                  <span>Find</span>
-                </button>
-                <button type="button" class="editor-toolbar-btn" onclick="editorOpenReplace()" title="Replace (Ctrl+H)">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M17 1l4 4-4 4"></path>
-                    <path d="M3 11V9a4 4 0 0 1 4-4h14"></path>
-                    <path d="M7 23l-4-4 4-4"></path>
-                    <path d="M21 13v2a4 4 0 0 1-4 4H3"></path>
-                  </svg>
-                  <span>Replace</span>
-                </button>
-                <button type="button" class="editor-toolbar-btn" onclick="editorGoToLine()" title="Go to Line (Ctrl+G)">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M5 12h14"></path>
-                    <path d="M12 5l7 7-7 7"></path>
-                  </svg>
-                  <span>Go to</span>
-                </button>
-                <div class="editor-toolbar-separator"></div>
-                <button type="button" class="editor-toolbar-btn" id="btnWordWrap" onclick="editorToggleWordWrap()" title="Toggle Word Wrap">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M3 6h18"></path>
-                    <path d="M3 12h15a3 3 0 1 1 0 6h-4"></path>
-                    <polyline points="10 15 7 18 10 21"></polyline>
-                  </svg>
-                  <span>Wrap</span>
-                </button>
-              </div>
               <div class="config-editor-info">
                 <span id="configSelectionInfo" class="editor-selection-info" style="display: none;">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M21 11V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6"></path>
-                    <path d="m12 12 4 10 1.7-4.3L22 16Z"></path>
-                  </svg>
                   <span id="selectionText">0 selected</span>
                 </span>
-                <span id="configCursorPos" class="editor-cursor-pos">
+                <span id="configCursorPos" class="editor-cursor-pos">Ln 1, Col 1</span>
+                <span id="configLineCount">0 lines</span>
+                <span id="configCharCount">0 chars</span>
+              </div>
+              <div class="editor-shortcuts-hint">
+                <button type="button" class="editor-shortcuts-btn" id="editorShortcutsBtn" title="Keyboard Shortcuts">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M5 12h14"></path>
-                    <path d="M12 5v14"></path>
+                    <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
+                    <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M6 16h8"></path>
                   </svg>
-                  Ln 1, Col 1
-                </span>
-                <span id="configLineCount">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="17" y1="10" x2="3" y2="10"></line>
-                    <line x1="21" y1="6" x2="3" y2="6"></line>
-                    <line x1="21" y1="14" x2="3" y2="14"></line>
-                    <line x1="17" y1="18" x2="3" y2="18"></line>
-                  </svg>
-                  0 lines
-                </span>
-                <span id="configCharCount">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polyline points="4 7 4 4 20 4 20 7"></polyline>
-                    <line x1="9" y1="20" x2="15" y2="20"></line>
-                    <line x1="12" y1="4" x2="12" y2="20"></line>
-                  </svg>
-                  0 chars
-                </span>
+                  <span>Shortcuts</span>
+                </button>
+                <div class="shortcuts-dropdown" id="shortcutsDropdown">
+                  <div class="shortcuts-title">Keyboard Shortcuts</div>
+                  <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>S</kbd> Save</div>
+                  <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>/</kbd> Toggle Comment</div>
+                  <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>F</kbd> Find</div>
+                  <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>H</kbd> Replace</div>
+                  <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>G</kbd> Go to Line</div>
+                  <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>D</kbd> Duplicate Line</div>
+                  <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>K</kbd> Delete Line</div>
+                  <div class="shortcut-item"><kbd>Tab</kbd> Indent</div>
+                  <div class="shortcut-item"><kbd>Shift</kbd>+<kbd>Tab</kbd> Outdent</div>
+                  <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>Z</kbd> Undo</div>
+                  <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>Y</kbd> Redo</div>
+                </div>
               </div>
             </div>
             <!-- Find/Replace Bar -->
