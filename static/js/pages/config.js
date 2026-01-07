@@ -1264,6 +1264,113 @@ function escapeRegex(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+/**
+ * Direct keydown handler for config editor textarea
+ * This ensures shortcuts work reliably when the editor is focused
+ */
+export function handleConfigEditorKeydown(e) {
+  // Ctrl+S: Save
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    saveConfigEnhanced();
+    return;
+  }
+
+  // Ctrl+/: Toggle comment
+  if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+    e.preventDefault();
+    editorToggleComment();
+    return;
+  }
+
+  // Ctrl+D: Duplicate line
+  if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+    e.preventDefault();
+    editorDuplicateLine();
+    return;
+  }
+
+  // Ctrl+Shift+K: Delete line
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'K') {
+    e.preventDefault();
+    editorDeleteLine();
+    return;
+  }
+
+  // Tab: Insert spaces (2 spaces for YAML)
+  if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey) {
+    e.preventDefault();
+    if (e.shiftKey) {
+      editorOutdent();
+    } else {
+      editorIndent();
+    }
+    return;
+  }
+
+  // Enter: Auto-indent
+  if (e.key === 'Enter' && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+    e.preventDefault();
+    editorAutoIndentNewline();
+    return;
+  }
+
+  // Ctrl+F: Find
+  if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+    e.preventDefault();
+    editorOpenFind();
+    return;
+  }
+
+  // Ctrl+H: Replace
+  if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
+    e.preventDefault();
+    editorOpenReplace();
+    return;
+  }
+
+  // Ctrl+G: Go to line
+  if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
+    e.preventDefault();
+    editorGoToLine();
+    return;
+  }
+
+  // Ctrl+Z: Undo
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+    // Let browser handle undo, but update state after
+    setTimeout(() => {
+      onConfigEditorInput();
+      updateLineNumbers();
+    }, 0);
+    return;
+  }
+
+  // Ctrl+Y or Ctrl+Shift+Z: Redo
+  if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+    // Let browser handle redo, but update state after
+    setTimeout(() => {
+      onConfigEditorInput();
+      updateLineNumbers();
+    }, 0);
+    return;
+  }
+
+  // Escape: Close find/goto modals
+  if (e.key === 'Escape') {
+    const findBar = document.getElementById('editorFindBar');
+    const gotoModal = document.getElementById('editorGotoModal');
+    if (findBar && findBar.style.display !== 'none') {
+      editorCloseFind();
+      e.preventDefault();
+    } else if (gotoModal && gotoModal.style.display !== 'none') {
+      editorCloseGoto();
+      e.preventDefault();
+    }
+    return;
+  }
+}
+
 // Export module interface for global access
 export const configModule = {
   loadConfig,
@@ -1272,6 +1379,7 @@ export const configModule = {
   toggleSettingEnhanced,
   onConfigEditorInput,
   setupConfigKeyboardShortcuts,
+  handleConfigEditorKeydown,
   editorToggleComment,
   editorIndent,
   editorOutdent,
@@ -1307,6 +1415,7 @@ window.saveConfigEnhanced = saveConfigEnhanced;
 window.reloadConfig = reloadConfig;
 window.toggleSettingEnhanced = toggleSettingEnhanced;
 window.onConfigEditorInput = onConfigEditorInput;
+window.handleConfigEditorKeydown = handleConfigEditorKeydown;
 window.editorToggleComment = editorToggleComment;
 window.editorIndent = editorIndent;
 window.editorOutdent = editorOutdent;
