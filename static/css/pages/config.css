@@ -512,34 +512,40 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 12px;
+  padding: 6px 12px;
   background: rgba(20, 20, 45, 0.8);
   border-bottom: 1px solid var(--border-color);
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
 }
 
 .config-editor-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
-  flex-wrap: wrap;
+  gap: 2px;
+  flex-shrink: 0;
 }
 
 .editor-toolbar-btn {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 6px 10px;
+  justify-content: center;
+  padding: 6px 8px;
   background: rgba(60, 60, 100, 0.3);
   border: 1px solid rgba(120, 120, 180, 0.2);
-  border-radius: 6px;
+  border-radius: 4px;
   color: var(--text-secondary);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.15s ease;
   white-space: nowrap;
+}
+
+/* Hide text labels by default - show only icons */
+.editor-toolbar-btn span {
+  display: none;
 }
 
 .editor-toolbar-btn:hover {
@@ -559,35 +565,36 @@
 
 .editor-toolbar-separator {
   width: 1px;
-  height: 20px;
+  height: 16px;
   background: rgba(120, 120, 180, 0.3);
-  margin: 0 4px;
+  margin: 0 2px;
+  flex-shrink: 0;
 }
 
 .config-editor-info {
   display: flex;
   align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .config-editor-info span {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 11px;
+  gap: 3px;
+  font-size: 10px;
   color: var(--text-muted);
   font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
 }
 
 .config-editor-info svg {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   opacity: 0.7;
 }
 
 .editor-cursor-pos {
-  padding: 3px 8px;
+  padding: 2px 6px;
   background: rgba(40, 40, 80, 0.5);
   border-radius: 4px;
   color: var(--accent-cyan) !important;
@@ -661,27 +668,15 @@
 /* Responsive for toolbar */
 @media (max-width: 768px) {
   .config-editor-toolbar {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-  
-  .config-editor-actions {
-    justify-content: flex-start;
+    flex-wrap: wrap;
   }
   
   .config-editor-info {
-    justify-content: flex-end;
-    border-top: 1px solid rgba(120, 120, 180, 0.15);
-    padding-top: 8px;
-  }
-  
-  .editor-toolbar-btn span {
-    display: none;
-  }
-  
-  .editor-toolbar-btn {
-    padding: 8px;
+    order: -1;
+    width: 100%;
+    justify-content: flex-start;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(120, 120, 180, 0.15);
   }
 }
 
@@ -696,6 +691,15 @@
   .code-editor-wrapper {
     height: 350px;
     min-height: 350px;
+  }
+  
+  .editor-toolbar-btn {
+    padding: 5px 6px;
+  }
+  
+  .editor-toolbar-btn svg {
+    width: 12px;
+    height: 12px;
   }
 }
 
