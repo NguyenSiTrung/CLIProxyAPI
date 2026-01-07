@@ -87,24 +87,11 @@ function updateConfigEditorInfo() {
   const charCountEl = document.getElementById('configCharCount');
 
   if (lineCountEl) {
-    lineCountEl.innerHTML = `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <line x1="17" y1="10" x2="3" y2="10"></line>
-        <line x1="21" y1="6" x2="3" y2="6"></line>
-        <line x1="21" y1="14" x2="3" y2="14"></line>
-        <line x1="17" y1="18" x2="3" y2="18"></line>
-      </svg>
-      ${lines} lines`;
+    lineCountEl.textContent = `${lines} lines`;
   }
 
   if (charCountEl) {
-    charCountEl.innerHTML = `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="4 7 4 4 20 4 20 7"></polyline>
-        <line x1="9" y1="20" x2="15" y2="20"></line>
-        <line x1="12" y1="4" x2="12" y2="20"></line>
-      </svg>
-      ${chars.toLocaleString()} chars`;
+    charCountEl.textContent = `${chars.toLocaleString()} chars`;
   }
 
   // Also update line numbers
@@ -746,12 +733,7 @@ export function updateCursorPosition() {
   const line = lines.length;
   const column = lines[lines.length - 1].length + 1;
 
-  cursorPosEl.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M5 12h14"></path>
-      <path d="M12 5v14"></path>
-    </svg>
-    Ln ${line}, Col ${column}`;
+  cursorPosEl.textContent = `Ln ${line}, Col ${column}`;
 }
 
 /**
