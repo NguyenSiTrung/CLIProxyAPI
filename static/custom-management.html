@@ -846,7 +846,7 @@
                   </svg></div>
                 <div>
                   <h3>Advanced Configuration</h3>
-                  <p>Edit full YAML configuration <span class="config-tooltip" data-tooltip="Ctrl+S: Save | Ctrl+/: Comment | Tab: Indent">ⓘ</span></p>
+                  <p>Edit full YAML configuration</p>
                 </div>
               </div>
               <div class="config-unsaved-indicator" id="configUnsavedIndicator">
@@ -896,29 +896,6 @@
                 <span id="configCursorPos" class="editor-cursor-pos">Ln 1, Col 1</span>
                 <span id="configLineCount">0 lines</span>
                 <span id="configCharCount">0 chars</span>
-              </div>
-              <div class="editor-shortcuts-hint">
-                <button type="button" class="editor-shortcuts-btn" id="editorShortcutsBtn" title="Keyboard Shortcuts">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect>
-                    <path d="M6 8h.001M10 8h.001M14 8h.001M18 8h.001M8 12h.001M12 12h.001M16 12h.001M6 16h8"></path>
-                  </svg>
-                  <span>Shortcuts</span>
-                </button>
-                <div class="shortcuts-dropdown" id="shortcutsDropdown">
-                  <div class="shortcuts-title">Keyboard Shortcuts</div>
-                  <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>S</kbd> Save</div>
-                  <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>/</kbd> Toggle Comment</div>
-                  <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>F</kbd> Find</div>
-                  <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>H</kbd> Replace</div>
-                  <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>G</kbd> Go to Line</div>
-                  <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>D</kbd> Duplicate Line</div>
-                  <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>K</kbd> Delete Line</div>
-                  <div class="shortcut-item"><kbd>Tab</kbd> Indent</div>
-                  <div class="shortcut-item"><kbd>Shift</kbd>+<kbd>Tab</kbd> Outdent</div>
-                  <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>Z</kbd> Undo</div>
-                  <div class="shortcut-item"><kbd>Ctrl</kbd>+<kbd>Y</kbd> Redo</div>
-                </div>
               </div>
             </div>
             <!-- Find/Replace Bar -->
@@ -986,7 +963,8 @@
                 <textarea id="configEditor" class="code-editor code-editor-with-lines"
                   placeholder="Loading config..." oninput="onConfigEditorInput()" 
                   onscroll="syncEditorScroll()" onclick="updateEditorState()" onkeyup="updateEditorState()"
-                  onselect="updateEditorState()" onfocus="updateEditorState()" spellcheck="false"></textarea>
+                  onselect="updateEditorState()" onfocus="updateEditorState()" spellcheck="false"
+                  onkeydown="handleConfigEditorKeydown(event)"></textarea>
               </div>
             </div>
           </div>

@@ -25,13 +25,23 @@
 /* Config Grid */
 .config-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr;
   gap: 20px;
   margin-bottom: 24px;
 }
 
-/* Config Section */
+/* Config Section - General Settings takes full width on its own row */
 .config-section {
+  background: var(--bg-card);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* Advanced Configuration Editor Section - takes full width */
+.config-editor-section {
+  grid-column: 1 / -1;
   background: var(--bg-card);
   backdrop-filter: blur(20px);
   border: 1px solid var(--border-color);
@@ -369,20 +379,13 @@
   visibility: visible;
 }
 
-/* Config Editor Section */
-.config-editor-section {
-  background: var(--bg-card);
-  backdrop-filter: blur(20px);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
-}
-
 .config-editor-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px 20px;
   background: linear-gradient(135deg, rgba(30, 30, 65, 0.6), rgba(25, 25, 55, 0.4));
   border-bottom: 1px solid var(--border-color);
 }
@@ -391,6 +394,8 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  flex: 1;
+  min-width: 200px;
 }
 
 .config-editor-title .icon-box {
@@ -621,8 +626,8 @@
 .code-editor-wrapper {
   display: flex;
   position: relative;
-  height: 440px;
-  min-height: 440px;
+  height: 520px;
+  min-height: 520px;
   background: rgba(5, 5, 15, 0.7);
   overflow: hidden;
 }
@@ -710,8 +715,8 @@
   }
   
   .code-editor-wrapper {
-    height: 350px;
-    min-height: 350px;
+    height: 400px;
+    min-height: 400px;
   }
 }
 
