@@ -307,6 +307,61 @@
   height: 14px;
 }
 
+/* Config Settings List - Used by Usage Stats page */
+.config-settings-list {
+  padding: 4px 0;
+}
+
+.config-setting-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 20px;
+  transition: all 0.2s ease;
+  border-left: 3px solid transparent;
+  position: relative;
+}
+
+.config-setting-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+  border-left-color: var(--accent-cyan);
+}
+
+.config-setting-info {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.config-setting-icon {
+  width: 32px;
+  height: 32px;
+  background: rgba(100, 100, 150, 0.15);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.config-setting-icon svg {
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary);
+}
+
+.config-setting-text h4 {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.config-setting-text p {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
 /* Unsaved Indicator */
 .config-unsaved-indicator {
   display: none;
