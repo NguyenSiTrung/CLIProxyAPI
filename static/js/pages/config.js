@@ -55,6 +55,7 @@ export async function loadConfig() {
     });
 
     updateConfigEditorInfo();
+    updateSyntaxHighlight();
     hideUnsavedIndicator();
     hideYamlError();
   } catch (e) {
