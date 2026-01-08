@@ -675,6 +675,77 @@ func (h *Handler) DeleteAuthFile(c *gin.Context) {
 	c.JSON(200, gin.H{"status": "ok"})
 }
 
+// RenameAuthFile renames an auth file in the auth directory.
+// This allows users to control the order of auth files for load balancing (fill first mode).
+// PUT /v0/management/auth-files/rename?old_name=xxx&new_name=yyy
+func (h *Handler) RenameAuthFile(c *gin.Context) {
+	if h.authManager == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "core auth manager unavailable"})
+		return
+	}
+	ctx := c.Request.Context()
+
+	oldName := strings.TrimSpace(c.Query("old_name"))
+	newName := strings.TrimSpace(c.Query("new_name"))
+
+	if oldName == "" || newName == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "old_name and new_name are required"})
+		return
+	}
+
+	if strings.Contains(oldName, string(os.PathSeparator)) || strings.Contains(newName, string(os.PathSeparator)) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid file name"})
+		return
+	}
+
+	if !strings.HasSuffix(strings.ToLower(newName), ".json") {
+		newName = newName + ".json"
+	}
+
+	oldPath := filepath.Join(h.cfg.AuthDir, filepath.Base(oldName))
+	newPath := filepath.Join(h.cfg.AuthDir, filepath.Base(newName))
+
+	if !filepath.IsAbs(oldPath) {
+		if abs, errAbs := filepath.Abs(oldPath); errAbs == nil {
+			oldPath = abs
+		}
+	}
+	if !filepath.IsAbs(newPath) {
+		if abs, errAbs := filepath.Abs(newPath); errAbs == nil {
+			newPath = abs
+		}
+	}
+
+	if oldPath == newPath {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "old and new names are the same"})
+		return
+	}
+
+	if _, err := os.Stat(oldPath); os.IsNotExist(err) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "source file not found"})
+		return
+	}
+
+	if _, err := os.Stat(newPath); err == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "destination file already exists"})
+		return
+	}
+
+	if err := os.Rename(oldPath, newPath); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to rename file: %v", err)})
+		return
+	}
+
+	h.disableAuth(ctx, oldPath)
+
+	data, err := os.ReadFile(newPath)
+	if err == nil {
+		_ = h.registerAuthFromFile(ctx, newPath, data)
+	}
+
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "old_name": oldName, "new_name": filepath.Base(newPath)})
+}
+
 func (h *Handler) authIDForPath(path string) string {
 	path = strings.TrimSpace(path)
 	if path == "" {
