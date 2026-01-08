@@ -718,125 +718,131 @@
           </div>
           <p class="page-subtitle">Manage server behavior and global settings</p>
         </div>
-        <div class="config-grid">
-          <div class="config-section">
-            <div class="config-section-header">
-              <div class="config-section-icon cyan"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                  fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M12 20h9" />
-                  <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" />
-                </svg></div>
-              <div class="config-section-title">
-                <h3>General Settings</h3>
-                <p>Core system toggles</p>
+        
+        <!-- Quick Toggles - Horizontal Cards -->
+        <div class="quick-toggles-section">
+          <div class="quick-toggles-grid">
+            <div class="quick-toggle-card" data-setting="debug">
+              <div class="quick-toggle-header">
+                <div class="quick-toggle-icon debug">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                  </svg>
+                </div>
+                <label class="toggle-enhanced" id="toggleDebugLabel">
+                  <input type="checkbox" id="toggleDebug" onchange="toggleSettingEnhanced('debug', this.checked, this)">
+                  <span class="toggle-enhanced-slider"></span>
+                </label>
               </div>
-              <div class="config-section-status" id="settingsStatus" style="display:none">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-                <span>Saved</span>
+              <div class="quick-toggle-content">
+                <h4>Debug Mode</h4>
+                <p>Verbose logging for troubleshooting</p>
+              </div>
+              <div class="quick-toggle-status">
+                <span class="status-indicator" id="statusDebug"></span>
+                <span class="status-text">Off</span>
               </div>
             </div>
-            <div class="config-settings-list">
-              <div class="config-setting-item" data-setting="debug">
-                <div class="config-setting-info">
-                  <div class="config-setting-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                      fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
-                    </svg></div>
-                  <div class="config-setting-text">
-                    <h4>Debug Mode</h4>
-                    <p>Enable verbose logging for troubleshooting</p>
-                  </div>
+
+            <div class="quick-toggle-card" data-setting="usage-statistics-enabled">
+              <div class="quick-toggle-header">
+                <div class="quick-toggle-icon stats">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M18 20V10m-6 10V4M6 20v-6" />
+                  </svg>
                 </div>
-                <div class="config-setting-status">
-                  <span class="setting-status-dot" id="statusDebug"></span>
-                  <label class="toggle-enhanced" id="toggleDebugLabel"><input type="checkbox" id="toggleDebug"
-                    onchange="toggleSettingEnhanced('debug', this.checked, this)"><span class="toggle-enhanced-slider"></span></label>
-                </div>
+                <label class="toggle-enhanced" id="toggleUsageStatsLabel">
+                  <input type="checkbox" id="toggleUsageStats" onchange="toggleSettingEnhanced('usage-statistics-enabled', this.checked, this)">
+                  <span class="toggle-enhanced-slider"></span>
+                </label>
               </div>
-              <div class="config-setting-item" data-setting="usage-statistics-enabled">
-                <div class="config-setting-info">
-                  <div class="config-setting-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                      fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M18 20V10m-6 10V4M6 20v-6" />
-                    </svg></div>
-                  <div class="config-setting-text">
-                    <h4>Usage Statistics</h4>
-                    <p>Track request counts and token metrics</p>
-                  </div>
-                </div>
-                <div class="config-setting-status">
-                  <span class="setting-status-dot" id="statusUsageStats"></span>
-                  <label class="toggle-enhanced" id="toggleUsageStatsLabel"><input type="checkbox" id="toggleUsageStats"
-                    onchange="toggleSettingEnhanced('usage-statistics-enabled', this.checked, this)"><span
-                    class="toggle-enhanced-slider"></span></label>
-                </div>
+              <div class="quick-toggle-content">
+                <h4>Usage Statistics</h4>
+                <p>Track requests and token metrics</p>
               </div>
-              <div class="config-setting-item" data-setting="logging-to-file">
-                <div class="config-setting-info">
-                  <div class="config-setting-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                      fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                      <polyline points="14 2 14 8 20 8"></polyline>
-                      <line x1="16" y1="13" x2="8" y2="13"></line>
-                      <line x1="16" y1="17" x2="8" y2="17"></line>
-                    </svg></div>
-                  <div class="config-setting-text">
-                    <h4>Logging to File</h4>
-                    <p>Persist logs to disk for later analysis</p>
-                  </div>
-                </div>
-                <div class="config-setting-status">
-                  <span class="setting-status-dot" id="statusLogging"></span>
-                  <label class="toggle-enhanced" id="toggleLoggingLabel"><input type="checkbox" id="toggleLogging"
-                    onchange="toggleSettingEnhanced('logging-to-file', this.checked, this)"><span
-                    class="toggle-enhanced-slider"></span></label>
-                </div>
+              <div class="quick-toggle-status">
+                <span class="status-indicator" id="statusUsageStats"></span>
+                <span class="status-text">Off</span>
               </div>
-              <div class="config-setting-item" data-setting="request-log">
-                <div class="config-setting-info">
-                  <div class="config-setting-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                      fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
-                      <path d="M3 3v5h5"></path>
-                      <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
-                      <path d="M16 21h5v-5"></path>
-                    </svg></div>
-                  <div class="config-setting-text">
-                    <h4>Request Log</h4>
-                    <p>Log detailed request/response information</p>
-                  </div>
+            </div>
+
+            <div class="quick-toggle-card" data-setting="logging-to-file">
+              <div class="quick-toggle-header">
+                <div class="quick-toggle-icon logging">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                  </svg>
                 </div>
-                <div class="config-setting-status">
-                  <span class="setting-status-dot" id="statusRequestLog"></span>
-                  <label class="toggle-enhanced" id="toggleRequestLogLabel"><input type="checkbox" id="toggleRequestLog"
-                    onchange="toggleSettingEnhanced('request-log', this.checked, this)"><span
-                    class="toggle-enhanced-slider"></span></label>
-                </div>
+                <label class="toggle-enhanced" id="toggleLoggingLabel">
+                  <input type="checkbox" id="toggleLogging" onchange="toggleSettingEnhanced('logging-to-file', this.checked, this)">
+                  <span class="toggle-enhanced-slider"></span>
+                </label>
               </div>
-              <div class="config-setting-item" data-setting="ws-auth">
-                <div class="config-setting-info">
-                  <div class="config-setting-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
-                      fill="none" stroke="currentColor" stroke-width="2">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                    </svg></div>
-                  <div class="config-setting-text">
-                    <h4>WebSocket Auth</h4>
-                    <p>Require authentication for WebSocket connections</p>
-                  </div>
+              <div class="quick-toggle-content">
+                <h4>File Logging</h4>
+                <p>Persist logs to disk</p>
+              </div>
+              <div class="quick-toggle-status">
+                <span class="status-indicator" id="statusLogging"></span>
+                <span class="status-text">Off</span>
+              </div>
+            </div>
+
+            <div class="quick-toggle-card" data-setting="request-log">
+              <div class="quick-toggle-header">
+                <div class="quick-toggle-icon request">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path>
+                    <path d="M3 3v5h5"></path>
+                    <path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path>
+                    <path d="M16 21h5v-5"></path>
+                  </svg>
                 </div>
-                <div class="config-setting-status">
-                  <span class="setting-status-dot" id="statusWsAuth"></span>
-                  <label class="toggle-enhanced" id="toggleWsAuthLabel"><input type="checkbox" id="toggleWsAuth"
-                    onchange="toggleSettingEnhanced('ws-auth', this.checked, this)"><span
-                    class="toggle-enhanced-slider"></span></label>
+                <label class="toggle-enhanced" id="toggleRequestLogLabel">
+                  <input type="checkbox" id="toggleRequestLog" onchange="toggleSettingEnhanced('request-log', this.checked, this)">
+                  <span class="toggle-enhanced-slider"></span>
+                </label>
+              </div>
+              <div class="quick-toggle-content">
+                <h4>Request Log</h4>
+                <p>Log request/response details</p>
+              </div>
+              <div class="quick-toggle-status">
+                <span class="status-indicator" id="statusRequestLog"></span>
+                <span class="status-text">Off</span>
+              </div>
+            </div>
+
+            <div class="quick-toggle-card" data-setting="ws-auth">
+              <div class="quick-toggle-header">
+                <div class="quick-toggle-icon security">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                  </svg>
                 </div>
+                <label class="toggle-enhanced" id="toggleWsAuthLabel">
+                  <input type="checkbox" id="toggleWsAuth" onchange="toggleSettingEnhanced('ws-auth', this.checked, this)">
+                  <span class="toggle-enhanced-slider"></span>
+                </label>
+              </div>
+              <div class="quick-toggle-content">
+                <h4>WebSocket Auth</h4>
+                <p>Require auth for WS connections</p>
+              </div>
+              <div class="quick-toggle-status">
+                <span class="status-indicator" id="statusWsAuth"></span>
+                <span class="status-text">Off</span>
               </div>
             </div>
           </div>
-          <div class="config-editor-section">
+        </div>
+
+        <!-- YAML Editor Section -->
+        <div class="config-editor-section">
             <div class="config-editor-header">
               <div class="config-editor-title">
                 <div class="icon-box"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"

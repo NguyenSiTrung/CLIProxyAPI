@@ -7,7 +7,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 
 .config-page-header .page-title {
@@ -21,6 +21,177 @@
   height: 28px;
   color: var(--accent-purple);
 }
+
+/* ===================================
+   Quick Toggles Section - Modern Cards
+   =================================== */
+
+.quick-toggles-section {
+  margin-bottom: 24px;
+  position: relative;
+}
+
+.quick-toggles-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.quick-toggle-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.quick-toggle-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent-purple), var(--accent-cyan));
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.quick-toggle-card:hover {
+  border-color: rgba(167, 139, 250, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+.quick-toggle-card:hover::before {
+  opacity: 1;
+}
+
+.quick-toggle-card.active {
+  border-color: var(--accent-green);
+  background: linear-gradient(135deg, rgba(34, 211, 160, 0.08), transparent);
+}
+
+.quick-toggle-card.active::before {
+  opacity: 1;
+  background: var(--accent-green);
+}
+
+.quick-toggle-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.quick-toggle-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.25s ease;
+}
+
+.quick-toggle-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.quick-toggle-icon.debug {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+}
+
+.quick-toggle-icon.stats {
+  background: rgba(96, 165, 250, 0.15);
+  color: #60a5fa;
+}
+
+.quick-toggle-icon.logging {
+  background: rgba(167, 139, 250, 0.15);
+  color: #a78bfa;
+}
+
+.quick-toggle-icon.request {
+  background: rgba(244, 114, 182, 0.15);
+  color: #f472b6;
+}
+
+.quick-toggle-icon.security {
+  background: rgba(34, 211, 160, 0.15);
+  color: #22d3a0;
+}
+
+.quick-toggle-content {
+  margin-bottom: 12px;
+}
+
+.quick-toggle-content h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 4px 0;
+}
+
+.quick-toggle-content p {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.quick-toggle-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.status-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: rgba(100, 116, 139, 0.5);
+  transition: all 0.25s ease;
+}
+
+.status-indicator.enabled {
+  background: var(--accent-green);
+  box-shadow: 0 0 8px rgba(34, 211, 160, 0.5);
+}
+
+.quick-toggle-status .status-text {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 500;
+}
+
+/* Responsive Quick Toggles */
+@media (max-width: 768px) {
+  .quick-toggles-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  
+  .quick-toggle-card {
+    padding: 14px;
+  }
+}
+
+@media (max-width: 480px) {
+  .quick-toggles-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ===================================
+   Legacy Config Section Styles (keeping for compatibility)
+   =================================== */
 
 /* Config Grid */
 .config-grid {
@@ -41,19 +212,19 @@
 
 /* Advanced Configuration Editor Section - takes full width */
 .config-editor-section {
-  grid-column: 1 / -1;
   background: var(--bg-card);
   backdrop-filter: blur(20px);
   border: 1px solid var(--border-color);
   border-radius: var(--radius-lg);
   overflow: hidden;
+  margin-bottom: 24px;
 }
 
 .config-section-header {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 20px 24px;
+  padding: 14px 20px;
   background: linear-gradient(135deg, rgba(30, 30, 65, 0.6), rgba(25, 25, 55, 0.4));
   border-bottom: 1px solid var(--border-color);
 }
@@ -105,95 +276,6 @@
 .config-section-status svg {
   width: 12px;
   height: 12px;
-}
-
-/* Config Settings List */
-.config-settings-list {
-  padding: 8px 0;
-}
-
-.config-setting-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 24px;
-  transition: all 0.2s ease;
-  border-left: 3px solid transparent;
-  position: relative;
-}
-
-.config-setting-item:hover {
-  background: rgba(255, 255, 255, 0.03);
-  border-left-color: var(--accent-cyan);
-}
-
-.config-setting-item::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: transparent;
-  transition: background 0.2s;
-}
-
-.config-setting-item:hover::after {
-  background: var(--accent-cyan);
-}
-
-.config-setting-info {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.config-setting-icon {
-  width: 36px;
-  height: 36px;
-  background: rgba(100, 100, 150, 0.15);
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.config-setting-icon svg {
-  width: 18px;
-  height: 18px;
-  color: var(--text-secondary);
-}
-
-.config-setting-text h4 {
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text-primary);
-  margin-bottom: 2px;
-}
-
-.config-setting-text p {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.config-setting-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.setting-status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--text-muted);
-  transition: all 0.2s;
-}
-
-.setting-status-dot.enabled {
-  background: var(--accent-green);
-  box-shadow: 0 0 8px rgba(34, 211, 160, 0.4);
 }
 
 /* Config Editor Toolbar */
@@ -737,7 +819,7 @@
   white-space: pre;
   overflow: hidden;
   pointer-events: none;
-  color: transparent;
+  color: #e2e8f0; /* Default text color for unhighlighted text */
   z-index: 1;
 }
 

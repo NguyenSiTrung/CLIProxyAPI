@@ -64,12 +64,22 @@ export async function loadConfig() {
 }
 
 /**
- * Update a status dot element
+ * Update a status dot element and its parent card
  */
 function updateStatusDot(id, enabled) {
   const dot = document.getElementById(id);
   if (dot) {
     dot.classList.toggle('enabled', enabled);
+    
+    // Update status text
+    const card = dot.closest('.quick-toggle-card');
+    if (card) {
+      card.classList.toggle('active', enabled);
+      const statusText = card.querySelector('.status-text');
+      if (statusText) {
+        statusText.textContent = enabled ? 'On' : 'Off';
+      }
+    }
   }
 }
 
@@ -237,12 +247,6 @@ export async function toggleSettingEnhanced(setting, value, inputEl) {
       label.classList.remove('loading');
       label.classList.add('success');
       setTimeout(() => label.classList.remove('success'), 400);
-    }
-
-    const statusEl = document.getElementById('settingsStatus');
-    if (statusEl) {
-      statusEl.style.display = 'flex';
-      setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
     }
 
     toast(`${setting.replace(/-/g, ' ')} ${value ? 'enabled' : 'disabled'}`, 'success');
