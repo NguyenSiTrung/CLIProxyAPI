@@ -330,6 +330,9 @@ export async function saveConfigEnhanced() {
  */
 export function setupConfigKeyboardShortcuts() {
   document.addEventListener('keydown', (e) => {
+    // Skip if already handled by textarea's onkeydown
+    if (e.defaultPrevented) return;
+    
     const configEditor = document.getElementById('configEditor');
     if (!configEditor || document.activeElement !== configEditor) return;
 
@@ -340,8 +343,8 @@ export function setupConfigKeyboardShortcuts() {
       return;
     }
 
-    // Ctrl+/: Toggle comment
-    if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+    // Ctrl+/: Toggle comment (use e.code for reliability across keyboard layouts)
+    if ((e.ctrlKey || e.metaKey) && (e.code === 'Slash' || e.key === '/' || e.key === '?')) {
       e.preventDefault();
       editorToggleComment();
       return;
@@ -423,52 +426,71 @@ export function editorToggleComment() {
   const editor = document.getElementById('configEditor');
   if (!editor) return;
 
-  const { selectionStart, selectionEnd, value } = editor;
+  const originalSelStart = editor.selectionStart;
+  const originalSelEnd = editor.selectionEnd;
+  const value = editor.value;
   const lines = value.split('\n');
-  
-  // Find line indices for selection
-  let charCount = 0;
-  let startLine = 0;
-  let endLine = 0;
-  
+
+  // Precompute original line start offsets
+  const lineStarts = new Array(lines.length);
+  let pos = 0;
   for (let i = 0; i < lines.length; i++) {
-    if (charCount + lines[i].length >= selectionStart && startLine === 0) {
-      startLine = i;
-    }
-    if (charCount + lines[i].length >= selectionEnd - 1 || i === lines.length - 1) {
-      endLine = i;
-      break;
-    }
-    charCount += lines[i].length + 1;
+    lineStarts[i] = pos;
+    pos += lines[i].length + 1; // + '\n'
   }
 
-  // Check if all selected lines are commented
-  const selectedLines = lines.slice(startLine, endLine + 1);
-  const allCommented = selectedLines.every(line => line.trim().startsWith('#') || line.trim() === '');
+  const offsetToLineIndex = (offset) => {
+    offset = Math.max(0, Math.min(offset, value.length));
+    let charCount = 0;
+    for (let i = 0; i < lines.length; i++) {
+      if (charCount <= offset && offset <= charCount + lines[i].length) return i;
+      charCount += lines[i].length + 1;
+    }
+    return lines.length - 1;
+  };
 
-  // Toggle comments
+  const startLine = offsetToLineIndex(originalSelStart);
+  const endPos = Math.max(originalSelStart, originalSelEnd - 1);
+  const endLine = offsetToLineIndex(endPos);
+
+  const nonEmptySelected = lines
+    .slice(startLine, endLine + 1)
+    .filter(line => line.trim() !== '');
+
+  if (nonEmptySelected.length === 0) return;
+
+  const allCommented = nonEmptySelected.every(line => line.trimStart().startsWith('#'));
+
+  let newSelStart = originalSelStart;
+  let newSelEnd = originalSelEnd;
+
   for (let i = startLine; i <= endLine; i++) {
     const line = lines[i];
     if (line.trim() === '') continue;
-    
-    if (allCommented) {
-      // Remove comment
-      lines[i] = line.replace(/^(\s*)#\s?/, '$1');
-    } else {
-      // Add comment
-      const leadingSpaces = line.match(/^(\s*)/)[1];
-      lines[i] = leadingSpaces + '# ' + line.trimStart();
+
+    const leading = (line.match(/^(\s*)/)?.[1]) ?? '';
+    const editIndex = lineStarts[i] + leading.length;
+
+    const newLine = allCommented
+      ? line.replace(/^(\s*)#\s?/, '$1')
+      : (leading + '# ' + line.slice(leading.length));
+
+    const delta = newLine.length - line.length;
+    if (delta !== 0) {
+      if (originalSelStart > editIndex) newSelStart += delta;
+      if (originalSelEnd > editIndex) newSelEnd += delta;
+      
+      // Update lineStarts for subsequent lines
+      for (let j = i + 1; j < lineStarts.length; j++) {
+        lineStarts[j] += delta;
+      }
+      lines[i] = newLine;
     }
   }
 
-  // Calculate new cursor position
-  const newValue = lines.join('\n');
-  const lengthDiff = newValue.length - value.length;
-  
-  editor.value = newValue;
-  editor.selectionStart = selectionStart;
-  editor.selectionEnd = selectionEnd + lengthDiff;
-  
+  editor.value = lines.join('\n');
+  editor.setSelectionRange(newSelStart, newSelEnd);
+
   onConfigEditorInput();
   updateLineNumbers();
 }
@@ -1281,9 +1303,10 @@ export function handleConfigEditorKeydown(e) {
     return;
   }
 
-  // Ctrl+/: Toggle comment
-  if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+  // Ctrl+/: Toggle comment (use e.code for reliability across keyboard layouts)
+  if ((e.ctrlKey || e.metaKey) && (e.code === 'Slash' || e.key === '/' || e.key === '?')) {
     e.preventDefault();
+    e.stopPropagation();
     editorToggleComment();
     return;
   }
