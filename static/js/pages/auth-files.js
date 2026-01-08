@@ -155,6 +155,11 @@ export async function loadAuthFiles() {
                 <circle cx="12" cy="12" r="3"/>
               </svg>
             </button>
+            <button class="auth-action-btn" onclick="renameAuth('${f.name}')" title="Rename (for load balancing order)">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+              </svg>
+            </button>
             <button class="auth-action-btn" onclick="downloadAuth('${f.name}')" title="Download">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -244,6 +249,25 @@ export async function deleteAuth(name) {
     loadAuthFiles();
   } catch (e) {
     toast('Failed: ' + e.message, 'error');
+  }
+}
+
+/**
+ * Rename an auth file
+ * This allows controlling the order of auth files for load balancing (fill first mode)
+ * @param {string} oldName - Current auth file name
+ */
+export async function renameAuth(oldName) {
+  const newName = prompt(`Enter new name for "${oldName}":\n\n(Tip: Use prefixes like 01_, 02_ to control load balancing order)`, oldName);
+  
+  if (!newName || newName === oldName) return;
+  
+  try {
+    await api('PUT', `/auth-files/rename?old_name=${encodeURIComponent(oldName)}&new_name=${encodeURIComponent(newName)}`);
+    toast('Renamed successfully', 'success');
+    loadAuthFiles();
+  } catch (e) {
+    toast('Failed to rename: ' + e.message, 'error');
   }
 }
 
@@ -553,6 +577,7 @@ window.loadAuthFiles = loadAuthFiles;
 window.viewAuthFile = viewAuthFile;
 window.downloadAuth = downloadAuth;
 window.deleteAuth = deleteAuth;
+window.renameAuth = renameAuth;
 window.deleteAllAuthFiles = deleteAllAuthFiles;
 window.startOAuth = startOAuth;
 window.showManualCallback = showManualCallback;
