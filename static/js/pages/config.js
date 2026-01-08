@@ -389,6 +389,13 @@ export function setupConfigKeyboardShortcuts() {
       return;
     }
 
+    // Ctrl+Shift+F: Format YAML
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
+      e.preventDefault();
+      formatYamlConfig();
+      return;
+    }
+
     // Ctrl+H: Replace
     if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
       e.preventDefault();
@@ -417,6 +424,27 @@ export function setupConfigKeyboardShortcuts() {
       return;
     }
   });
+}
+
+/**
+ * Replace editor content while preserving undo stack (if possible)
+ * Falls back to direct assignment if execCommand not available
+ */
+function replaceEditorContent(editor, newValue, selStart, selEnd) {
+  // Select all and replace using execCommand to preserve undo stack
+  editor.focus();
+  editor.select();
+  
+  // Try using execCommand (deprecated but still works in most browsers for undo)
+  const success = document.execCommand('insertText', false, newValue);
+  
+  if (!success) {
+    // Fallback: direct assignment (breaks undo stack)
+    editor.value = newValue;
+  }
+  
+  // Restore selection
+  editor.setSelectionRange(selStart, selEnd);
 }
 
 /**
@@ -488,8 +516,8 @@ export function editorToggleComment() {
     }
   }
 
-  editor.value = lines.join('\n');
-  editor.setSelectionRange(newSelStart, newSelEnd);
+  const newValue = lines.join('\n');
+  replaceEditorContent(editor, newValue, newSelStart, newSelEnd);
 
   onConfigEditorInput();
   updateLineNumbers();
@@ -924,6 +952,86 @@ export function editorRedo() {
 }
 
 /**
+ * Format YAML configuration
+ * Normalizes indentation and fixes common formatting issues
+ */
+export function formatYamlConfig() {
+  const editor = document.getElementById('configEditor');
+  if (!editor) return;
+
+  const originalValue = editor.value;
+  const lines = originalValue.split('\n');
+  const formattedLines = [];
+  
+  let inMultilineString = false;
+  
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    
+    // Skip empty lines but preserve them
+    if (line.trim() === '') {
+      formattedLines.push('');
+      continue;
+    }
+    
+    // Handle multiline strings (|, >)
+    if (inMultilineString) {
+      formattedLines.push(line);
+      // Check if we're exiting multiline (next non-empty line with less indent)
+      const nextNonEmpty = lines.slice(i + 1).find(l => l.trim() !== '');
+      if (nextNonEmpty) {
+        const currentIndent = line.match(/^(\s*)/)[1].length;
+        const nextIndent = nextNonEmpty.match(/^(\s*)/)[1].length;
+        if (nextIndent <= currentIndent && !nextNonEmpty.match(/^\s/)) {
+          inMultilineString = false;
+        }
+      }
+      continue;
+    }
+    
+    // Detect start of multiline string
+    if (line.match(/:\s*[|>]\s*$/)) {
+      inMultilineString = true;
+    }
+    
+    // Normalize tabs to 2 spaces
+    line = line.replace(/\t/g, '  ');
+    
+    // Remove trailing whitespace
+    line = line.trimEnd();
+    
+    // Ensure single space after colon for key-value pairs (but not for empty values)
+    line = line.replace(/^(\s*)([^:#\n]+):(\s*)(?!$)(.+)$/, (match, indent, key, spaces, value) => {
+      // Don't modify if it's a URL or contains special characters
+      if (value.includes('://') || key.includes('://')) {
+        return match;
+      }
+      return `${indent}${key}: ${value.trim()}`;
+    });
+    
+    // Ensure proper list item spacing
+    line = line.replace(/^(\s*)-(\s*)(?!$)(.+)$/, (match, indent, spaces, value) => {
+      return `${indent}- ${value.trim()}`;
+    });
+    
+    formattedLines.push(line);
+  }
+  
+  const formattedValue = formattedLines.join('\n');
+  
+  // Only update if there are changes
+  if (formattedValue !== originalValue) {
+    const cursorPos = Math.min(editor.selectionStart, formattedValue.length);
+    replaceEditorContent(editor, formattedValue, cursorPos, cursorPos);
+    
+    onConfigEditorInput();
+    toast('YAML formatted', 'success');
+  } else {
+    toast('Already formatted', 'info');
+  }
+}
+
+/**
  * Toggle word wrap
  */
 let wordWrapEnabled = false;
@@ -1325,6 +1433,13 @@ export function handleConfigEditorKeydown(e) {
     return;
   }
 
+  // Ctrl+Shift+F: Format YAML
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
+    e.preventDefault();
+    formatYamlConfig();
+    return;
+  }
+
   // Tab: Insert spaces (2 spaces for YAML)
   if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey) {
     e.preventDefault();
@@ -1421,6 +1536,7 @@ export const configModule = {
   editorUndo,
   editorRedo,
   editorToggleWordWrap,
+  formatYamlConfig,
   editorOpenFind,
   editorOpenReplace,
   editorCloseFind,
@@ -1457,6 +1573,7 @@ window.updateSyntaxHighlight = updateSyntaxHighlight;
 window.editorUndo = editorUndo;
 window.editorRedo = editorRedo;
 window.editorToggleWordWrap = editorToggleWordWrap;
+window.formatYamlConfig = formatYamlConfig;
 window.editorOpenFind = editorOpenFind;
 window.editorOpenReplace = editorOpenReplace;
 window.editorCloseFind = editorCloseFind;
