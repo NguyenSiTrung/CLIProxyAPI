@@ -1124,6 +1124,9 @@ func (s *Server) UpdateClients(cfg *config.Config) {
 		s.mgmt.SetConfig(cfg)
 		s.mgmt.SetAuthManager(s.handlers.AuthManager)
 	}
+	if s.costManager != nil {
+		s.costManager.SetConfig(cfg)
+	}
 
 	// Notify Amp module only when Amp config has changed.
 	ampConfigChanged := oldCfg == nil || !reflect.DeepEqual(oldCfg.AmpCode, cfg.AmpCode)

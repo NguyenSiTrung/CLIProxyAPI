@@ -56,6 +56,16 @@ func (m *Manager) SetEnabled(enabled bool) {
 	m.cfg.AccessKeyLimits.Enabled = enabled
 }
 
+// SetConfig updates the config reference for hot-reload support.
+func (m *Manager) SetConfig(cfg *config.Config) {
+	if m == nil || cfg == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.cfg = cfg
+}
+
 // GetLimit returns the cost limit for an API key.
 // If the key has a specific limit configured, that is returned.
 // Otherwise, the default limit is returned.
