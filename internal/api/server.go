@@ -278,6 +278,8 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 	s.costManager = cost.NewManager(cfg, dataDir)
 	// Hook cost manager into the usage plugin for automatic cost recording
 	cost.DefaultCostLimitPlugin().SetManager(s.costManager)
+	// Set cost manager for management API endpoints
+	s.mgmt.SetCostManager(s.costManager)
 	// Load pricing data from /model-pricing endpoint (use defaults if unavailable)
 	if s.costManager.Calculator() != nil {
 		if err := s.costManager.Calculator().LoadPricing(fmt.Sprintf("http://%s:%d", cfg.Host, cfg.Port)); err != nil {
@@ -661,6 +663,13 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.GET("/model-pricing", s.mgmt.GetModelPricing)
 		mgmt.PUT("/model-pricing", s.mgmt.PutModelPricing)
 		mgmt.DELETE("/model-pricing", s.mgmt.DeleteModelPricing)
+
+		mgmt.GET("/access-key-limits", s.mgmt.GetAccessKeyLimits)
+		mgmt.PUT("/access-key-limits/enabled", s.mgmt.PutAccessKeyLimitsEnabled)
+		mgmt.PATCH("/access-key-limits/enabled", s.mgmt.PutAccessKeyLimitsEnabled)
+		mgmt.PUT("/access-key-limits/keys/:key", s.mgmt.PutAccessKeyLimit)
+		mgmt.PATCH("/access-key-limits/keys/:key", s.mgmt.PutAccessKeyLimit)
+		mgmt.POST("/access-key-limits/keys/:key/reset", s.mgmt.ResetAccessKeyLimit)
 	}
 }
 

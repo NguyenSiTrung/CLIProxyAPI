@@ -12,6 +12,11 @@
 - Data directory uses util.WritablePath() fallback pattern (same as logs)
 - Middleware pattern: Create CostLimitMiddleware(manager) in internal/api/middleware/, register with v1.Use() after AuthMiddleware
 - API key is stored in context as "apiKey" by AuthMiddleware - use c.Get("apiKey") to retrieve
+- Usage plugin pattern: Create Plugin implementing coreusage.Plugin in internal/cost/plugin.go, register in init()
+- CostLimitPlugin uses SetManager() pattern - set manager reference during server startup after cost.NewManager()
+- Plugin only records cost for successful requests (check record.Failed == false)
+- Management API handlers: Add methods to Handler struct in internal/api/handlers/management/, use SetXxx() to inject dependencies
+- Management API routes: Register in registerManagementRoutes() in server.go with PUT and PATCH for update endpoints
 
 ---
 
@@ -142,4 +147,35 @@ Thread: https://aresproxy.me/threads/T-019ba1e1-53a3-702a-860f-a5c2fa7e1101
   - API key stored in gin context as "apiKey" (string) by AuthMiddleware
   - Use v1.Use() to add middleware after AuthMiddleware in route group
   - 429 response includes error, message, current_cost, max_cost, currency, api_key (masked)
+---
+
+## 2026-01-09 - US-008
+Thread: https://ampcode.com/threads/T-019ba1e4-aeab-7368-b6c5-512d6d083e6e
+- Created internal/cost/plugin.go with CostLimitPlugin implementing coreusage.Plugin
+- Plugin registered via init() with coreusage.RegisterPlugin()
+- HandleUsage only records cost for successful requests (record.Failed == false)
+- Added SetManager() method for setting cost manager reference during server startup
+- Hooked plugin into server startup in internal/api/server.go after cost.NewManager()
+- Files changed: internal/cost/plugin.go, internal/api/server.go
+- **Learnings for future iterations:**
+  - Usage plugins register globally via init() but may need per-server state via SetManager() pattern
+  - record.Failed is the primary indicator of request success in usage records
+  - DefaultCostLimitPlugin() singleton pattern allows server to set manager reference
+---
+
+## 2026-01-09 - US-009
+Thread: https://aresproxy.me/threads/T-019ba1ea-6370-73ea-8fc2-4c29703c904b
+- Created internal/api/handlers/management/cost_limits.go with 4 endpoints
+- GET /v0/management/access-key-limits - returns enabled, default_max_cost, keys array
+- PUT /v0/management/access-key-limits/enabled - enable/disable cost limits
+- PUT /v0/management/access-key-limits/keys/:key - set max cost for specific key
+- POST /v0/management/access-key-limits/keys/:key/reset - reset accumulated cost to 0
+- Added SetCostManager() method to Handler for setting cost manager reference
+- Registered routes in registerManagementRoutes() in server.go
+- Files changed: internal/api/handlers/management/cost_limits.go, internal/api/server.go
+- **Learnings for future iterations:**
+  - Management handlers use package-level var for cost manager reference (costManager var)
+  - SetCostManager() pattern matches SetLogDirectory() for injecting dependencies
+  - Routes registered with both PUT and PATCH for consistency with other endpoints
+  - Response JSON uses snake_case for fields (api_key, max_cost, current_cost)
 ---
