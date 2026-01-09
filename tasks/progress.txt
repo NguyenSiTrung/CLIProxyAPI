@@ -5,6 +5,7 @@
 - Nested config structs are placed after the main Config struct definition
 - Use `go build ./...` to verify backend compiles
 - Cost module (internal/cost/) follows pattern: Calculator struct with sync.RWMutex for thread-safe access
+- Accumulator uses JSON file format for persistence (map[string]float64)
 
 ---
 
@@ -52,7 +53,23 @@ Thread: https://aresproxy.me/threads/T-019ba1d0-75ba-73aa-9281-43edb0276ea5
 - US-001: Add access-key-limits configuration struct
 - US-002: Add config.example.yaml documentation
 - US-003: Create cost calculator module
+- US-004: Create cost accumulator with persistence
 
+---
+
+## 2026-01-09 - US-004
+Thread: https://aresproxy.me/threads/T-019ba1d4-bb71-72ad-80e0-a77347217efe
+- Created internal/cost/accumulator.go with cost tracking per API key
+- Implemented Accumulator struct with map[string]float64 and sync.RWMutex
+- Implemented Add(apiKey, cost), Get(apiKey), Reset(apiKey) methods
+- Implemented GetAll() for retrieving all costs
+- Implemented SaveToFile(path) for JSON persistence
+- Implemented LoadFromFile(path) with graceful handling of missing files
+- Files changed: internal/cost/accumulator.go
+- **Learnings for future iterations:**
+  - Accumulator file format: JSON object with apiKey -> cost (float64)
+  - LoadFromFile returns nil (not error) if file doesn't exist - allows fresh starts
+  - GetAll() returns a copy to prevent external mutation
 ---
 
 ## Notes
