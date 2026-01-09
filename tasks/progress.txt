@@ -10,6 +10,8 @@
 - Server integration: costManager field in Server struct, initialized in NewServer
 - CostManager() getter method on Server provides access to middleware and handlers
 - Data directory uses util.WritablePath() fallback pattern (same as logs)
+- Middleware pattern: Create CostLimitMiddleware(manager) in internal/api/middleware/, register with v1.Use() after AuthMiddleware
+- API key is stored in context as "apiKey" by AuthMiddleware - use c.Get("apiKey") to retrieve
 
 ---
 
@@ -127,4 +129,17 @@ Thread: https://aresproxy.me/threads/T-019ba1dc-4c0e-766c-a944-8b8f8b19ba1c
   - Data directory follows same pattern as logDir (uses util.WritablePath() fallback)
   - CostManager() getter allows middleware to access limit checks
   - Pricing load happens on startup (gracefully fails if server not yet listening)
+---
+
+## 2026-01-09 - US-007
+Thread: https://aresproxy.me/threads/T-019ba1e1-53a3-702a-860f-a5c2fa7e1101
+- Created internal/api/middleware/cost_limit.go with CostLimitMiddleware
+- Middleware checks if cost limits enabled, extracts API key from context, calls manager.CheckLimit
+- Returns 429 with JSON error when limit exceeded (includes masked api_key, current_cost, max_cost, currency)
+- Registered middleware after AuthMiddleware on /v1 and /v1beta route groups
+- Files changed: internal/api/middleware/cost_limit.go, internal/api/server.go
+- **Learnings for future iterations:**
+  - API key stored in gin context as "apiKey" (string) by AuthMiddleware
+  - Use v1.Use() to add middleware after AuthMiddleware in route group
+  - 429 response includes error, message, current_cost, max_cost, currency, api_key (masked)
 ---
