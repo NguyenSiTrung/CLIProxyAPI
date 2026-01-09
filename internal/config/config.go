@@ -105,6 +105,9 @@ type Config struct {
 	// Payload defines default and override rules for provider payload parameters.
 	Payload PayloadConfig `yaml:"payload" json:"payload"`
 
+	// AccessKeyLimits configures per-access-key cost limits.
+	AccessKeyLimits AccessKeyLimits `yaml:"access-key-limits" json:"access-key-limits"`
+
 	// Telegram configures the Telegram bot for server monitoring.
 	Telegram TelegramConfig `yaml:"telegram" json:"telegram"`
 
@@ -121,6 +124,27 @@ type TelegramConfig struct {
 	AllowedChatIDs []int64 `yaml:"allowed-chat-ids" json:"allowed-chat-ids"`
 	// ServerURL is the public URL of your proxy server (for docs links).
 	ServerURL string `yaml:"server-url" json:"server-url"`
+}
+
+// AccessKeyLimits configures per-access-key cost limits for blocking requests
+// when accumulated costs exceed the configured maximum.
+type AccessKeyLimits struct {
+	// Enabled controls whether cost limit enforcement is active.
+	Enabled bool `yaml:"enabled" json:"enabled"`
+	// DefaultMaxCost is the default maximum cost for keys not explicitly configured.
+	// A value of 0 means unlimited (no limit enforced).
+	DefaultMaxCost float64 `yaml:"default-max-cost" json:"default-max-cost"`
+	// Keys defines per-key cost limit overrides.
+	Keys []AccessKeyLimit `yaml:"keys" json:"keys"`
+}
+
+// AccessKeyLimit defines a cost limit for a specific API key.
+type AccessKeyLimit struct {
+	// APIKey is the access key identifier (from top-level api-keys).
+	APIKey string `yaml:"api-key" json:"api-key"`
+	// MaxCost is the maximum accumulated cost before requests are blocked.
+	// A value of 0 means unlimited (no limit enforced for this key).
+	MaxCost float64 `yaml:"max-cost" json:"max-cost"`
 }
 
 // UsageAutoBackupConfig holds the usage statistics auto-backup configuration.
