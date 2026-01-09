@@ -6,6 +6,7 @@
 - Use `go build ./...` to verify backend compiles
 - Cost module (internal/cost/) follows pattern: Calculator struct with sync.RWMutex for thread-safe access
 - Accumulator uses JSON file format for persistence (map[string]float64)
+- Manager uses coreusage.Detail from sdk/cliproxy/usage for token details
 
 ---
 
@@ -54,6 +55,7 @@ Thread: https://aresproxy.me/threads/T-019ba1d0-75ba-73aa-9281-43edb0276ea5
 - US-002: Add config.example.yaml documentation
 - US-003: Create cost calculator module
 - US-004: Create cost accumulator with persistence
+- US-005: Create cost limit manager
 
 ---
 
@@ -88,3 +90,21 @@ Story breakdown:
 Quality checks:
 - Go build: `go build ./...` to verify backend compiles
 - Lint: Check for any linting errors
+
+## 2026-01-09 - US-005
+Thread: https://aresproxy.me/threads/T-019ba1d7-b825-7249-bdf4-b9e183b8274e
+- Created internal/cost/manager.go combining config, calculator, and accumulator
+- Implemented Manager struct with sync.RWMutex for thread-safe config access
+- Implemented NewManager() that loads existing costs from data directory
+- Implemented IsEnabled(), SetEnabled() for config access
+- Implemented GetLimit(), SetLimit(), CheckLimit() for limit management
+- Implemented RecordUsage() that calculates cost and accumulates it
+- Implemented ResetKey() and GetAllLimits() for key management
+- Auto-saves accumulator after each RecordUsage call
+- Files changed: internal/cost/manager.go
+- **Learnings for future iterations:**
+  - Manager imports coreusage.Detail from sdk/cliproxy/usage package
+  - Accumulator file stored as cost_accumulator.json in data directory
+  - CheckLimit returns (allowed, current, limit) tuple for middleware use
+  - GetAllLimits returns []KeyLimitInfo slice (not map) with all keys having limits or costs
+---

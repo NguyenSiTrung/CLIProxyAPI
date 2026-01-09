@@ -24,6 +24,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/api/modules"
 	ampmodule "github.com/router-for-me/CLIProxyAPI/v6/internal/api/modules/amp"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/cost"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/logging"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/managementasset"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/usage"
@@ -169,6 +170,9 @@ type Server struct {
 	keepAliveOnTimeout func()
 	keepAliveHeartbeat chan struct{}
 	keepAliveStop      chan struct{}
+
+	// costManager manages cost limits for API keys
+	costManager *cost.Manager
 }
 
 // NewServer creates and initializes a new API server instance.
@@ -265,6 +269,19 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 	}
 	s.mgmt.SetLogDirectory(logDir)
 	s.localPassword = optionState.localPassword
+
+	// Initialize cost manager for access key cost limits
+	dataDir := s.currentPath
+	if base := util.WritablePath(); base != "" {
+		dataDir = base
+	}
+	s.costManager = cost.NewManager(cfg, dataDir)
+	// Load pricing data from /model-pricing endpoint (use defaults if unavailable)
+	if s.costManager.Calculator() != nil {
+		if err := s.costManager.Calculator().LoadPricing(fmt.Sprintf("http://%s:%d", cfg.Host, cfg.Port)); err != nil {
+			log.Debugf("cost calculator: using default pricing (unable to load from endpoint: %v)", err)
+		}
+	}
 
 	// Setup routes
 	s.setupRoutes()
@@ -1126,6 +1143,15 @@ func (s *Server) SetWebsocketAuthChangeHandler(fn func(bool, bool)) {
 		return
 	}
 	s.wsAuthChanged = fn
+}
+
+// CostManager returns the cost limit manager for the server.
+// This allows middleware and handlers to access cost limit functionality.
+func (s *Server) CostManager() *cost.Manager {
+	if s == nil {
+		return nil
+	}
+	return s.costManager
 }
 
 // (management handlers moved to internal/api/handlers/management)
