@@ -19,6 +19,9 @@ import {
 let requestsChartInstance = null;
 let tokensChartInstance = null;
 
+// Cost limits cache
+let costLimitsCache = null;
+
 // Default pricing for well-known models (prices per 1M tokens in USD)
 const DEFAULT_MODEL_PRICING = {
   // OpenAI Models
@@ -95,6 +98,31 @@ async function loadPricingConfig() {
 }
 
 /**
+ * Load cost limits data from server
+ */
+async function loadCostLimitsData() {
+  try {
+    const data = await api('GET', '/access-key-limits');
+    costLimitsCache = data;
+    return data;
+  } catch (e) {
+    console.error('Failed to load cost limits:', e);
+    costLimitsCache = { enabled: false, keys: [] };
+    return costLimitsCache;
+  }
+}
+
+/**
+ * Get cost limit info for an API key
+ */
+function getCostLimitInfo(apiKey) {
+  if (!costLimitsCache || !costLimitsCache.enabled || !costLimitsCache.keys) {
+    return null;
+  }
+  return costLimitsCache.keys.find(k => k.api_key === apiKey) || null;
+}
+
+/**
  * Format numbers with appropriate suffixes
  */
 function formatNumber(num, decimals = 1) {
@@ -158,7 +186,7 @@ export async function loadUsageStats() {
     refreshBtn.disabled = true;
   }
 
-  await loadPricingConfig();
+  await Promise.all([loadPricingConfig(), loadCostLimitsData()]);
 
   try {
     const d = await api('GET', '/usage');
@@ -419,6 +447,27 @@ function updateUsageCosts(usageData, modelUsage) {
 }
 
 /**
+ * Get usage percentage bar HTML for cost limits
+ */
+function getCostLimitBarHtml(currentCost, maxCost) {
+  if (!maxCost || maxCost === 0) {
+    return '';
+  }
+  const percentage = Math.min((currentCost / maxCost) * 100, 100);
+  let colorClass = 'usage-green';
+  if (percentage >= 90) {
+    colorClass = 'usage-red';
+  } else if (percentage >= 70) {
+    colorClass = 'usage-yellow';
+  }
+  return `
+    <div class="usage-bar-container" style="width:60px;height:16px">
+      <div class="usage-bar ${colorClass}" style="width:${percentage}%"></div>
+      <span class="usage-text" style="font-size:9px">${percentage.toFixed(0)}%</span>
+    </div>`;
+}
+
+/**
  * Render provider statistics
  */
 function renderProviderStats(providerUsage) {
@@ -441,21 +490,43 @@ function renderProviderStats(providerUsage) {
     return;
   }
 
-  providerContainer.innerHTML = '<div class="config-settings-list">' + pEntries.map(([name, stats], idx) => `
-    <div class="config-setting-item provider-clickable" style="padding:12px 16px;transition:all 0.2s;cursor:pointer" data-provider-key="${escapeHtml(name)}" data-provider-idx="${idx}">
+  providerContainer.innerHTML = '<div class="config-settings-list">' + pEntries.map(([name, stats], idx) => {
+    const limitInfo = getCostLimitInfo(name);
+    const isLimitExceeded = limitInfo && limitInfo.max_cost > 0 && limitInfo.current_cost >= limitInfo.max_cost;
+    const hasLimit = limitInfo && limitInfo.max_cost > 0;
+    
+    let limitBadgeHtml = '';
+    if (isLimitExceeded) {
+      limitBadgeHtml = '<span class="badge" style="background:rgba(248,113,113,0.2);color:var(--accent-red);font-size:9px;padding:2px 6px;margin-left:6px">Limit Exceeded</span>';
+    }
+    
+    let limitBarHtml = '';
+    if (hasLimit) {
+      limitBarHtml = getCostLimitBarHtml(limitInfo.current_cost, limitInfo.max_cost);
+    }
+    
+    let costDisplayHtml = `<span class="badge" style="background:rgba(251,191,36,0.15);color:var(--accent-yellow);font-weight:600">$${stats.cost.toFixed(4)}</span>`;
+    if (hasLimit) {
+      costDisplayHtml = `<span class="badge" style="background:rgba(251,191,36,0.15);color:var(--accent-yellow);font-weight:600">$${stats.cost.toFixed(4)} / $${limitInfo.max_cost.toFixed(2)}</span>`;
+    }
+    
+    return `
+    <div class="config-setting-item provider-clickable${isLimitExceeded ? ' provider-limit-exceeded' : ''}" style="padding:12px 16px;transition:all 0.2s;cursor:pointer${isLimitExceeded ? ';background:rgba(248,113,113,0.08)' : ''}" data-provider-key="${escapeHtml(name)}" data-provider-idx="${idx}">
       <div class="config-setting-info">
         <div class="config-setting-text">
-          <h4 style="font-family:monospace;font-size:13px" title="${escapeHtml(name)}">${escapeHtml(name.length > 25 ? name.slice(0, 22) + '...' : name)}</h4>
+          <h4 style="font-family:monospace;font-size:13px" title="${escapeHtml(name)}">${escapeHtml(name.length > 25 ? name.slice(0, 22) + '...' : name)}${limitBadgeHtml}</h4>
           <p>${formatNumber(stats.tokens)} tokens</p>
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
-        <span class="badge" style="background:rgba(251,191,36,0.15);color:var(--accent-yellow);font-weight:600">$${stats.cost.toFixed(4)}</span>
+        ${limitBarHtml}
+        ${costDisplayHtml}
         <span class="badge badge-purple">${stats.requests.toLocaleString()}</span>
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
       </div>
     </div>
-  `).join('') + '</div>';
+  `;
+  }).join('') + '</div>';
 
   providerContainer.querySelectorAll('.provider-clickable').forEach(el => {
     el.addEventListener('click', () => {
