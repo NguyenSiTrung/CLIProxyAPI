@@ -1,0 +1,18 @@
+## Codebase Patterns
+- Frontend JS modules are in static/js/pages/ with corresponding exports via keysModule
+- The keysModule object is exposed on window for HTML onclick handlers
+- crypto.getRandomValues() is available in browser context for secure randomness
+- Go build: `go build ./...` to verify backend compiles
+
+---
+
+## 2026-01-09 - US-001
+Thread: https://aresproxy.me/threads/T-019ba103-46a9-7705-b6af-0ebf96ac7153
+- Implemented generateRandomKey() function in static/js/pages/keys.js
+- Function generates 32-character alphanumeric string using crypto.getRandomValues()
+- Exported via keysModule for modal use
+- Files changed: static/js/pages/keys.js
+- **Learnings for future iterations:**
+  - The PRD branch should be based on feature/proxy-server, not main (main doesn't have the static/js/pages structure)
+  - keysModule exports need to be updated when adding new functions
+---
