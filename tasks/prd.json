@@ -1,17 +1,18 @@
 {
   "project": "CLIProxyAPI",
-  "branchName": "ralph/generate-random-access-key",
-  "description": "Generate Random API Key for Access Keys - Add a button to generate secure random alphanumeric keys when adding Access Keys",
+  "branchName": "ralph/access-key-cost-limits",
+  "description": "Access Key Cost Limits - Set maximum cost limits per access key with hard 429 blocking and manual reset",
   "userStories": [
     {
       "id": "US-001",
-      "title": "Implement generateRandomKey function",
-      "description": "As a developer, I need a function that generates a cryptographically secure 32-character alphanumeric key.",
+      "title": "Add access-key-limits configuration struct",
+      "description": "As a developer, I need a configuration struct to store cost limit settings separate from api-keys.",
       "acceptanceCriteria": [
-        "Add generateRandomKey() function to static/js/pages/keys.js",
-        "Function returns a 32-character string using characters A-Z, a-z, 0-9",
-        "Function uses crypto.getRandomValues() for secure randomness",
-        "Function is exported for use in the modal",
+        "Add AccessKeyLimits struct to internal/config/config.go",
+        "Struct has fields: Enabled (bool), DefaultMaxCost (float64), Keys ([]AccessKeyLimit)",
+        "AccessKeyLimit struct has: APIKey (string), MaxCost (float64)",
+        "Add AccessKeyLimits field to Config struct with yaml tag 'access-key-limits'",
+        "Config loads correctly from YAML with new section",
         "Typecheck passes"
       ],
       "priority": 1,
@@ -20,18 +21,14 @@
     },
     {
       "id": "US-002",
-      "title": "Add Generate button to Access Key modal",
-      "description": "As a user, I want to see a Generate button next to the API key input field when adding an Access Key.",
+      "title": "Add config.example.yaml documentation",
+      "description": "As a user, I need example configuration to understand how to use cost limits.",
       "acceptanceCriteria": [
-        "Modify openAddKeyModal() to conditionally render Generate button when type === 'access'",
-        "Button appears next to the API Key input field",
-        "Button has a refresh/generate icon (SVG)",
-        "Button uses existing btn btn-secondary styling",
-        "Button does NOT appear for Gemini, Claude, or Codex key modals",
-        "Clicking button calls generateRandomKey() and sets input value",
-        "Input field gains focus after key generation",
-        "Typecheck passes",
-        "Verify in browser using dev-browser skill"
+        "Add commented access-key-limits section to config.example.yaml",
+        "Include enabled, default-max-cost, and keys array with examples",
+        "Add explanatory comments for each field",
+        "Show 2-3 example keys with different limits",
+        "Typecheck passes"
       ],
       "priority": 2,
       "passes": true,
@@ -39,17 +36,213 @@
     },
     {
       "id": "US-003",
-      "title": "Add visual feedback on key generation",
-      "description": "As a user, I want visual feedback when a key is generated so I know the action was successful.",
+      "title": "Create cost calculator module",
+      "description": "As the system, I need to calculate request cost using model pricing data.",
       "acceptanceCriteria": [
-        "Input field briefly highlights (e.g., border color change) when key is generated",
-        "Generated key is immediately visible in the input field",
-        "Animation/highlight uses CSS transition (no jarring effects)",
+        "Create internal/cost/calculator.go",
+        "Add Calculator struct with pricing map and mutex",
+        "Implement LoadPricing() that fetches from /model-pricing endpoint",
+        "Implement CalculateCost(model string, inputTokens, outputTokens, cachedTokens int64) float64",
+        "Cost formula: (input/1M * inputPrice) + (output/1M * outputPrice) + (cached/1M * cachedPrice)",
+        "Add fallback DEFAULT_MODEL_PRICING map matching usage.js defaults",
+        "Typecheck passes"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-004",
+      "title": "Create cost accumulator with persistence",
+      "description": "As the system, I need to track accumulated cost per API key with file persistence.",
+      "acceptanceCriteria": [
+        "Create internal/cost/accumulator.go",
+        "Add Accumulator struct with map[string]float64 and sync.RWMutex",
+        "Implement Add(apiKey string, cost float64) to increment accumulated cost",
+        "Implement Get(apiKey string) float64 to retrieve current cost",
+        "Implement Reset(apiKey string) to clear accumulated cost to 0",
+        "Implement SaveToFile(path string) error for persistence",
+        "Implement LoadFromFile(path string) error to restore on startup",
+        "File format: JSON map of apiKey to cost",
+        "Typecheck passes"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-005",
+      "title": "Create cost limit manager",
+      "description": "As the system, I need a manager that combines config, calculator, and accumulator.",
+      "acceptanceCriteria": [
+        "Create internal/cost/manager.go",
+        "Add Manager struct holding config, calculator, accumulator",
+        "Implement NewManager(cfg *config.Config, dataDir string) *Manager",
+        "Implement IsEnabled() bool from config",
+        "Implement GetLimit(apiKey string) float64 (returns key limit or default)",
+        "Implement CheckLimit(apiKey string) (allowed bool, current float64, limit float64)",
+        "Implement RecordUsage(apiKey, model string, tokens usage.Detail) to calculate and accumulate cost",
+        "Implement ResetKey(apiKey string) error",
+        "Implement GetAllLimits() map with current costs and limits for all keys",
+        "Auto-save accumulator after each RecordUsage call",
+        "Typecheck passes"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-006",
+      "title": "Integrate cost manager with server startup",
+      "description": "As the system, I need the cost manager initialized on server start.",
+      "acceptanceCriteria": [
+        "Initialize cost.Manager in cmd/server/main.go or internal/api/server.go",
+        "Load accumulated costs from persistence file on startup",
+        "Load pricing data from /model-pricing endpoint (or use defaults)",
+        "Store manager reference accessible to middleware and handlers",
+        "Typecheck passes"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-007",
+      "title": "Create cost limit enforcement middleware",
+      "description": "As an administrator, I want requests blocked when a key exceeds its limit.",
+      "acceptanceCriteria": [
+        "Create internal/api/middleware/cost_limit.go",
+        "Middleware checks if cost limits feature is enabled",
+        "If disabled, pass through without checks",
+        "Extract API key from request context (after auth middleware)",
+        "Call manager.CheckLimit(apiKey) to verify",
+        "If limit exceeded, return 429 with JSON: {error, message, current_cost, max_cost, currency}",
+        "Mask API key in response (show last 4 chars only)",
+        "Register middleware after auth middleware in request chain",
+        "Typecheck passes"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-008",
+      "title": "Record usage cost after successful requests",
+      "description": "As the system, I need to accumulate cost after each successful API response.",
+      "acceptanceCriteria": [
+        "Hook into existing usage.Record publishing flow",
+        "After usage record is created with token counts, call manager.RecordUsage()",
+        "Only record cost for successful requests (not failed)",
+        "Cost accumulation happens in usage plugin or post-response handler",
+        "Typecheck passes"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-009",
+      "title": "Add management API endpoints for cost limits",
+      "description": "As an administrator, I need API endpoints to manage cost limits.",
+      "acceptanceCriteria": [
+        "Create internal/api/handlers/management/cost_limits.go",
+        "GET /v0/management/access-key-limits returns {enabled, default_max_cost, keys: [{api_key, max_cost, current_cost}]}",
+        "PUT /v0/management/access-key-limits/enabled with body {enabled: bool}",
+        "PUT /v0/management/access-key-limits/keys/:key with body {max_cost: float}",
+        "POST /v0/management/access-key-limits/keys/:key/reset resets accumulated cost",
+        "All endpoints require management key authentication",
+        "Register routes in management router",
+        "Typecheck passes"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-010",
+      "title": "Add global toggle in management UI settings",
+      "description": "As an administrator, I want to enable/disable cost limits from the UI.",
+      "acceptanceCriteria": [
+        "Add 'Cost Limits' toggle switch in Settings section of custom-management.html",
+        "Toggle fetches current state from GET /v0/management/access-key-limits",
+        "Toggle change calls PUT /v0/management/access-key-limits/enabled",
+        "Toast notification confirms enable/disable",
+        "Toggle reflects current state on page load",
         "Typecheck passes",
         "Verify in browser using dev-browser skill"
       ],
-      "priority": 3,
-      "passes": true,
+      "priority": 10,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-011",
+      "title": "Add Cost Limits tab to Keys page",
+      "description": "As an administrator, I want a dedicated tab to manage per-key cost limits.",
+      "acceptanceCriteria": [
+        "Add 'Cost Limits' tab alongside existing tabs in Keys page",
+        "Tab shows list of all access keys with columns: Key (masked), Max Cost, Current Cost, Usage %",
+        "Usage percentage shown as colored progress bar (green <70%, yellow 70-90%, red >90%)",
+        "Keys exceeding limit show 'Blocked' badge",
+        "Keys with max_cost=0 show 'Unlimited'",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 11,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-012",
+      "title": "Add edit limit modal in UI",
+      "description": "As an administrator, I want to set/change cost limits per key via modal.",
+      "acceptanceCriteria": [
+        "Add 'Edit' button per row in Cost Limits tab",
+        "Clicking Edit opens modal with current max_cost value",
+        "Modal has input field for max cost (number, 2 decimal places)",
+        "Modal has 'Unlimited' checkbox that sets max_cost to 0",
+        "Save calls PUT /v0/management/access-key-limits/keys/:key",
+        "Toast confirms save success",
+        "List refreshes after save",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 12,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-013",
+      "title": "Add reset button with confirmation",
+      "description": "As an administrator, I want to reset a key's accumulated cost via UI.",
+      "acceptanceCriteria": [
+        "Add 'Reset' button per row in Cost Limits tab",
+        "Clicking Reset shows confirmation dialog: 'Reset accumulated cost for ****XXXX to $0.00?'",
+        "Confirm calls POST /v0/management/access-key-limits/keys/:key/reset",
+        "Toast confirms reset success",
+        "List refreshes showing $0.00 current cost",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 13,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-014",
+      "title": "Display cost limits in Usage Stats page",
+      "description": "As an administrator, I want to see cost vs limit in Usage Stats.",
+      "acceptanceCriteria": [
+        "Enhance provider/API key breakdown in Usage Stats to show limit info",
+        "Each row shows: current cost, max cost (if set), percentage bar",
+        "Keys exceeding limit show 'Limit Exceeded' badge in red",
+        "Keys without limits show cost only, no percentage bar",
+        "Fetch limit data from GET /v0/management/access-key-limits",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 14,
+      "passes": false,
       "notes": ""
     }
   ]
