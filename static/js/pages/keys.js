@@ -174,13 +174,27 @@ export function copyKey(text) {
 
 /**
  * Handle Generate button click - generates random key and sets input value
+ * Provides visual feedback via highlight animation
  */
 export function handleGenerateKey() {
   const key = generateRandomKey();
   const input = document.getElementById('newKeyValue');
   if (input) {
     input.value = key;
+    
+    // Remove class first to reset animation if button is clicked multiple times
+    input.classList.remove('key-generated');
+    // Force reflow to restart animation
+    void input.offsetWidth;
+    // Add highlight class for visual feedback
+    input.classList.add('key-generated');
+    
     input.focus();
+    
+    // Remove highlight class after animation completes (keep subtle glow)
+    setTimeout(() => {
+      input.classList.remove('key-generated');
+    }, 2000);
   }
 }
 
