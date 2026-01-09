@@ -7,6 +7,9 @@
 - Cost module (internal/cost/) follows pattern: Calculator struct with sync.RWMutex for thread-safe access
 - Accumulator uses JSON file format for persistence (map[string]float64)
 - Manager uses coreusage.Detail from sdk/cliproxy/usage for token details
+- Server integration: costManager field in Server struct, initialized in NewServer
+- CostManager() getter method on Server provides access to middleware and handlers
+- Data directory uses util.WritablePath() fallback pattern (same as logs)
 
 ---
 
@@ -56,6 +59,7 @@ Thread: https://aresproxy.me/threads/T-019ba1d0-75ba-73aa-9281-43edb0276ea5
 - US-003: Create cost calculator module
 - US-004: Create cost accumulator with persistence
 - US-005: Create cost limit manager
+- US-006: Integrate cost manager with server startup
 
 ---
 
@@ -107,4 +111,20 @@ Thread: https://aresproxy.me/threads/T-019ba1d7-b825-7249-bdf4-b9e183b8274e
   - Accumulator file stored as cost_accumulator.json in data directory
   - CheckLimit returns (allowed, current, limit) tuple for middleware use
   - GetAllLimits returns []KeyLimitInfo slice (not map) with all keys having limits or costs
+---
+
+## 2026-01-09 - US-006
+Thread: https://aresproxy.me/threads/T-019ba1dc-4c0e-766c-a944-8b8f8b19ba1c
+- Integrated cost.Manager with server startup in internal/api/server.go
+- Added costManager field to Server struct
+- Imported internal/cost package
+- Initialized cost.Manager in NewServer with data directory for persistence
+- Added CostManager() getter method for middleware and handler access
+- Attempts to load pricing from /model-pricing endpoint (falls back to defaults)
+- Files changed: internal/api/server.go
+- **Learnings for future iterations:**
+  - Cost manager initialized after management handler, before routes
+  - Data directory follows same pattern as logDir (uses util.WritablePath() fallback)
+  - CostManager() getter allows middleware to access limit checks
+  - Pricing load happens on startup (gracefully fails if server not yet listening)
 ---
