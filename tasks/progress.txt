@@ -4,6 +4,7 @@
 - Config structs in internal/config/config.go use yaml/json tags with kebab-case names
 - Nested config structs are placed after the main Config struct definition
 - Use `go build ./...` to verify backend compiles
+- Cost module (internal/cost/) follows pattern: Calculator struct with sync.RWMutex for thread-safe access
 
 ---
 
@@ -19,11 +20,6 @@ Thread: https://aresproxy.me/threads/T-019ba1c8-734f-71a3-887d-70e59e34e1d6
   - AccessKeyLimit has APIKey, MaxCost fields
 ---
 
-## Current Story: US-002
-## Status: Not Started
-
----
-
 ## 2026-01-09 - US-002
 Thread: https://aresproxy.me/threads/T-019ba1cd-339b-705e-b202-920cb52c0a44
 - Added commented access-key-limits section to config.example.yaml
@@ -36,10 +32,26 @@ Thread: https://aresproxy.me/threads/T-019ba1cd-339b-705e-b202-920cb52c0a44
   - Place access-key-limits after api-keys section since they're related
 ---
 
+## 2026-01-09 - US-003
+Thread: https://aresproxy.me/threads/T-019ba1d0-75ba-73aa-9281-43edb0276ea5
+- Created internal/cost/calculator.go with cost calculation functionality
+- Added Calculator struct with sync.RWMutex for thread-safe pricing map access
+- Implemented LoadPricing() to fetch from /model-pricing endpoint with fallback to defaults
+- Implemented CalculateCost(model, inputTokens, outputTokens, cachedTokens) using formula from usage.js
+- Added DefaultModelPricing map matching usage.js defaults (OpenAI, Anthropic, Google, DeepSeek, Mistral)
+- Files changed: internal/cost/calculator.go
+- **Learnings for future iterations:**
+  - Cost formula: (nonCachedInput/1M * inputPrice) + (output/1M * outputPrice) + (cached/1M * cachedPrice)
+  - If cached_input price not set, default to 10% of input price
+  - Use fuzzy matching for model names (check contains in both directions)
+  - ModelPricing struct mirrors the JSON structure from /model-pricing endpoint
+---
+
 ## Completed Stories
 
 - US-001: Add access-key-limits configuration struct
 - US-002: Add config.example.yaml documentation
+- US-003: Create cost calculator module
 
 ---
 
