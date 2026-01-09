@@ -179,3 +179,71 @@ Thread: https://aresproxy.me/threads/T-019ba1ea-6370-73ea-8fc2-4c29703c904b
   - Routes registered with both PUT and PATCH for consistency with other endpoints
   - Response JSON uses snake_case for fields (api_key, max_cost, current_cost)
 ---
+
+## 2026-01-09 - US-010
+Thread: https://aresproxy.me/threads/T-019ba1f0-a456-74df-bd90-ddfce9deeab7
+- Added Cost Limits toggle switch in Configuration page quick-toggles-grid
+- Created toggleCostLimitsEnabled() function for handling toggle state changes
+- Created loadCostLimitsState() function to fetch current enabled state from API
+- Added CSS for cost icon styling (orange color theme)
+- Toggle calls GET /v0/management/access-key-limits for initial state
+- Toggle change calls PUT /v0/management/access-key-limits/enabled
+- Includes toast notification for enable/disable confirmation
+- Files changed: static/custom-management.html, static/js/pages/config.js, static/css/pages/config.css
+- **Learnings for future iterations:**
+  - Quick toggles in config page use quick-toggle-card pattern with icon, toggle-enhanced label, content, and status
+  - Icon colors are defined in static/css/pages/config.css with .quick-toggle-icon.{name} classes
+  - Cost limits API uses separate endpoint /access-key-limits instead of /config for toggle state
+  - loadCostLimitsState() is called at the end of loadConfig() to load cost limits state on page load
+  - Toggle functions need to be added to configModule export and window bindings for HTML onclick access
+---
+
+## 2026-01-09 - US-011
+Thread: https://aresproxy.me/threads/T-019ba1fa-530b-779e-9c16-284e08a3a6b1
+- Added "Cost Limits" tab alongside existing tabs (Access, Gemini, Claude, Codex) in Keys page
+- Tab shows table with columns: API Key (masked), Max Cost, Current Cost, Usage %
+- Implemented colored progress bar: green (<70%), yellow (70-90%), red (>90%)
+- Keys exceeding limit show 'Blocked' badge with red styling
+- Keys with max_cost=0 show 'Unlimited' in max cost column
+- Added loadCostLimits() and renderCostLimitsList() functions in keys.js
+- Added CSS for cost-limits-table, usage-bar, badge-blocked in keys.css
+- Tab auto-loads cost limits data when switched to
+- Files changed: static/custom-management.html, static/js/pages/keys.js, static/css/pages/keys.css
+- **Learnings for future iterations:**
+  - Keys page tabs use data-keytab attribute and keytab-{id} for content divs
+  - Tab switching handled in setupKeysTabHandlers() - can add conditional loading for specific tabs
+  - Cost limits API returns {enabled, default_max_cost, keys: [{api_key, max_cost, current_cost}]}
+  - Progress bar colors: usage-green (<70%), usage-yellow (70-90%), usage-red (>=90%)
+---
+
+## 2026-01-09 - US-012 & US-013
+Thread: https://aresproxy.me/threads/T-019ba200-fab1-746d-bdf5-6bb0dc949313
+- US-012: Edit limit modal with max cost input and unlimited checkbox
+- US-013: Reset button with confirmation dialog
+- Both features implemented in previous iteration (code already in keys.js)
+- openEditLimitModal() shows modal with max cost input and unlimited checkbox
+- saveEditLimit() calls PUT /access-key-limits/keys/:key to update max cost
+- confirmResetCost() shows confirmation dialog with masked key display
+- resetCost() calls POST /access-key-limits/keys/:key/reset
+- Files changed: None (already implemented)
+- **Learnings for future iterations:**
+  - Edit modal disables input when unlimited checkbox is checked
+  - Reset confirmation shows masked key with ****XXXX format
+---
+
+## 2026-01-09 - US-014
+Thread: https://aresproxy.me/threads/T-019ba200-fab1-746d-bdf5-6bb0dc949313
+- Enhanced provider stats in Usage Stats page to show cost limit info
+- Added costLimitsCache and loadCostLimitsData() to fetch limits data
+- Added getCostLimitInfo() to look up limit info by API key
+- Added getCostLimitBarHtml() to render progress bar for cost limits
+- Provider rows show: current cost vs max cost, percentage bar, "Limit Exceeded" badge
+- Keys exceeding limit have red background highlight
+- Keys without limits show cost only (no percentage bar)
+- Files changed: static/js/pages/usage.js
+- **Learnings for future iterations:**
+  - Cost limits data is loaded alongside pricing config in loadUsageStats()
+  - getCostLimitInfo() returns null if limits not enabled or key not found
+  - Provider stats use inline styles for limit exceeded highlighting
+  - Progress bar uses same color classes as keys.css (usage-green, usage-yellow, usage-red)
+---
