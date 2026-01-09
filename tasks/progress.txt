@@ -30,3 +30,17 @@ Thread: https://aresproxy.me/threads/T-019ba107-87df-779a-b745-afd4dc273225
   - dev-browser skill was not available for browser verification
   - Modal content uses inline styles for flex layout when adding buttons next to inputs
 ---
+
+## 2026-01-09 - US-003
+Thread: https://aresproxy.me/threads/T-019ba10b-7cb4-73df-a4fa-a7618e98dd7a
+- Added visual feedback animation when generating a random key
+- Added `.key-generated` CSS class with `keyGeneratedPulse` animation to keys.css
+- Modified `handleGenerateKey()` to add/remove the highlight class with proper animation restart logic
+- Animation uses cyan→green transition for visual polish matching the design system
+- Highlight persists briefly (2 seconds) then fades gracefully
+- Files changed: static/js/pages/keys.js, static/css/pages/keys.css
+- **Learnings for future iterations:**
+  - Use `void element.offsetWidth` to force reflow and restart CSS animations
+  - Use setTimeout to remove temporary visual feedback classes after animation duration
+  - CSS custom properties (--accent-green, --accent-cyan) are used consistently throughout the design system
+---
