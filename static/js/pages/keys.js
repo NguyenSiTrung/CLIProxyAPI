@@ -173,10 +173,31 @@ export function copyKey(text) {
 }
 
 /**
+ * Handle Generate button click - generates random key and sets input value
+ */
+export function handleGenerateKey() {
+  const key = generateRandomKey();
+  const input = document.getElementById('newKeyValue');
+  if (input) {
+    input.value = key;
+    input.focus();
+  }
+}
+
+/**
  * Open modal to add a new key
  */
 export function openAddKeyModal(type) {
   const typeInfo = getKeyTypeInfo(type);
+  const isAccessKey = type === 'access';
+  
+  // Generate button HTML - only for access keys
+  const generateButtonHtml = isAccessKey ? `
+    <button type="button" class="btn btn-secondary" onclick="window.keysModule.handleGenerateKey()" title="Generate random key" style="margin-left: 8px; padding: 8px 12px;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+    </button>` : '';
   
   const content = `
     <div class="key-format-hint">
@@ -187,7 +208,10 @@ export function openAddKeyModal(type) {
     </div>
     <div class="form-group">
       <label>API Key</label>
-      <input type="text" id="newKeyValue" class="form-input" placeholder="${typeInfo.prefix ? 'e.g. ' + typeInfo.prefix + '...' : 'Enter your API key'}" autocomplete="off" spellcheck="false">
+      <div style="display: flex; align-items: center;">
+        <input type="text" id="newKeyValue" class="form-input" placeholder="${typeInfo.prefix ? 'e.g. ' + typeInfo.prefix + '...' : 'Enter your API key'}" autocomplete="off" spellcheck="false" style="flex: 1;">
+        ${generateButtonHtml}
+      </div>
     </div>`;
 
   const footer = `
@@ -305,7 +329,8 @@ export const keysModule = {
   toggleKeyReveal,
   copyKey,
   setupKeysTabHandlers,
-  generateRandomKey
+  generateRandomKey,
+  handleGenerateKey
 };
 
 // Expose functions to window for HTML onclick handlers

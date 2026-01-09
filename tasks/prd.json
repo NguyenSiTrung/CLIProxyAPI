@@ -1,0 +1,56 @@
+{
+  "project": "CLIProxyAPI",
+  "branchName": "ralph/generate-random-access-key",
+  "description": "Generate Random API Key for Access Keys - Add a button to generate secure random alphanumeric keys when adding Access Keys",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Implement generateRandomKey function",
+      "description": "As a developer, I need a function that generates a cryptographically secure 32-character alphanumeric key.",
+      "acceptanceCriteria": [
+        "Add generateRandomKey() function to static/js/pages/keys.js",
+        "Function returns a 32-character string using characters A-Z, a-z, 0-9",
+        "Function uses crypto.getRandomValues() for secure randomness",
+        "Function is exported for use in the modal",
+        "Typecheck passes"
+      ],
+      "priority": 1,
+      "passes": true,
+      "notes": ""
+    },
+    {
+      "id": "US-002",
+      "title": "Add Generate button to Access Key modal",
+      "description": "As a user, I want to see a Generate button next to the API key input field when adding an Access Key.",
+      "acceptanceCriteria": [
+        "Modify openAddKeyModal() to conditionally render Generate button when type === 'access'",
+        "Button appears next to the API Key input field",
+        "Button has a refresh/generate icon (SVG)",
+        "Button uses existing btn btn-secondary styling",
+        "Button does NOT appear for Gemini, Claude, or Codex key modals",
+        "Clicking button calls generateRandomKey() and sets input value",
+        "Input field gains focus after key generation",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": ""
+    },
+    {
+      "id": "US-003",
+      "title": "Add visual feedback on key generation",
+      "description": "As a user, I want visual feedback when a key is generated so I know the action was successful.",
+      "acceptanceCriteria": [
+        "Input field briefly highlights (e.g., border color change) when key is generated",
+        "Generated key is immediately visible in the input field",
+        "Animation/highlight uses CSS transition (no jarring effects)",
+        "Typecheck passes",
+        "Verify in browser using dev-browser skill"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": ""
+    }
+  ]
+}
