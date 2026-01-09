@@ -603,6 +603,192 @@ export async function resetCost(apiKey) {
   }
 }
 
+/**
+ * Open modal to add a new cost limit (shows key dropdown)
+ */
+export async function openAddLimitModal() {
+  try {
+    // Fetch both access keys and existing limits in parallel
+    const [keysResponse, limitsResponse] = await Promise.all([
+      api('GET', '/api-keys').catch(() => ({})),
+      api('GET', '/access-key-limits/keys').catch(() => ({}))
+    ]);
+
+    const accessKeys = keysResponse['api-keys'] || [];
+    const existingLimits = limitsResponse.keys || [];
+
+    if (!accessKeys.length) {
+      toast('No access keys found. Add an access key first.', 'error');
+      return;
+    }
+
+    // Build map of existing limits (apiKey -> limitData)
+    const limitsMap = {};
+    existingLimits.forEach(limit => {
+      limitsMap[limit.api_key] = limit;
+    });
+
+    // Build dropdown options
+    const options = accessKeys.map(key => {
+      const maskedKey = maskApiKey(key);
+      const hasLimit = limitsMap[key] !== undefined;
+      const indicator = hasLimit ? ' ✓ has limit' : '';
+      return `<option value="${key}" data-has-limit="${hasLimit}">${maskedKey}${indicator}</option>`;
+    }).join('');
+
+    const content = `
+      <div class="form-group">
+        <label>Select Access Key</label>
+        <select id="limitKeySelect" class="form-input">
+          <option value="">-- Select a key --</option>
+          ${options}
+        </select>
+      </div>
+      <div id="limitKeyHint" class="key-format-hint" style="display:none;">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+        </svg>
+        <span id="limitKeyHintText"></span>
+      </div>`;
+
+    const footer = `
+      <button class="btn btn-secondary" onclick="window.closeModal()">Cancel</button>
+      <button class="btn btn-primary" id="proceedLimitBtn" onclick="window.keysModule.proceedWithLimitSelection()" disabled>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+        Continue
+      </button>`;
+
+    showModal('Add Cost Limit', content, footer);
+
+    // Setup change handler for dropdown
+    const select = document.getElementById('limitKeySelect');
+    select?.addEventListener('change', () => {
+      const selectedKey = select.value;
+      const btn = document.getElementById('proceedLimitBtn');
+      const hint = document.getElementById('limitKeyHint');
+      const hintText = document.getElementById('limitKeyHintText');
+      
+      if (selectedKey) {
+        btn.disabled = false;
+        const hasLimit = limitsMap[selectedKey] !== undefined;
+        if (hasLimit) {
+          hint.style.display = 'flex';
+          hintText.textContent = 'This key already has a limit. You will edit the existing limit.';
+        } else {
+          hint.style.display = 'flex';
+          hintText.textContent = 'This key has no limit. You will create a new limit.';
+        }
+      } else {
+        btn.disabled = true;
+        hint.style.display = 'none';
+      }
+    });
+  } catch (e) {
+    toast('Failed to load keys: ' + e.message, 'error');
+  }
+}
+
+// Store limits map for use in proceedWithLimitSelection
+let _limitsMapCache = null;
+
+/**
+ * Handle proceed button click from add limit modal
+ */
+export async function proceedWithLimitSelection() {
+  const select = document.getElementById('limitKeySelect');
+  const selectedKey = select?.value;
+  
+  if (!selectedKey) {
+    toast('Please select a key', 'error');
+    return;
+  }
+
+  closeModal();
+
+  // Re-fetch limits to check if key has limit
+  try {
+    const limitsResponse = await api('GET', '/access-key-limits/keys').catch(() => ({}));
+    const existingLimits = limitsResponse.keys || [];
+    const limitsMap = {};
+    existingLimits.forEach(limit => {
+      limitsMap[limit.api_key] = limit;
+    });
+
+    const existingLimit = limitsMap[selectedKey];
+    if (existingLimit) {
+      // Open edit modal with existing values
+      openEditLimitModal(selectedKey, existingLimit.max_cost);
+    } else {
+      // Open add modal for new limit
+      openAddLimitForKeyModal(selectedKey);
+    }
+  } catch (e) {
+    toast('Failed: ' + e.message, 'error');
+  }
+}
+
+/**
+ * Open modal to add cost limit for a specific key (no existing limit)
+ */
+export function openAddLimitForKeyModal(apiKey) {
+  const maskedKey = maskApiKey(apiKey);
+  
+  const content = `
+    <div class="form-group">
+      <label>API Key</label>
+      <div class="key-display">${maskedKey}</div>
+    </div>
+    <div class="form-group">
+      <label>Maximum Cost (USD)</label>
+      <input type="number" id="newMaxCost" class="form-input" step="0.01" min="0" value="" placeholder="Enter max cost">
+    </div>
+    <div class="form-group">
+      <label class="checkbox-label">
+        <input type="checkbox" id="newUnlimited" onchange="document.getElementById('newMaxCost').disabled = this.checked; if(this.checked) document.getElementById('newMaxCost').value = '';">
+        <span>Unlimited (no cost limit)</span>
+      </label>
+    </div>`;
+
+  const footer = `
+    <button class="btn btn-secondary" onclick="window.closeModal()">Cancel</button>
+    <button class="btn btn-primary" onclick="window.keysModule.saveNewLimit('${apiKey}')">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      Add Limit
+    </button>`;
+
+  showModal('Add Cost Limit', content, footer);
+  setTimeout(() => document.getElementById('newMaxCost')?.focus(), 100);
+}
+
+/**
+ * Save new cost limit for a key
+ */
+export async function saveNewLimit(apiKey) {
+  const unlimitedEl = document.getElementById('newUnlimited');
+  const maxCostEl = document.getElementById('newMaxCost');
+  
+  const isUnlimited = unlimitedEl?.checked;
+  const maxCost = isUnlimited ? 0 : parseFloat(maxCostEl?.value || '0');
+
+  if (!isUnlimited && (!maxCostEl?.value || maxCost < 0)) {
+    toast('Please enter a valid max cost or select unlimited', 'error');
+    return;
+  }
+
+  try {
+    await api('PUT', `/access-key-limits/keys/${encodeURIComponent(apiKey)}`, { max_cost: maxCost });
+    closeModal();
+    toast('Cost limit added successfully', 'success');
+    loadCostLimits();
+  } catch (e) {
+    toast('Failed: ' + e.message, 'error');
+  }
+}
+
 // Export module interface for global access
 export const keysModule = {
   loadKeys,
@@ -620,7 +806,11 @@ export const keysModule = {
   openEditLimitModal,
   saveEditLimit,
   confirmResetCost,
-  resetCost
+  resetCost,
+  openAddLimitModal,
+  proceedWithLimitSelection,
+  openAddLimitForKeyModal,
+  saveNewLimit
 };
 
 // Expose functions to window for HTML onclick handlers
