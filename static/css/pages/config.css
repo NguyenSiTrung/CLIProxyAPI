@@ -126,6 +126,11 @@
   color: #22d3a0;
 }
 
+.quick-toggle-icon.cost {
+  background: rgba(249, 115, 22, 0.15);
+  color: #f97316;
+}
+
 .quick-toggle-content {
   margin-bottom: 12px;
 }

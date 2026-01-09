@@ -58,6 +58,9 @@ export async function loadConfig() {
     updateSyntaxHighlight();
     hideUnsavedIndicator();
     hideYamlError();
+    
+    // Load cost limits state separately (uses different API endpoint)
+    loadCostLimitsState();
   } catch (e) {
     toast('Failed to load config: ' + e.message, 'error');
   }
@@ -250,6 +253,50 @@ export async function toggleSettingEnhanced(setting, value, inputEl) {
     }
 
     toast(`${setting.replace(/-/g, ' ')} ${value ? 'enabled' : 'disabled'}`, 'success');
+  } catch (e) {
+    inputEl.checked = !value;
+    if (label) label.classList.remove('loading');
+    toast('Failed: ' + e.message, 'error');
+  }
+}
+
+/**
+ * Load cost limits state from API
+ */
+export async function loadCostLimitsState() {
+  try {
+    const data = await api('GET', '/access-key-limits');
+    const enabled = data.enabled || false;
+    
+    const toggle = document.getElementById('toggleCostLimits');
+    if (toggle) toggle.checked = enabled;
+    
+    updateStatusDot('statusCostLimits', enabled);
+  } catch (e) {
+    console.warn('Could not load cost limits state:', e.message);
+  }
+}
+
+/**
+ * Toggle cost limits enabled state
+ */
+export async function toggleCostLimitsEnabled(value, inputEl) {
+  const label = inputEl.closest('.toggle-enhanced');
+  
+  if (label) label.classList.add('loading');
+  
+  try {
+    await api('PUT', '/access-key-limits/enabled', { enabled: value });
+    
+    updateStatusDot('statusCostLimits', value);
+    
+    if (label) {
+      label.classList.remove('loading');
+      label.classList.add('success');
+      setTimeout(() => label.classList.remove('success'), 400);
+    }
+    
+    toast(`Cost limits ${value ? 'enabled' : 'disabled'}`, 'success');
   } catch (e) {
     inputEl.checked = !value;
     if (label) label.classList.remove('loading');
@@ -1520,6 +1567,8 @@ export const configModule = {
   saveConfigEnhanced,
   reloadConfig,
   toggleSettingEnhanced,
+  loadCostLimitsState,
+  toggleCostLimitsEnabled,
   onConfigEditorInput,
   setupConfigKeyboardShortcuts,
   handleConfigEditorKeydown,
@@ -1558,6 +1607,8 @@ window.loadConfig = loadConfig;
 window.saveConfigEnhanced = saveConfigEnhanced;
 window.reloadConfig = reloadConfig;
 window.toggleSettingEnhanced = toggleSettingEnhanced;
+window.loadCostLimitsState = loadCostLimitsState;
+window.toggleCostLimitsEnabled = toggleCostLimitsEnabled;
 window.onConfigEditorInput = onConfigEditorInput;
 window.handleConfigEditorKeydown = handleConfigEditorKeydown;
 window.editorToggleComment = editorToggleComment;
