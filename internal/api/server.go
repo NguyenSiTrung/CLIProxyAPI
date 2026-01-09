@@ -276,6 +276,8 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 		dataDir = base
 	}
 	s.costManager = cost.NewManager(cfg, dataDir)
+	// Hook cost manager into the usage plugin for automatic cost recording
+	cost.DefaultCostLimitPlugin().SetManager(s.costManager)
 	// Load pricing data from /model-pricing endpoint (use defaults if unavailable)
 	if s.costManager.Calculator() != nil {
 		if err := s.costManager.Calculator().LoadPricing(fmt.Sprintf("http://%s:%d", cfg.Host, cfg.Port)); err != nil {
