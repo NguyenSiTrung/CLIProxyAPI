@@ -11,6 +11,23 @@ import { showModal, closeModal } from '../core/modal.js';
 let revealedKeys = {};
 
 /**
+ * Generate a cryptographically secure 32-character alphanumeric key
+ * @returns {string} A 32-character random alphanumeric string (A-Z, a-z, 0-9)
+ */
+export function generateRandomKey() {
+  const charset = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const length = 32;
+  const randomValues = new Uint8Array(length);
+  crypto.getRandomValues(randomValues);
+  
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += charset[randomValues[i] % charset.length];
+  }
+  return result;
+}
+
+/**
  * Load all API keys and render them
  */
 export async function loadKeys() {
@@ -287,7 +304,8 @@ export const keysModule = {
   confirmDeleteKey,
   toggleKeyReveal,
   copyKey,
-  setupKeysTabHandlers
+  setupKeysTabHandlers,
+  generateRandomKey
 };
 
 // Expose functions to window for HTML onclick handlers
