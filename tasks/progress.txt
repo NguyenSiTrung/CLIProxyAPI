@@ -1,46 +1,61 @@
+# Ralph Progress Log - Access Key Cost Limits
+
 ## Codebase Patterns
-- Frontend JS modules are in static/js/pages/ with corresponding exports via keysModule
-- The keysModule object is exposed on window for HTML onclick handlers
-- crypto.getRandomValues() is available in browser context for secure randomness
-- Go build: `go build ./...` to verify backend compiles
-- When adding new functions to keysModule, remember to export them in the module object at the bottom of keys.js
+- Config structs in internal/config/config.go use yaml/json tags with kebab-case names
+- Nested config structs are placed after the main Config struct definition
+- Use `go build ./...` to verify backend compiles
 
 ---
 
 ## 2026-01-09 - US-001
-Thread: https://aresproxy.me/threads/T-019ba103-46a9-7705-b6af-0ebf96ac7153
-- Implemented generateRandomKey() function in static/js/pages/keys.js
-- Function generates 32-character alphanumeric string using crypto.getRandomValues()
-- Exported via keysModule for modal use
-- Files changed: static/js/pages/keys.js
+Thread: https://aresproxy.me/threads/T-019ba1c8-734f-71a3-887d-70e59e34e1d6
+- Implemented AccessKeyLimits and AccessKeyLimit structs in internal/config/config.go
+- Added AccessKeyLimits field to Config struct with yaml tag 'access-key-limits'
+- Files changed: internal/config/config.go
 - **Learnings for future iterations:**
-  - The PRD branch should be based on feature/proxy-server, not main (main doesn't have the static/js/pages structure)
-  - keysModule exports need to be updated when adding new functions
+  - Config structs follow pattern: yaml:"kebab-case" json:"kebab-case"
+  - Place new config structs after TelegramConfig (around line 128)
+  - AccessKeyLimits has Enabled, DefaultMaxCost, Keys fields
+  - AccessKeyLimit has APIKey, MaxCost fields
+---
+
+## Current Story: US-002
+## Status: Not Started
+
 ---
 
 ## 2026-01-09 - US-002
-Thread: https://aresproxy.me/threads/T-019ba107-87df-779a-b745-afd4dc273225
-- Added handleGenerateKey() function that generates key and sets input value
-- Modified openAddKeyModal() to conditionally render Generate button for access keys only
-- Button uses refresh icon SVG and btn btn-secondary styling
-- Button appears in a flex container next to the input field
-- Input field gains focus after key generation
-- Files changed: static/js/pages/keys.js
+Thread: https://aresproxy.me/threads/T-019ba1cd-339b-705e-b202-920cb52c0a44
+- Added commented access-key-limits section to config.example.yaml
+- Includes enabled, default-max-cost, and keys array with 3 example keys
+- Added explanatory comments for each field
+- Files changed: config.example.yaml
 - **Learnings for future iterations:**
-  - dev-browser skill was not available for browser verification
-  - Modal content uses inline styles for flex layout when adding buttons next to inputs
+  - Config example sections follow the pattern: header comment, then commented YAML structure
+  - Use # before each config line and ## for inline value comments
+  - Place access-key-limits after api-keys section since they're related
 ---
 
-## 2026-01-09 - US-003
-Thread: https://aresproxy.me/threads/T-019ba10b-7cb4-73df-a4fa-a7618e98dd7a
-- Added visual feedback animation when generating a random key
-- Added `.key-generated` CSS class with `keyGeneratedPulse` animation to keys.css
-- Modified `handleGenerateKey()` to add/remove the highlight class with proper animation restart logic
-- Animation uses cyan→green transition for visual polish matching the design system
-- Highlight persists briefly (2 seconds) then fades gracefully
-- Files changed: static/js/pages/keys.js, static/css/pages/keys.css
-- **Learnings for future iterations:**
-  - Use `void element.offsetWidth` to force reflow and restart CSS animations
-  - Use setTimeout to remove temporary visual feedback classes after animation duration
-  - CSS custom properties (--accent-green, --accent-cyan) are used consistently throughout the design system
+## Completed Stories
+
+- US-001: Add access-key-limits configuration struct
+- US-002: Add config.example.yaml documentation
+
 ---
+
+## Notes
+
+Feature: Access Key Cost Limits
+Branch: ralph/access-key-cost-limits
+Total Stories: 14
+
+Story breakdown:
+- US-001 to US-002: Configuration (backend)
+- US-003 to US-005: Cost calculation and accumulation (backend)
+- US-006 to US-008: Server integration and middleware (backend)
+- US-009: Management API endpoints (backend)
+- US-010 to US-014: UI implementation (frontend)
+
+Quality checks:
+- Go build: `go build ./...` to verify backend compiles
+- Lint: Check for any linting errors
