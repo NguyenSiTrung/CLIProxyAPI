@@ -10,6 +10,9 @@ import { showModal, closeModal } from '../core/modal.js';
 // Track revealed keys state
 let revealedKeys = {};
 
+// Cache cost limits data for cross-tab state tracking
+let costLimitsCache = null;
+
 /**
  * Generate a cryptographically secure 32-character alphanumeric key
  * @returns {string} A 32-character random alphanumeric string (A-Z, a-z, 0-9)
@@ -32,12 +35,16 @@ export function generateRandomKey() {
  */
 export async function loadKeys() {
   try {
-    const [a, g, c, x] = await Promise.all([
+    const [a, g, c, x, limitsData] = await Promise.all([
       api('GET', '/api-keys').catch(() => ({})),
       api('GET', '/gemini-api-key').catch(() => ({})),
       api('GET', '/claude-api-key').catch(() => ({})),
-      api('GET', '/codex-api-key').catch(() => ({}))
+      api('GET', '/codex-api-key').catch(() => ({})),
+      api('GET', '/access-key-limits').catch(() => ({}))
     ]);
+
+    // Update cost limits cache
+    costLimitsCache = limitsData;
 
     const accessKeys = a['api-keys'] || [];
     const geminiKeys = g['gemini-api-key'] || [];
@@ -96,6 +103,7 @@ function renderKeyList(id, keys, type) {
   if (!container) return;
 
   const typeInfo = getKeyTypeInfo(type);
+  const isAccessKey = type === 'access';
 
   if (!keys.length) {
     container.innerHTML = `
@@ -115,6 +123,9 @@ function renderKeyList(id, keys, type) {
     return;
   }
 
+  // Get cost limits map for access keys
+  const limitsMap = isAccessKey ? getCostLimitsMap() : {};
+
   container.innerHTML = keys.map((k, i) => {
     const fullKey = typeof k === 'string' ? k : (k.key || k.api_key || JSON.stringify(k));
     const maskedKey = fullKey.length > 12 ? fullKey.slice(0, 6) + '••••••••' + fullKey.slice(-4) : '••••••••';
@@ -124,11 +135,29 @@ function renderKeyList(id, keys, type) {
     const displayKey = isRevealed ? fullKey : maskedKey;
     const escapedKey = fullKey.replace(/'/g, "\\'").replace(/"/g, '\\"');
 
+    // For access keys, check if has cost limit
+    const keyHasLimit = isAccessKey && limitsMap[fullKey] !== undefined;
+    const limitBadge = keyHasLimit ? '<span class="key-limit-badge" title="Cost limit configured">$</span>' : '';
+    const limitButtonLabel = keyHasLimit ? 'Edit Limit' : 'Set Limit';
+    const limitButtonOnclick = keyHasLimit 
+      ? `window.keysModule.openEditLimitModal('${escapedKey}', ${limitsMap[fullKey]?.max_cost || 0})`
+      : `window.keysModule.openAddLimitForKeyModal('${escapedKey}')`;
+    const limitButton = isAccessKey ? `
+      <button class="key-action-btn limit${keyHasLimit ? ' has-limit' : ''}" onclick="${limitButtonOnclick}" title="${limitButtonLabel}">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="1" x2="12" y2="23" />
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+        </svg>${limitButtonLabel}
+      </button>` : '';
+
     return '<div class="key-card">' +
       '<span class="key-index">' + (i + 1) + '</span>' +
       '<div class="key-icon"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" /></svg></div>' +
       '<div class="key-info">' +
+      '<div class="key-value-wrapper">' +
       '<div class="key-value ' + (isRevealed ? 'revealed' : '') + '" id="key-display-' + keyId + '">' + displayKey + '</div>' +
+      limitBadge +
+      '</div>' +
       '<div class="key-meta">' + keyMeta + '</div>' +
       '</div>' +
       '<div class="key-actions">' +
@@ -137,6 +166,7 @@ function renderKeyList(id, keys, type) {
       (isRevealed ? '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/>' : '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>') +
       '</svg>' +
       '</button>' +
+      limitButton +
       '<button class="key-action-btn copy" onclick="window.keysModule.copyKey(\'' + escapedKey + '\')">' +
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></svg>Copy' +
       '</button>' +
@@ -344,6 +374,8 @@ export function setupKeysTabHandlers() {
 export async function loadCostLimits() {
   try {
     const data = await api('GET', '/access-key-limits');
+    // Update cache for cross-tab state tracking
+    costLimitsCache = data;
     renderCostLimitsList(data);
   } catch (e) {
     const container = document.getElementById('costLimitsList');
@@ -360,6 +392,30 @@ export async function loadCostLimits() {
         </div>`;
     }
   }
+}
+
+/**
+ * Get cost limits map (apiKey -> limitData) from cache
+ * @returns {Object} Map of apiKey to limit data
+ */
+export function getCostLimitsMap() {
+  const map = {};
+  if (costLimitsCache && costLimitsCache.keys) {
+    costLimitsCache.keys.forEach(limit => {
+      map[limit.api_key] = limit;
+    });
+  }
+  return map;
+}
+
+/**
+ * Check if an API key has an existing cost limit
+ * @param {string} apiKey - The API key to check
+ * @returns {boolean} True if the key has an existing limit
+ */
+export function hasExistingLimit(apiKey) {
+  const map = getCostLimitsMap();
+  return map[apiKey] !== undefined;
 }
 
 /**

@@ -298,6 +298,46 @@
   box-shadow: 0 0 12px rgba(96, 165, 250, 0.2);
 }
 
+/* Limit action button (Set Limit / Edit Limit) */
+.key-action-btn.limit {
+  background: rgba(251, 191, 36, 0.15);
+  color: var(--accent-yellow);
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+.key-action-btn.limit:hover {
+  background: rgba(251, 191, 36, 0.25);
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.2);
+}
+
+.key-action-btn.limit.has-limit {
+  background: rgba(34, 211, 160, 0.15);
+  color: var(--accent-green);
+  border-color: rgba(34, 211, 160, 0.3);
+}
+
+.key-action-btn.limit.has-limit:hover {
+  background: rgba(34, 211, 160, 0.25);
+  box-shadow: 0 0 12px rgba(34, 211, 160, 0.2);
+}
+
+/* Cost limit badge for access keys */
+.key-limit-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: linear-gradient(135deg, rgba(34, 211, 160, 0.2), rgba(34, 211, 160, 0.3));
+  color: var(--accent-green);
+  font-size: 11px;
+  font-weight: 700;
+  border-radius: 50%;
+  border: 1px solid rgba(34, 211, 160, 0.4);
+  cursor: help;
+  flex-shrink: 0;
+}
+
 .key-action-btn svg {
   width: 14px;
   height: 14px;
