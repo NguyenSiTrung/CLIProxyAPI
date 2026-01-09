@@ -427,6 +427,15 @@ export function refreshCostLimits() {
 }
 
 /**
+ * Refresh all cost-related data across tabs
+ * Call this after adding/editing/resetting a limit to keep both tabs in sync
+ */
+export async function refreshAllCostData() {
+  await loadCostLimits();
+  await loadKeys();
+}
+
+/**
  * Mask API key for display (show last 4 chars)
  */
 function maskApiKey(key) {
@@ -615,7 +624,7 @@ export async function saveEditLimit(apiKey) {
     await api('PUT', `/access-key-limits/keys/${encodeURIComponent(apiKey)}`, { max_cost: maxCost });
     closeModal();
     toast('Cost limit updated successfully', 'success');
-    loadCostLimits();
+    refreshAllCostData();
   } catch (e) {
     toast('Failed: ' + e.message, 'error');
   }
@@ -653,7 +662,7 @@ export async function resetCost(apiKey) {
     await api('POST', `/access-key-limits/keys/${encodeURIComponent(apiKey)}/reset`);
     closeModal();
     toast('Cost reset successfully', 'success');
-    loadCostLimits();
+    refreshAllCostData();
   } catch (e) {
     toast('Failed: ' + e.message, 'error');
   }
@@ -839,7 +848,7 @@ export async function saveNewLimit(apiKey) {
     await api('PUT', `/access-key-limits/keys/${encodeURIComponent(apiKey)}`, { max_cost: maxCost });
     closeModal();
     toast('Cost limit added successfully', 'success');
-    loadCostLimits();
+    refreshAllCostData();
   } catch (e) {
     toast('Failed: ' + e.message, 'error');
   }
@@ -859,6 +868,9 @@ export const keysModule = {
   handleGenerateKey,
   loadCostLimits,
   refreshCostLimits,
+  refreshAllCostData,
+  getCostLimitsMap,
+  hasExistingLimit,
   openEditLimitModal,
   saveEditLimit,
   confirmResetCost,
