@@ -644,6 +644,11 @@
               <polyline points="16 18 22 12 16 6" />
               <polyline points="8 6 2 12 8 18" />
             </svg>Codex <span class="tab-badge" id="codexTabBadge">0</span></div>
+          <div class="keys-tab" data-keytab="costlimits"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="12" y1="1" x2="12" y2="23" />
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>Cost Limits</div>
         </div>
         <div id="keytab-access" class="keys-content active">
           <div class="card">
@@ -703,6 +708,26 @@
                 </svg>Add Key </button>
             </div>
             <div id="codexKeysList" class="keys-grid"></div>
+          </div>
+        </div>
+        <div id="keytab-costlimits" class="keys-content">
+          <div class="card">
+            <div class="keys-section-header">
+              <div class="keys-section-title">
+                <h3>Cost Limits</h3><span class="key-count" id="costLimitsKeyCount">0 keys</span>
+              </div>
+              <div class="cost-limits-header-actions">
+                <button class="btn btn-secondary btn-sm" onclick="window.keysModule.refreshCostLimits()" title="Refresh cost limits">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                  </svg>
+                  Refresh
+                </button>
+              </div>
+            </div>
+            <div id="costLimitsList" class="cost-limits-grid"></div>
           </div>
         </div>
       </div>

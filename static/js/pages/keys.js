@@ -329,8 +329,278 @@ export function setupKeysTabHandlers() {
       const tabId = tab.dataset.keytab;
       const content = document.getElementById(`keytab-${tabId}`);
       if (content) content.classList.add('active');
+      
+      // Load cost limits when switching to cost limits tab
+      if (tabId === 'costlimits') {
+        loadCostLimits();
+      }
     });
   });
+}
+
+/**
+ * Load cost limits data and render the list
+ */
+export async function loadCostLimits() {
+  try {
+    const data = await api('GET', '/access-key-limits');
+    renderCostLimitsList(data);
+  } catch (e) {
+    const container = document.getElementById('costLimitsList');
+    if (container) {
+      container.innerHTML = `
+        <div class="keys-empty-state">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <h4>Unable to Load Cost Limits</h4>
+          <p>${e.message || 'Failed to fetch cost limits data'}</p>
+        </div>`;
+    }
+  }
+}
+
+/**
+ * Refresh cost limits (alias for loadCostLimits)
+ */
+export function refreshCostLimits() {
+  loadCostLimits();
+  toast('Cost limits refreshed', 'success');
+}
+
+/**
+ * Mask API key for display (show last 4 chars)
+ */
+function maskApiKey(key) {
+  if (!key || key.length <= 4) return '••••' + (key || '');
+  return '••••' + key.slice(-4);
+}
+
+/**
+ * Get usage percentage and color class
+ */
+function getUsageInfo(currentCost, maxCost) {
+  if (!maxCost || maxCost === 0) {
+    return { percentage: 0, colorClass: '', isUnlimited: true };
+  }
+  const percentage = Math.min((currentCost / maxCost) * 100, 100);
+  let colorClass = 'usage-green';
+  if (percentage >= 90) {
+    colorClass = 'usage-red';
+  } else if (percentage >= 70) {
+    colorClass = 'usage-yellow';
+  }
+  return { percentage, colorClass, isUnlimited: false };
+}
+
+/**
+ * Render cost limits list
+ */
+function renderCostLimitsList(data) {
+  const container = document.getElementById('costLimitsList');
+  if (!container) return;
+
+  const keys = data.keys || [];
+  const enabled = data.enabled;
+  
+  // Update key count
+  const keyCountEl = document.getElementById('costLimitsKeyCount');
+  if (keyCountEl) {
+    keyCountEl.textContent = `${keys.length} key${keys.length !== 1 ? 's' : ''}`;
+  }
+
+  if (!enabled) {
+    container.innerHTML = `
+      <div class="keys-empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="1" x2="12" y2="23" />
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+        </svg>
+        <h4>Cost Limits Disabled</h4>
+        <p>Enable cost limits in Configuration to track and limit API costs per key.</p>
+      </div>`;
+    return;
+  }
+
+  if (!keys.length) {
+    container.innerHTML = `
+      <div class="keys-empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="12" y1="1" x2="12" y2="23" />
+          <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+        </svg>
+        <h4>No Cost Data</h4>
+        <p>Cost data will appear here once API keys start making requests.</p>
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="cost-limits-table-container">
+      <table class="cost-limits-table">
+        <thead>
+          <tr>
+            <th>API Key</th>
+            <th>Max Cost</th>
+            <th>Current Cost</th>
+            <th>Usage</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="costLimitsTableBody">
+        </tbody>
+      </table>
+    </div>`;
+
+  const tbody = document.getElementById('costLimitsTableBody');
+  keys.forEach((keyInfo, idx) => {
+    const { api_key, max_cost, current_cost } = keyInfo;
+    const maskedKey = maskApiKey(api_key);
+    const usageInfo = getUsageInfo(current_cost, max_cost);
+    const isBlocked = max_cost > 0 && current_cost >= max_cost;
+    
+    const row = document.createElement('tr');
+    row.className = isBlocked ? 'cost-limit-blocked' : '';
+    row.innerHTML = `
+      <td>
+        <div class="cost-limit-key">
+          <span class="key-masked">${maskedKey}</span>
+          ${isBlocked ? '<span class="badge badge-blocked">Blocked</span>' : ''}
+        </div>
+      </td>
+      <td>
+        <span class="cost-value">${usageInfo.isUnlimited ? 'Unlimited' : '$' + max_cost.toFixed(2)}</span>
+      </td>
+      <td>
+        <span class="cost-value">$${current_cost.toFixed(2)}</span>
+      </td>
+      <td>
+        ${usageInfo.isUnlimited ? '<span class="cost-unlimited-badge">—</span>' : `
+        <div class="usage-bar-container">
+          <div class="usage-bar ${usageInfo.colorClass}" style="width: ${usageInfo.percentage}%"></div>
+          <span class="usage-text">${usageInfo.percentage.toFixed(1)}%</span>
+        </div>
+        `}
+      </td>
+      <td>
+        <div class="cost-limit-actions">
+          <button class="btn btn-xs btn-secondary" onclick="window.keysModule.openEditLimitModal('${api_key}', ${max_cost})" title="Edit limit">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+            Edit
+          </button>
+          <button class="btn btn-xs btn-warning" onclick="window.keysModule.confirmResetCost('${api_key}', '${maskedKey}')" title="Reset cost">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+            Reset
+          </button>
+        </div>
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+}
+
+/**
+ * Open modal to edit cost limit for a key
+ */
+export function openEditLimitModal(apiKey, currentMaxCost) {
+  const maskedKey = maskApiKey(apiKey);
+  const isUnlimited = !currentMaxCost || currentMaxCost === 0;
+  
+  const content = `
+    <div class="form-group">
+      <label>API Key</label>
+      <div class="key-display">${maskedKey}</div>
+    </div>
+    <div class="form-group">
+      <label>Maximum Cost (USD)</label>
+      <input type="number" id="editMaxCost" class="form-input" step="0.01" min="0" value="${isUnlimited ? '' : currentMaxCost.toFixed(2)}" placeholder="Enter max cost" ${isUnlimited ? 'disabled' : ''}>
+    </div>
+    <div class="form-group">
+      <label class="checkbox-label">
+        <input type="checkbox" id="editUnlimited" ${isUnlimited ? 'checked' : ''} onchange="document.getElementById('editMaxCost').disabled = this.checked; if(this.checked) document.getElementById('editMaxCost').value = '';">
+        <span>Unlimited (no cost limit)</span>
+      </label>
+    </div>`;
+
+  const footer = `
+    <button class="btn btn-secondary" onclick="window.closeModal()">Cancel</button>
+    <button class="btn btn-primary" onclick="window.keysModule.saveEditLimit('${apiKey}')">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+        <polyline points="17 21 17 13 7 13 7 21"/>
+        <polyline points="7 3 7 8 15 8"/>
+      </svg>
+      Save
+    </button>`;
+
+  showModal('Edit Cost Limit', content, footer);
+}
+
+/**
+ * Save edited cost limit
+ */
+export async function saveEditLimit(apiKey) {
+  const unlimitedEl = document.getElementById('editUnlimited');
+  const maxCostEl = document.getElementById('editMaxCost');
+  
+  const isUnlimited = unlimitedEl?.checked;
+  const maxCost = isUnlimited ? 0 : parseFloat(maxCostEl?.value || '0');
+
+  try {
+    await api('PUT', `/access-key-limits/keys/${encodeURIComponent(apiKey)}`, { max_cost: maxCost });
+    closeModal();
+    toast('Cost limit updated successfully', 'success');
+    loadCostLimits();
+  } catch (e) {
+    toast('Failed: ' + e.message, 'error');
+  }
+}
+
+/**
+ * Show confirmation dialog for resetting cost
+ */
+export function confirmResetCost(apiKey, maskedKey) {
+  const content = `
+    <div style="text-align:center; padding: 24px 0;">
+      <div style="width:64px; height:64px; background:rgba(251, 191, 36, 0.1); border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px auto;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-yellow)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+      </div>
+      <h4 style="margin-bottom:8px; font-size:18px;">Reset Accumulated Cost?</h4>
+      <p style="color:var(--text-secondary); font-size:14px; max-width:300px; margin:0 auto;">Reset accumulated cost for <strong>${maskedKey}</strong> to $0.00?</p>
+    </div>`;
+
+  const footer = `
+    <button class="btn btn-secondary" onclick="window.closeModal()">Cancel</button>
+    <button class="btn btn-warning" onclick="window.keysModule.resetCost('${apiKey}')">Yes, Reset</button>`;
+
+  showModal('Reset Cost', content, footer);
+}
+
+/**
+ * Reset accumulated cost for a key
+ */
+export async function resetCost(apiKey) {
+  try {
+    await api('POST', `/access-key-limits/keys/${encodeURIComponent(apiKey)}/reset`);
+    closeModal();
+    toast('Cost reset successfully', 'success');
+    loadCostLimits();
+  } catch (e) {
+    toast('Failed: ' + e.message, 'error');
+  }
 }
 
 // Export module interface for global access
@@ -344,7 +614,13 @@ export const keysModule = {
   copyKey,
   setupKeysTabHandlers,
   generateRandomKey,
-  handleGenerateKey
+  handleGenerateKey,
+  loadCostLimits,
+  refreshCostLimits,
+  openEditLimitModal,
+  saveEditLimit,
+  confirmResetCost,
+  resetCost
 };
 
 // Expose functions to window for HTML onclick handlers
