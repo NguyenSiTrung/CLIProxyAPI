@@ -831,6 +831,29 @@
                 <span class="status-text">Off</span>
               </div>
             </div>
+
+            <div class="quick-toggle-card" data-setting="cost-limits">
+              <div class="quick-toggle-header">
+                <div class="quick-toggle-icon cost">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                  </svg>
+                </div>
+                <label class="toggle-enhanced" id="toggleCostLimitsLabel">
+                  <input type="checkbox" id="toggleCostLimits" onchange="toggleCostLimitsEnabled(this.checked, this)">
+                  <span class="toggle-enhanced-slider"></span>
+                </label>
+              </div>
+              <div class="quick-toggle-content">
+                <h4>Cost Limits</h4>
+                <p>Block keys exceeding cost limits</p>
+              </div>
+              <div class="quick-toggle-status">
+                <span class="status-indicator" id="statusCostLimits"></span>
+                <span class="status-text">Off</span>
+              </div>
+            </div>
           </div>
         </div>
 
