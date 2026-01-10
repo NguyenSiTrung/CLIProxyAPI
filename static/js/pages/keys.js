@@ -6,12 +6,118 @@
 import { api } from '../core/api.js';
 import { toast } from '../core/toast.js';
 import { showModal, closeModal } from '../core/modal.js';
+import { 
+  getModelPricingConfig,
+  setModelPricingConfig,
+  isPricingConfigLoaded,
+  setPricingConfigLoaded
+} from '../core/state.js';
 
 // Track revealed keys state
 let revealedKeys = {};
 
 // Cache cost limits data for cross-tab state tracking
 let costLimitsCache = null;
+
+// Default pricing for well-known models (prices per 1M tokens in USD)
+const DEFAULT_MODEL_PRICING = {
+  'gpt-4o': { input: 2.50, output: 10.00, cached_input: 1.25 },
+  'gpt-4o-2024-08-06': { input: 2.50, output: 10.00, cached_input: 1.25 },
+  'gpt-4o-mini': { input: 0.15, output: 0.60, cached_input: 0.075 },
+  'gpt-4-turbo': { input: 10.00, output: 30.00 },
+  'gpt-4': { input: 30.00, output: 60.00 },
+  'gpt-4.1': { input: 2.00, output: 8.00, cached_input: 0.50 },
+  'gpt-4.1-mini': { input: 0.40, output: 1.60, cached_input: 0.10 },
+  'gpt-3.5-turbo': { input: 0.50, output: 1.50 },
+  'o1': { input: 15.00, output: 60.00 },
+  'o1-preview': { input: 15.00, output: 60.00 },
+  'o1-mini': { input: 1.10, output: 4.40 },
+  'o3': { input: 2.00, output: 8.00, cached_input: 0.50 },
+  'o3-mini': { input: 1.10, output: 4.40 },
+  'o4-mini': { input: 1.10, output: 4.40, cached_input: 0.275 },
+  'claude-3-5-sonnet-20241022': { input: 3.00, output: 15.00, cached_input: 0.30 },
+  'claude-3-5-haiku-20241022': { input: 0.80, output: 4.00, cached_input: 0.08 },
+  'claude-3-opus-20240229': { input: 15.00, output: 75.00, cached_input: 1.50 },
+  'claude-3-haiku-20240307': { input: 0.25, output: 1.25, cached_input: 0.03 },
+  'claude-sonnet-4-20250514': { input: 3.00, output: 15.00, cached_input: 0.30 },
+  'claude-opus-4-20250514': { input: 15.00, output: 75.00, cached_input: 1.50 },
+  'gemini-1.5-pro': { input: 1.25, output: 5.00, cached_input: 0.3125 },
+  'gemini-1.5-flash': { input: 0.075, output: 0.30, cached_input: 0.01875 },
+  'gemini-2.0-flash': { input: 0.10, output: 0.40, cached_input: 0.025 },
+  'gemini-2.5-pro': { input: 1.25, output: 10.00, cached_input: 0.125 },
+  'gemini-2.5-flash': { input: 0.15, output: 0.60, cached_input: 0.0375 },
+  'deepseek-chat': { input: 0.14, output: 0.28, cached_input: 0.014 },
+  'deepseek-reasoner': { input: 0.55, output: 2.19 },
+  'mistral-large-latest': { input: 2.00, output: 6.00 },
+  'mistral-small-latest': { input: 0.20, output: 0.60 },
+};
+
+/**
+ * Get default pricing for a model
+ */
+function getDefaultPricing(modelId) {
+  if (DEFAULT_MODEL_PRICING[modelId]) {
+    return DEFAULT_MODEL_PRICING[modelId];
+  }
+  const lowerModelId = modelId.toLowerCase();
+  for (const [key, pricing] of Object.entries(DEFAULT_MODEL_PRICING)) {
+    if (lowerModelId.includes(key.toLowerCase()) || key.toLowerCase().includes(lowerModelId)) {
+      return pricing;
+    }
+  }
+  return null;
+}
+
+/**
+ * Calculate cost for an API key from usage data
+ */
+function calculateCostFromUsage(apiKey, usageData) {
+  if (!usageData || !usageData.apis) return 0;
+  
+  const apiStats = usageData.apis[apiKey];
+  if (!apiStats) return 0;
+  
+  const pricingConfig = getModelPricingConfig();
+  let totalCost = 0;
+  
+  const providerModels = apiStats.models || {};
+  for (const [modelName, modelStats] of Object.entries(providerModels)) {
+    if (!modelStats || typeof modelStats !== 'object') continue;
+    const details = modelStats.details || [];
+    let modelInput = 0, modelOutput = 0, modelCached = 0;
+    for (const detail of details) {
+      const t = detail.tokens || {};
+      modelInput += (t.input_tokens || 0);
+      modelOutput += (t.output_tokens || 0);
+      modelCached += (t.cached_tokens || 0);
+    }
+    const pricing = pricingConfig[modelName] || getDefaultPricing(modelName);
+    if (pricing) {
+      const nonCachedInput = Math.max(0, modelInput - modelCached);
+      const inputCost = (nonCachedInput / 1000000) * (pricing.input || 0);
+      const outputCost = (modelOutput / 1000000) * (pricing.output || 0);
+      const cachedCost = (modelCached / 1000000) * (pricing.cached_input || pricing.input * 0.1 || 0);
+      totalCost += inputCost + outputCost + cachedCost;
+    }
+  }
+  
+  return totalCost;
+}
+
+/**
+ * Load pricing configuration from server
+ */
+async function loadPricingConfig() {
+  if (isPricingConfigLoaded()) return;
+  try {
+    const data = await api('GET', '/model-pricing');
+    setModelPricingConfig(data.pricing || {});
+    setPricingConfigLoaded(true);
+  } catch (e) {
+    console.error('Failed to load pricing config:', e);
+    setModelPricingConfig({});
+  }
+}
 
 /**
  * Generate a cryptographically secure 32-character alphanumeric key
@@ -373,10 +479,30 @@ export function setupKeysTabHandlers() {
  */
 export async function loadCostLimits() {
   try {
-    const data = await api('GET', '/access-key-limits');
+    // Load pricing config first if not loaded
+    await loadPricingConfig();
+    
+    // Fetch cost limits and usage data in parallel
+    const [limitsData, usageData] = await Promise.all([
+      api('GET', '/access-key-limits').catch(() => ({ enabled: false, keys: [] })),
+      api('GET', '/usage-statistics').catch(() => ({ apis: {} }))
+    ]);
+    
+    // Merge calculated costs from usage data into limits data
+    const enhancedData = {
+      ...limitsData,
+      keys: (limitsData.keys || []).map(keyInfo => {
+        const calculatedCost = calculateCostFromUsage(keyInfo.api_key, usageData);
+        return {
+          ...keyInfo,
+          current_cost: calculatedCost > 0 ? calculatedCost : keyInfo.current_cost
+        };
+      })
+    };
+    
     // Update cache for cross-tab state tracking
-    costLimitsCache = data;
-    renderCostLimitsList(data);
+    costLimitsCache = enhancedData;
+    renderCostLimitsList(enhancedData);
   } catch (e) {
     const container = document.getElementById('costLimitsList');
     if (container) {
