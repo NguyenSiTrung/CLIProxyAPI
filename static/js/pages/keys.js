@@ -89,7 +89,8 @@ function calculateCostFromUsage(apiKey, usageData) {
       const t = detail.tokens || {};
       modelInput += (t.input_tokens || 0);
       modelOutput += (t.output_tokens || 0);
-      modelCached += (t.cached_tokens || 0);
+      // Handle both cached_tokens and cache_read_input_tokens field names
+      modelCached += (t.cached_tokens || t.cache_read_input_tokens || 0);
     }
     const pricing = pricingConfig[modelName] || getDefaultPricing(modelName);
     if (pricing) {
@@ -483,10 +484,14 @@ export async function loadCostLimits() {
     await loadPricingConfig();
     
     // Fetch cost limits and usage data in parallel
-    const [limitsData, usageData] = await Promise.all([
+    // Note: /usage returns { usage: { apis: ... } }, we need the inner .usage object
+    const [limitsData, usageResponse] = await Promise.all([
       api('GET', '/access-key-limits').catch(() => ({ enabled: false, keys: [] })),
-      api('GET', '/usage-statistics').catch(() => ({ apis: {} }))
+      api('GET', '/usage').catch(() => ({ usage: { apis: {} } }))
     ]);
+    
+    // Extract the usage object (endpoint returns { usage: snapshot })
+    const usageData = usageResponse.usage || { apis: {} };
     
     // Merge calculated costs from usage data into limits data
     const enhancedData = {
