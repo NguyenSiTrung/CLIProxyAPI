@@ -492,7 +492,8 @@ function renderProviderStats(providerUsage) {
 
   providerContainer.innerHTML = '<div class="config-settings-list">' + pEntries.map(([name, stats], idx) => {
     const limitInfo = getCostLimitInfo(name);
-    const isLimitExceeded = limitInfo && limitInfo.max_cost > 0 && limitInfo.current_cost >= limitInfo.max_cost;
+    // Use calculated cost (stats.cost) for limit exceeded check
+    const isLimitExceeded = limitInfo && limitInfo.max_cost > 0 && stats.cost >= limitInfo.max_cost;
     const hasLimit = limitInfo && limitInfo.max_cost > 0;
     
     let limitBadgeHtml = '';
@@ -502,7 +503,8 @@ function renderProviderStats(providerUsage) {
     
     let limitBarHtml = '';
     if (hasLimit) {
-      limitBarHtml = getCostLimitBarHtml(limitInfo.current_cost, limitInfo.max_cost);
+      // Use the calculated cost (stats.cost) for the progress bar, not the server-side accumulator
+      limitBarHtml = getCostLimitBarHtml(stats.cost, limitInfo.max_cost);
     }
     
     let costDisplayHtml = `<span class="badge" style="background:rgba(251,191,36,0.15);color:var(--accent-yellow);font-weight:600">$${stats.cost.toFixed(4)}</span>`;
