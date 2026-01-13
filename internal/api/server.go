@@ -276,6 +276,8 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 		dataDir = base
 	}
 	s.costManager = cost.NewManager(cfg, dataDir)
+	// Start auto-reset scheduler for cost/request limits
+	s.costManager.StartAutoReset()
 	// Hook cost manager into the usage plugin for automatic cost recording
 	cost.DefaultCostLimitPlugin().SetManager(s.costManager)
 	// Set cost manager for management API endpoints
@@ -937,6 +939,11 @@ func (s *Server) Start() error {
 //   - error: An error if the server fails to stop
 func (s *Server) Stop(ctx context.Context) error {
 	log.Debug("Stopping API server...")
+
+	// Stop auto-reset scheduler
+	if s.costManager != nil {
+		s.costManager.StopAutoReset()
+	}
 
 	if s.keepAliveEnabled {
 		select {

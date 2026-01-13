@@ -4,6 +4,7 @@ package cost
 import (
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
 	coreusage "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/usage"
@@ -11,6 +12,7 @@ import (
 
 const accumulatorFileName = "cost_accumulator.json"
 const requestAccumulatorFileName = "request_accumulator.json"
+const autoResetStateFileName = "auto_reset_state.json"
 
 // Manager combines config, calculator, and accumulator to provide
 // a unified interface for cost limit management.
@@ -20,17 +22,24 @@ type Manager struct {
 	calculator         *Calculator
 	accumulator        *Accumulator
 	requestAccumulator *RequestAccumulator
+	autoResetScheduler *AutoResetScheduler
 	dataDir            string
 }
 
 // NewManager creates a new cost limit manager.
 // It loads existing accumulated costs from the data directory if available.
 func NewManager(cfg *config.Config, dataDir string) *Manager {
+	stateFile := ""
+	if dataDir != "" {
+		stateFile = filepath.Join(dataDir, autoResetStateFileName)
+	}
+
 	m := &Manager{
 		cfg:                cfg,
 		calculator:         NewCalculator(),
 		accumulator:        NewAccumulator(),
 		requestAccumulator: NewRequestAccumulator(),
+		autoResetScheduler: NewAutoResetScheduler(stateFile, time.Minute),
 		dataDir:            dataDir,
 	}
 	if dataDir != "" {
@@ -380,4 +389,127 @@ func (m *Manager) saveRequests() error {
 		return nil
 	}
 	return m.requestAccumulator.SaveToFile(filepath.Join(m.dataDir, requestAccumulatorFileName))
+}
+
+// StartAutoReset starts the background auto-reset scheduler.
+// It periodically checks all keys and resets counters that have exceeded their interval.
+func (m *Manager) StartAutoReset() {
+	if m == nil || m.autoResetScheduler == nil {
+		return
+	}
+
+	m.autoResetScheduler.SetCheckFunction(func() {
+		m.checkAndPerformAutoResets()
+	})
+	m.autoResetScheduler.Start()
+}
+
+// StopAutoReset stops the background auto-reset scheduler.
+func (m *Manager) StopAutoReset() {
+	if m == nil || m.autoResetScheduler == nil {
+		return
+	}
+	m.autoResetScheduler.Stop()
+}
+
+// checkAndPerformAutoResets checks all configured keys and resets counters as needed.
+func (m *Manager) checkAndPerformAutoResets() {
+	if m == nil || m.cfg == nil || !m.IsEnabled() {
+		return
+	}
+
+	m.mu.RLock()
+	keys := make([]config.AccessKeyLimit, len(m.cfg.AccessKeyLimits.Keys))
+	copy(keys, m.cfg.AccessKeyLimits.Keys)
+	m.mu.RUnlock()
+
+	now := time.Now()
+	state := m.autoResetScheduler.State()
+
+	for _, keyLimit := range keys {
+		interval := ParseResetInterval(keyLimit.AutoResetInterval)
+		if interval == ResetNone {
+			continue
+		}
+
+		lastReset := state.GetLastReset(keyLimit.APIKey)
+		if lastReset.IsZero() {
+			state.SetLastReset(keyLimit.APIKey, now)
+			continue
+		}
+
+		if ShouldReset(lastReset, interval, now) {
+			_ = m.ResetAll(keyLimit.APIKey)
+			state.SetLastReset(keyLimit.APIKey, now)
+		}
+	}
+
+	_ = m.autoResetScheduler.SaveState()
+}
+
+// GetAutoResetInterval returns the auto-reset interval for an API key.
+func (m *Manager) GetAutoResetInterval(apiKey string) string {
+	if m == nil || m.cfg == nil {
+		return ""
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for _, keyLimit := range m.cfg.AccessKeyLimits.Keys {
+		if keyLimit.APIKey == apiKey {
+			return keyLimit.AutoResetInterval
+		}
+	}
+	return ""
+}
+
+// SetAutoResetInterval updates the auto-reset interval for a specific API key.
+func (m *Manager) SetAutoResetInterval(apiKey string, interval string) {
+	if m == nil || m.cfg == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for i, keyLimit := range m.cfg.AccessKeyLimits.Keys {
+		if keyLimit.APIKey == apiKey {
+			m.cfg.AccessKeyLimits.Keys[i].AutoResetInterval = interval
+			if ParseResetInterval(interval) != ResetNone {
+				m.autoResetScheduler.State().SetLastReset(apiKey, time.Now())
+			}
+			return
+		}
+	}
+	m.cfg.AccessKeyLimits.Keys = append(m.cfg.AccessKeyLimits.Keys, config.AccessKeyLimit{
+		APIKey:            apiKey,
+		AutoResetInterval: interval,
+	})
+	if ParseResetInterval(interval) != ResetNone {
+		m.autoResetScheduler.State().SetLastReset(apiKey, time.Now())
+	}
+}
+
+// GetLastResetTime returns the last reset time for an API key.
+func (m *Manager) GetLastResetTime(apiKey string) time.Time {
+	if m == nil || m.autoResetScheduler == nil {
+		return time.Time{}
+	}
+	return m.autoResetScheduler.State().GetLastReset(apiKey)
+}
+
+// GetNextResetTime returns the next scheduled reset time for an API key.
+// Returns zero time if no auto-reset is configured.
+func (m *Manager) GetNextResetTime(apiKey string) time.Time {
+	if m == nil {
+		return time.Time{}
+	}
+	interval := ParseResetInterval(m.GetAutoResetInterval(apiKey))
+	if interval == ResetNone {
+		return time.Time{}
+	}
+	lastReset := m.GetLastResetTime(apiKey)
+	if lastReset.IsZero() {
+		return time.Time{}
+	}
+	return NextResetTime(lastReset, interval)
 }
