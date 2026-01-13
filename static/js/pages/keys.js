@@ -592,6 +592,23 @@ function getUsageInfo(currentCost, maxCost) {
 }
 
 /**
+ * Get request usage percentage and color class
+ */
+function getRequestUsageInfo(currentRequests, maxRequests) {
+  if (!maxRequests || maxRequests === 0) {
+    return { percentage: 0, colorClass: '', isUnlimited: true };
+  }
+  const percentage = Math.min((currentRequests / maxRequests) * 100, 100);
+  let colorClass = 'usage-green';
+  if (percentage >= 90) {
+    colorClass = 'usage-red';
+  } else if (percentage >= 70) {
+    colorClass = 'usage-yellow';
+  }
+  return { percentage, colorClass, isUnlimited: false };
+}
+
+/**
  * Render cost limits list
  */
 function renderCostLimitsList(data) {
@@ -639,9 +656,9 @@ function renderCostLimitsList(data) {
         <thead>
           <tr>
             <th>API Key</th>
-            <th>Max Cost</th>
-            <th>Current Cost</th>
-            <th>Usage</th>
+            <th>Cost Limit</th>
+            <th>Request Limit</th>
+            <th>Auto-Reset</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -652,10 +669,25 @@ function renderCostLimitsList(data) {
 
   const tbody = document.getElementById('costLimitsTableBody');
   keys.forEach((keyInfo, idx) => {
-    const { api_key, max_cost, current_cost } = keyInfo;
+    const { api_key, max_cost, current_cost, max_requests, current_requests, auto_reset_interval, next_reset_time } = keyInfo;
     const maskedKey = maskApiKey(api_key);
     const usageInfo = getUsageInfo(current_cost, max_cost);
-    const isBlocked = max_cost > 0 && current_cost >= max_cost;
+    const requestUsageInfo = getRequestUsageInfo(current_requests || 0, max_requests || 0);
+    const isCostBlocked = max_cost > 0 && current_cost >= max_cost;
+    const isRequestBlocked = max_requests > 0 && (current_requests || 0) >= max_requests;
+    const isBlocked = isCostBlocked || isRequestBlocked;
+    
+    // Format auto-reset display
+    let autoResetDisplay = '—';
+    if (auto_reset_interval && auto_reset_interval !== 'none') {
+      autoResetDisplay = auto_reset_interval.charAt(0).toUpperCase() + auto_reset_interval.slice(1);
+      if (next_reset_time) {
+        try {
+          const nextReset = new Date(next_reset_time);
+          autoResetDisplay += `<br><span class="next-reset-time">${nextReset.toLocaleDateString()}</span>`;
+        } catch (e) { /* ignore */ }
+      }
+    }
     
     const row = document.createElement('tr');
     row.className = isBlocked ? 'cost-limit-blocked' : '';
@@ -663,33 +695,44 @@ function renderCostLimitsList(data) {
       <td>
         <div class="cost-limit-key">
           <span class="key-masked">${maskedKey}</span>
-          ${isBlocked ? '<span class="badge badge-blocked">Blocked</span>' : ''}
+          ${isBlocked ? `<span class="badge badge-blocked">${isCostBlocked ? 'Cost' : 'Requests'}</span>` : ''}
         </div>
       </td>
       <td>
-        <span class="cost-value">${usageInfo.isUnlimited ? 'Unlimited' : '$' + max_cost.toFixed(2)}</span>
-      </td>
-      <td>
-        <span class="cost-value">$${current_cost.toFixed(2)}</span>
-      </td>
-      <td>
-        ${usageInfo.isUnlimited ? '<span class="cost-unlimited-badge">—</span>' : `
-        <div class="usage-bar-container">
-          <div class="usage-bar ${usageInfo.colorClass}" style="width: ${usageInfo.percentage}%"></div>
-          <span class="usage-text">${usageInfo.percentage.toFixed(1)}%</span>
+        <div class="limit-cell">
+          <span class="cost-value">${usageInfo.isUnlimited ? '∞' : '$' + max_cost.toFixed(2)}</span>
+          <span class="current-value">$${current_cost.toFixed(2)}</span>
+          ${usageInfo.isUnlimited ? '' : `
+          <div class="usage-bar-mini">
+            <div class="usage-bar ${usageInfo.colorClass}" style="width: ${usageInfo.percentage}%"></div>
+          </div>
+          `}
         </div>
-        `}
+      </td>
+      <td>
+        <div class="limit-cell">
+          <span class="cost-value">${requestUsageInfo.isUnlimited ? '∞' : max_requests.toLocaleString()}</span>
+          <span class="current-value">${(current_requests || 0).toLocaleString()}</span>
+          ${requestUsageInfo.isUnlimited ? '' : `
+          <div class="usage-bar-mini">
+            <div class="usage-bar ${requestUsageInfo.colorClass}" style="width: ${requestUsageInfo.percentage}%"></div>
+          </div>
+          `}
+        </div>
+      </td>
+      <td>
+        <span class="auto-reset-cell">${autoResetDisplay}</span>
       </td>
       <td>
         <div class="cost-limit-actions">
-          <button class="btn btn-xs btn-secondary" onclick="window.keysModule.openEditLimitModal('${api_key}', ${max_cost})" title="Edit limit">
+          <button class="btn btn-xs btn-secondary" onclick="window.keysModule.openEditLimitModal('${api_key}', ${max_cost}, ${max_requests || 0}, '${auto_reset_interval || ''}')" title="Edit limit">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
             </svg>
             Edit
           </button>
-          <button class="btn btn-xs btn-warning" onclick="window.keysModule.confirmResetCost('${api_key}', '${maskedKey}')" title="Reset cost">
+          <button class="btn btn-xs btn-warning" onclick="window.keysModule.confirmResetCost('${api_key}', '${maskedKey}')" title="Reset">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="23 4 23 10 17 10"></polyline>
               <polyline points="1 20 1 14 7 14"></polyline>
@@ -707,24 +750,35 @@ function renderCostLimitsList(data) {
 /**
  * Open modal to edit cost limit for a key
  */
-export function openEditLimitModal(apiKey, currentMaxCost) {
+export function openEditLimitModal(apiKey, currentMaxCost, currentMaxRequests = 0, currentAutoReset = '') {
   const maskedKey = maskApiKey(apiKey);
-  const isUnlimited = !currentMaxCost || currentMaxCost === 0;
+  const isCostUnlimited = !currentMaxCost || currentMaxCost === 0;
+  const isRequestsUnlimited = !currentMaxRequests || currentMaxRequests === 0;
   
   const content = `
     <div class="form-group">
       <label>API Key</label>
       <div class="key-display">${maskedKey}</div>
     </div>
-    <div class="form-group">
-      <label>Maximum Cost (USD)</label>
-      <input type="number" id="editMaxCost" class="form-input" step="0.01" min="0" value="${isUnlimited ? '' : currentMaxCost.toFixed(2)}" placeholder="Enter max cost" ${isUnlimited ? 'disabled' : ''}>
+    <div class="form-row">
+      <div class="form-group form-group-half">
+        <label>Maximum Cost (USD)</label>
+        <input type="number" id="editMaxCost" class="form-input" step="0.01" min="0" value="${isCostUnlimited ? '' : currentMaxCost.toFixed(2)}" placeholder="0 = unlimited">
+      </div>
+      <div class="form-group form-group-half">
+        <label>Maximum Requests</label>
+        <input type="number" id="editMaxRequests" class="form-input" step="1" min="0" value="${isRequestsUnlimited ? '' : currentMaxRequests}" placeholder="0 = unlimited">
+      </div>
     </div>
     <div class="form-group">
-      <label class="checkbox-label">
-        <input type="checkbox" id="editUnlimited" ${isUnlimited ? 'checked' : ''} onchange="document.getElementById('editMaxCost').disabled = this.checked; if(this.checked) document.getElementById('editMaxCost').value = '';">
-        <span>Unlimited (no cost limit)</span>
-      </label>
+      <label>Auto-Reset Interval</label>
+      <select id="editAutoReset" class="form-input">
+        <option value="none" ${!currentAutoReset || currentAutoReset === 'none' ? 'selected' : ''}>None (manual reset only)</option>
+        <option value="hourly" ${currentAutoReset === 'hourly' ? 'selected' : ''}>Hourly</option>
+        <option value="daily" ${currentAutoReset === 'daily' ? 'selected' : ''}>Daily</option>
+        <option value="weekly" ${currentAutoReset === 'weekly' ? 'selected' : ''}>Weekly</option>
+        <option value="monthly" ${currentAutoReset === 'monthly' ? 'selected' : ''}>Monthly</option>
+      </select>
     </div>`;
 
   const footer = `
@@ -738,23 +792,29 @@ export function openEditLimitModal(apiKey, currentMaxCost) {
       Save
     </button>`;
 
-  showModal('Edit Cost Limit', content, footer);
+  showModal('Edit Limit', content, footer);
 }
 
 /**
  * Save edited cost limit
  */
 export async function saveEditLimit(apiKey) {
-  const unlimitedEl = document.getElementById('editUnlimited');
   const maxCostEl = document.getElementById('editMaxCost');
+  const maxRequestsEl = document.getElementById('editMaxRequests');
+  const autoResetEl = document.getElementById('editAutoReset');
   
-  const isUnlimited = unlimitedEl?.checked;
-  const maxCost = isUnlimited ? 0 : parseFloat(maxCostEl?.value || '0');
+  const maxCost = parseFloat(maxCostEl?.value || '0') || 0;
+  const maxRequests = parseInt(maxRequestsEl?.value || '0', 10) || 0;
+  const autoResetInterval = autoResetEl?.value || 'none';
 
   try {
-    await api('PUT', `/access-key-limits/keys/${encodeURIComponent(apiKey)}`, { max_cost: maxCost });
+    await api('PUT', `/access-key-limits/keys/${encodeURIComponent(apiKey)}`, { 
+      max_cost: maxCost,
+      max_requests: maxRequests,
+      auto_reset_interval: autoResetInterval
+    });
     closeModal();
-    toast('Cost limit updated successfully', 'success');
+    toast('Limit updated successfully', 'success');
     refreshAllCostData();
   } catch (e) {
     toast('Failed: ' + e.message, 'error');
@@ -936,15 +996,25 @@ export function openAddLimitForKeyModal(apiKey) {
       <label>API Key</label>
       <div class="key-display">${maskedKey}</div>
     </div>
-    <div class="form-group">
-      <label>Maximum Cost (USD)</label>
-      <input type="number" id="newMaxCost" class="form-input" step="0.01" min="0" value="" placeholder="Enter max cost">
+    <div class="form-row">
+      <div class="form-group form-group-half">
+        <label>Maximum Cost (USD)</label>
+        <input type="number" id="newMaxCost" class="form-input" step="0.01" min="0" value="" placeholder="0 = unlimited">
+      </div>
+      <div class="form-group form-group-half">
+        <label>Maximum Requests</label>
+        <input type="number" id="newMaxRequests" class="form-input" step="1" min="0" value="" placeholder="0 = unlimited">
+      </div>
     </div>
     <div class="form-group">
-      <label class="checkbox-label">
-        <input type="checkbox" id="newUnlimited" onchange="document.getElementById('newMaxCost').disabled = this.checked; if(this.checked) document.getElementById('newMaxCost').value = '';">
-        <span>Unlimited (no cost limit)</span>
-      </label>
+      <label>Auto-Reset Interval</label>
+      <select id="newAutoReset" class="form-input">
+        <option value="none" selected>None (manual reset only)</option>
+        <option value="hourly">Hourly</option>
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+        <option value="monthly">Monthly</option>
+      </select>
     </div>`;
 
   const footer = `
@@ -956,7 +1026,7 @@ export function openAddLimitForKeyModal(apiKey) {
       Add Limit
     </button>`;
 
-  showModal('Add Cost Limit', content, footer);
+  showModal('Add Limit', content, footer);
   setTimeout(() => document.getElementById('newMaxCost')?.focus(), 100);
 }
 
@@ -964,21 +1034,27 @@ export function openAddLimitForKeyModal(apiKey) {
  * Save new cost limit for a key
  */
 export async function saveNewLimit(apiKey) {
-  const unlimitedEl = document.getElementById('newUnlimited');
   const maxCostEl = document.getElementById('newMaxCost');
+  const maxRequestsEl = document.getElementById('newMaxRequests');
+  const autoResetEl = document.getElementById('newAutoReset');
   
-  const isUnlimited = unlimitedEl?.checked;
-  const maxCost = isUnlimited ? 0 : parseFloat(maxCostEl?.value || '0');
+  const maxCost = parseFloat(maxCostEl?.value || '0') || 0;
+  const maxRequests = parseInt(maxRequestsEl?.value || '0', 10) || 0;
+  const autoResetInterval = autoResetEl?.value || 'none';
 
-  if (!isUnlimited && (!maxCostEl?.value || maxCost < 0)) {
-    toast('Please enter a valid max cost or select unlimited', 'error');
+  if (maxCost === 0 && maxRequests === 0 && autoResetInterval === 'none') {
+    toast('Please set at least one limit or auto-reset interval', 'error');
     return;
   }
 
   try {
-    await api('PUT', `/access-key-limits/keys/${encodeURIComponent(apiKey)}`, { max_cost: maxCost });
+    await api('PUT', `/access-key-limits/keys/${encodeURIComponent(apiKey)}`, { 
+      max_cost: maxCost,
+      max_requests: maxRequests,
+      auto_reset_interval: autoResetInterval
+    });
     closeModal();
-    toast('Cost limit added successfully', 'success');
+    toast('Limit added successfully', 'success');
     refreshAllCostData();
   } catch (e) {
     toast('Failed: ' + e.message, 'error');

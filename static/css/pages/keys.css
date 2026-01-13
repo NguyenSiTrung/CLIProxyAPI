@@ -780,6 +780,59 @@
   border-color: var(--accent-yellow);
 }
 
+/* Limit Cell (compact display of limit + current) */
+.limit-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.limit-cell .cost-value {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.limit-cell .current-value {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* Mini usage bar (for compact table view) */
+.usage-bar-mini {
+  height: 4px;
+  width: 60px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.usage-bar-mini .usage-bar {
+  height: 100%;
+  border-radius: 2px;
+}
+
+/* Auto-reset cell */
+.auto-reset-cell {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.next-reset-time {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* Form row (for side-by-side inputs) */
+.form-row {
+  display: flex;
+  gap: 12px;
+}
+
+.form-group-half {
+  flex: 1;
+}
+
 /* Responsive Cost Limits Table */
 @media (max-width: 768px) {
   .cost-limits-table th,
