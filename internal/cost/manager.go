@@ -10,28 +10,32 @@ import (
 )
 
 const accumulatorFileName = "cost_accumulator.json"
+const requestAccumulatorFileName = "request_accumulator.json"
 
 // Manager combines config, calculator, and accumulator to provide
 // a unified interface for cost limit management.
 type Manager struct {
-	mu          sync.RWMutex
-	cfg         *config.Config
-	calculator  *Calculator
-	accumulator *Accumulator
-	dataDir     string
+	mu                 sync.RWMutex
+	cfg                *config.Config
+	calculator         *Calculator
+	accumulator        *Accumulator
+	requestAccumulator *RequestAccumulator
+	dataDir            string
 }
 
 // NewManager creates a new cost limit manager.
 // It loads existing accumulated costs from the data directory if available.
 func NewManager(cfg *config.Config, dataDir string) *Manager {
 	m := &Manager{
-		cfg:         cfg,
-		calculator:  NewCalculator(),
-		accumulator: NewAccumulator(),
-		dataDir:     dataDir,
+		cfg:                cfg,
+		calculator:         NewCalculator(),
+		accumulator:        NewAccumulator(),
+		requestAccumulator: NewRequestAccumulator(),
+		dataDir:            dataDir,
 	}
 	if dataDir != "" {
 		_ = m.accumulator.LoadFromFile(filepath.Join(dataDir, accumulatorFileName))
+		_ = m.requestAccumulator.LoadFromFile(filepath.Join(dataDir, requestAccumulatorFileName))
 	}
 	return m
 }
@@ -85,6 +89,25 @@ func (m *Manager) GetLimit(apiKey string) float64 {
 	return m.cfg.AccessKeyLimits.DefaultMaxCost
 }
 
+// GetRequestLimit returns the request count limit for an API key.
+// If the key has a specific limit configured, that is returned.
+// Otherwise, the default limit is returned.
+// A limit of 0 means unlimited.
+func (m *Manager) GetRequestLimit(apiKey string) int64 {
+	if m == nil || m.cfg == nil {
+		return 0
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	for _, keyLimit := range m.cfg.AccessKeyLimits.Keys {
+		if keyLimit.APIKey == apiKey {
+			return keyLimit.MaxRequests
+		}
+	}
+	return m.cfg.AccessKeyLimits.DefaultMaxRequests
+}
+
 // SetLimit updates the cost limit for a specific API key.
 func (m *Manager) SetLimit(apiKey string, maxCost float64) {
 	if m == nil || m.cfg == nil {
@@ -105,10 +128,67 @@ func (m *Manager) SetLimit(apiKey string, maxCost float64) {
 	})
 }
 
-// CheckLimit checks if an API key is within its cost limit.
+// SetRequestLimit updates the request count limit for a specific API key.
+func (m *Manager) SetRequestLimit(apiKey string, maxRequests int64) {
+	if m == nil || m.cfg == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for i, keyLimit := range m.cfg.AccessKeyLimits.Keys {
+		if keyLimit.APIKey == apiKey {
+			m.cfg.AccessKeyLimits.Keys[i].MaxRequests = maxRequests
+			return
+		}
+	}
+	m.cfg.AccessKeyLimits.Keys = append(m.cfg.AccessKeyLimits.Keys, config.AccessKeyLimit{
+		APIKey:      apiKey,
+		MaxRequests: maxRequests,
+	})
+}
+
+// LimitExceededType indicates which limit type was exceeded.
+type LimitExceededType string
+
+const (
+	LimitNone    LimitExceededType = "none"
+	LimitCost    LimitExceededType = "cost"
+	LimitRequest LimitExceededType = "request"
+)
+
+// CheckLimit checks if an API key is within both cost and request limits.
 // Returns whether the key is allowed to make requests, the current accumulated cost,
-// and the configured limit.
-func (m *Manager) CheckLimit(apiKey string) (allowed bool, current float64, limit float64) {
+// the configured cost limit, and which limit type was exceeded (if any).
+func (m *Manager) CheckLimit(apiKey string) (allowed bool, currentCost float64, costLimit float64, exceeded LimitExceededType) {
+	if m == nil {
+		return true, 0, 0, LimitNone
+	}
+	if !m.IsEnabled() {
+		return true, 0, 0, LimitNone
+	}
+
+	currentCost = m.accumulator.Get(apiKey)
+	costLimit = m.GetLimit(apiKey)
+	currentRequests := m.requestAccumulator.Get(apiKey)
+	requestLimit := m.GetRequestLimit(apiKey)
+
+	// Check cost limit first
+	if costLimit > 0 && currentCost >= costLimit {
+		return false, currentCost, costLimit, LimitCost
+	}
+
+	// Check request limit
+	if requestLimit > 0 && currentRequests >= requestLimit {
+		return false, currentCost, costLimit, LimitRequest
+	}
+
+	return true, currentCost, costLimit, LimitNone
+}
+
+// CheckRequestLimit checks only the request count limit for an API key.
+// Returns whether the key is allowed, current count, and the limit.
+func (m *Manager) CheckRequestLimit(apiKey string) (allowed bool, current int64, limit int64) {
 	if m == nil {
 		return true, 0, 0
 	}
@@ -116,13 +196,30 @@ func (m *Manager) CheckLimit(apiKey string) (allowed bool, current float64, limi
 		return true, 0, 0
 	}
 
-	current = m.accumulator.Get(apiKey)
-	limit = m.GetLimit(apiKey)
+	current = m.requestAccumulator.Get(apiKey)
+	limit = m.GetRequestLimit(apiKey)
 
 	if limit == 0 {
 		return true, current, limit
 	}
 	return current < limit, current, limit
+}
+
+// RecordRequest increments the request count for an API key.
+func (m *Manager) RecordRequest(apiKey string) {
+	if m == nil || !m.IsEnabled() {
+		return
+	}
+	m.requestAccumulator.Add(apiKey, 1)
+	m.saveRequests()
+}
+
+// GetCurrentRequestCount returns the current request count for an API key.
+func (m *Manager) GetCurrentRequestCount(apiKey string) int64 {
+	if m == nil {
+		return 0
+	}
+	return m.requestAccumulator.Get(apiKey)
 }
 
 // RecordUsage calculates the cost for a usage record and accumulates it.
@@ -148,6 +245,28 @@ func (m *Manager) ResetKey(apiKey string) error {
 	return m.save()
 }
 
+// ResetRequestCount resets the request count for an API key to zero.
+func (m *Manager) ResetRequestCount(apiKey string) error {
+	if m == nil {
+		return nil
+	}
+	m.requestAccumulator.Reset(apiKey)
+	return m.saveRequests()
+}
+
+// ResetAll resets both cost and request count for an API key to zero.
+func (m *Manager) ResetAll(apiKey string) error {
+	if m == nil {
+		return nil
+	}
+	m.accumulator.Reset(apiKey)
+	m.requestAccumulator.Reset(apiKey)
+	if err := m.save(); err != nil {
+		return err
+	}
+	return m.saveRequests()
+}
+
 // GetCurrentCost returns the current accumulated cost for an API key.
 func (m *Manager) GetCurrentCost(apiKey string) float64 {
 	if m == nil {
@@ -158,13 +277,16 @@ func (m *Manager) GetCurrentCost(apiKey string) float64 {
 
 // KeyLimitInfo contains limit and cost information for an API key.
 type KeyLimitInfo struct {
-	APIKey      string  `json:"api_key"`
-	MaxCost     float64 `json:"max_cost"`
-	CurrentCost float64 `json:"current_cost"`
+	APIKey            string  `json:"api_key"`
+	MaxCost           float64 `json:"max_cost"`
+	CurrentCost       float64 `json:"current_cost"`
+	MaxRequests       int64   `json:"max_requests"`
+	CurrentRequests   int64   `json:"current_requests"`
+	AutoResetInterval string  `json:"auto_reset_interval"`
 }
 
 // GetAllLimits returns limit and cost information for all keys that have
-// either a configured limit or accumulated cost.
+// either a configured limit or accumulated cost/requests.
 func (m *Manager) GetAllLimits() []KeyLimitInfo {
 	if m == nil {
 		return nil
@@ -179,19 +301,36 @@ func (m *Manager) GetAllLimits() []KeyLimitInfo {
 	for _, keyLimit := range m.cfg.AccessKeyLimits.Keys {
 		keySet[keyLimit.APIKey] = struct{}{}
 		result = append(result, KeyLimitInfo{
-			APIKey:      keyLimit.APIKey,
-			MaxCost:     keyLimit.MaxCost,
-			CurrentCost: m.accumulator.Get(keyLimit.APIKey),
+			APIKey:            keyLimit.APIKey,
+			MaxCost:           keyLimit.MaxCost,
+			CurrentCost:       m.accumulator.Get(keyLimit.APIKey),
+			MaxRequests:       keyLimit.MaxRequests,
+			CurrentRequests:   m.requestAccumulator.Get(keyLimit.APIKey),
+			AutoResetInterval: keyLimit.AutoResetInterval,
 		})
 	}
 
 	allCosts := m.accumulator.GetAll()
-	for apiKey, cost := range allCosts {
+	allRequests := m.requestAccumulator.GetAll()
+
+	// Merge keys from both accumulators
+	allKeys := make(map[string]struct{})
+	for k := range allCosts {
+		allKeys[k] = struct{}{}
+	}
+	for k := range allRequests {
+		allKeys[k] = struct{}{}
+	}
+
+	for apiKey := range allKeys {
 		if _, exists := keySet[apiKey]; !exists {
 			result = append(result, KeyLimitInfo{
-				APIKey:      apiKey,
-				MaxCost:     m.cfg.AccessKeyLimits.DefaultMaxCost,
-				CurrentCost: cost,
+				APIKey:            apiKey,
+				MaxCost:           m.cfg.AccessKeyLimits.DefaultMaxCost,
+				CurrentCost:       allCosts[apiKey],
+				MaxRequests:       m.cfg.AccessKeyLimits.DefaultMaxRequests,
+				CurrentRequests:   allRequests[apiKey],
+				AutoResetInterval: "",
 			})
 		}
 	}
@@ -209,6 +348,16 @@ func (m *Manager) GetDefaultMaxCost() float64 {
 	return m.cfg.AccessKeyLimits.DefaultMaxCost
 }
 
+// GetDefaultMaxRequests returns the default maximum request count for keys without specific limits.
+func (m *Manager) GetDefaultMaxRequests() int64 {
+	if m == nil || m.cfg == nil {
+		return 0
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.cfg.AccessKeyLimits.DefaultMaxRequests
+}
+
 // Calculator returns the underlying pricing calculator.
 func (m *Manager) Calculator() *Calculator {
 	if m == nil {
@@ -217,10 +366,18 @@ func (m *Manager) Calculator() *Calculator {
 	return m.calculator
 }
 
-// save persists the accumulator to disk.
+// save persists the cost accumulator to disk.
 func (m *Manager) save() error {
 	if m.dataDir == "" {
 		return nil
 	}
 	return m.accumulator.SaveToFile(filepath.Join(m.dataDir, accumulatorFileName))
+}
+
+// saveRequests persists the request accumulator to disk.
+func (m *Manager) saveRequests() error {
+	if m.dataDir == "" {
+		return nil
+	}
+	return m.requestAccumulator.SaveToFile(filepath.Join(m.dataDir, requestAccumulatorFileName))
 }
