@@ -141,6 +141,9 @@ type AccessKeyLimits struct {
 	// DefaultMaxCost is the default maximum cost for keys not explicitly configured.
 	// A value of 0 means unlimited (no limit enforced).
 	DefaultMaxCost float64 `yaml:"default-max-cost" json:"default-max-cost"`
+	// DefaultMaxRequests is the default maximum request count for keys not explicitly configured.
+	// A value of 0 means unlimited (no limit enforced).
+	DefaultMaxRequests int64 `yaml:"default-max-requests" json:"default-max-requests"`
 	// Keys defines per-key cost limit overrides.
 	Keys []AccessKeyLimit `yaml:"keys" json:"keys"`
 }
@@ -152,6 +155,12 @@ type AccessKeyLimit struct {
 	// MaxCost is the maximum accumulated cost before requests are blocked.
 	// A value of 0 means unlimited (no limit enforced for this key).
 	MaxCost float64 `yaml:"max-cost" json:"max-cost"`
+	// MaxRequests is the maximum request count before requests are blocked.
+	// A value of 0 means unlimited (no limit enforced for this key).
+	MaxRequests int64 `yaml:"max-requests" json:"max-requests"`
+	// AutoResetInterval defines when usage counters automatically reset.
+	// Valid values: "hourly", "daily", "weekly", "monthly", "none" (default: "none").
+	AutoResetInterval string `yaml:"auto-reset-interval" json:"auto-reset-interval"`
 }
 
 // UsageAutoBackupConfig holds the usage statistics auto-backup configuration.

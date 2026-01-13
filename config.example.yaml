@@ -47,22 +47,30 @@ api-keys:
   - "your-api-key-3"
 
 # Access Key Cost Limits
-# Configure per-access-key cost limits to block requests when accumulated costs exceed limits.
-# Requires manual reset to unblock a key after it exceeds its limit.
+# Configure per-access-key cost and request count limits to block requests when limits are exceeded.
+# Supports automatic reset intervals (hourly/daily/weekly/monthly) or manual reset.
 # access-key-limits:
 #   # Enable cost limit enforcement (default: false)
 #   enabled: false
 #   # Default maximum cost (USD) for keys not explicitly configured.
 #   # Set to 0 for unlimited (no limit enforced).
 #   default-max-cost: 10.00
+#   # Default maximum request count for keys not explicitly configured.
+#   # Set to 0 for unlimited (no limit enforced).
+#   default-max-requests: 1000
 #   # Per-key cost limit overrides
 #   keys:
 #     - api-key: "your-api-key-1"
 #       max-cost: 25.00          # Higher limit for power users
+#       max-requests: 5000       # Request count limit
+#       auto-reset-interval: daily  # Reset counters daily (hourly/daily/weekly/monthly/none)
 #     - api-key: "your-api-key-2"
 #       max-cost: 5.00           # Lower limit for testing
+#       max-requests: 100        # Lower request limit
+#       auto-reset-interval: none   # Manual reset only (default)
 #     - api-key: "your-api-key-3"
-#       max-cost: 0              # Unlimited (no limit enforced)
+#       max-cost: 0              # Unlimited cost (no limit enforced)
+#       max-requests: 0          # Unlimited requests (no limit enforced)
 
 # Enable debug logging
 debug: false
