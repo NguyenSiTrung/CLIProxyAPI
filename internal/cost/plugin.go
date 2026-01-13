@@ -31,7 +31,7 @@ func (p *CostLimitPlugin) SetManager(manager *Manager) {
 }
 
 // HandleUsage implements coreusage.Plugin.
-// It records the cost for successful requests only.
+// It records the cost for successful requests and increments request count.
 func (p *CostLimitPlugin) HandleUsage(ctx context.Context, record coreusage.Record) {
 	if p == nil {
 		return
@@ -58,6 +58,10 @@ func (p *CostLimitPlugin) HandleUsage(ctx context.Context, record coreusage.Reco
 		return
 	}
 
+	// Record request count (always, regardless of cost)
+	manager.RecordRequest(apiKey)
+
+	// Record cost (only if cost > 0)
 	manager.RecordUsage(apiKey, record.Model, record.Detail)
 }
 
