@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/api/middleware"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/logging"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/api/handlers"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/api/handlers/claude"
@@ -35,6 +36,14 @@ func clientAPIKeyMiddleware() gin.HandlerFunc {
 		}
 		c.Next()
 	}
+}
+
+// costLimitMiddleware returns the cost/request limit middleware when a cost manager is configured.
+func (m *AmpModule) costLimitMiddleware() gin.HandlerFunc {
+	if m == nil || m.costManager == nil {
+		return nil
+	}
+	return middleware.CostLimitMiddleware(m.costManager)
 }
 
 // getClientAPIKeyFromContext retrieves the client API key from request context.
@@ -243,7 +252,11 @@ func (m *AmpModule) registerManagementRoutes(engine *gin.Engine, baseHandler *ha
 	// Route POST model calls through Gemini bridge with FallbackHandler.
 	// FallbackHandler checks provider -> mapping -> proxy fallback automatically.
 	// All other methods (e.g., GET model listing) always proxy to upstream to preserve Amp CLI behavior.
-	ampAPI.Any("/provider/google/v1beta1/*path", func(c *gin.Context) {
+	googleV1beta1 := ampAPI.Group("/provider/google/v1beta1")
+	if limiter := m.costLimitMiddleware(); limiter != nil {
+		googleV1beta1.Use(limiter)
+	}
+	googleV1beta1.Any("/*path", func(c *gin.Context) {
 		if c.Request.Method == "POST" {
 			if path := c.Param("path"); strings.Contains(path, "/models/") {
 				// POST with /models/ path -> use Gemini bridge with fallback handler
@@ -282,6 +295,9 @@ func (m *AmpModule) registerProviderAliases(engine *gin.Engine, baseHandler *han
 
 	if auth != nil {
 		ampProviders.Use(auth)
+	}
+	if limiter := m.costLimitMiddleware(); limiter != nil {
+		ampProviders.Use(limiter)
 	}
 	// Inject client API key into request context for per-client upstream routing
 	ampProviders.Use(clientAPIKeyMiddleware())
@@ -334,4 +350,3 @@ func (m *AmpModule) registerProviderAliases(engine *gin.Engine, baseHandler *han
 		v1betaAmp.GET("/models/*action", geminiHandlers.GeminiGetHandler)
 	}
 }
-

@@ -3,11 +3,91 @@ package amp
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/cost"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/api/handlers"
 )
+
+func TestProviderAliasesEnforceCostLimit(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+
+	cfg := &config.Config{AccessKeyLimits: config.AccessKeyLimits{Enabled: true, DefaultMaxRequests: 1}}
+	manager := cost.NewManager(cfg, "")
+	manager.RecordRequest("limited-key")
+
+	authMiddleware := func(c *gin.Context) {
+		if key := c.GetHeader("X-API-Key"); key != "" {
+			c.Set("apiKey", key)
+		}
+		c.Next()
+	}
+
+	m := New(WithAuthMiddleware(authMiddleware), WithCostManager(manager))
+	base := &handlers.BaseAPIHandler{}
+	m.registerProviderAliases(r, base, authMiddleware)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/provider/openai/models", nil)
+	req.Header.Set("X-API-Key", "limited-key")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429 when request limit exceeded, got %d", w.Code)
+	}
+	if body := w.Body.String(); !strings.Contains(body, "request_limit_exceeded") {
+		t.Fatalf("expected request_limit_exceeded in response, got %q", body)
+	}
+}
+
+func TestGoogleV1Beta1BridgeEnforcesCostLimit(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+
+	cfg := &config.Config{AccessKeyLimits: config.AccessKeyLimits{Enabled: true, DefaultMaxRequests: 1}}
+	manager := cost.NewManager(cfg, "")
+	manager.RecordRequest("limited-key")
+
+	// Prepare proxy to satisfy availability middleware
+	proxyTarget := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer proxyTarget.Close()
+
+	proxy, err := createReverseProxy(proxyTarget.URL, NewStaticSecretSource(""))
+	if err != nil {
+		t.Fatalf("failed to create reverse proxy: %v", err)
+	}
+
+	authMiddleware := func(c *gin.Context) {
+		if key := c.GetHeader("X-API-Key"); key != "" {
+			c.Set("apiKey", key)
+		}
+		c.Next()
+	}
+
+	m := &AmpModule{costManager: manager}
+	m.setProxy(proxy)
+	base := &handlers.BaseAPIHandler{}
+	m.registerManagementRoutes(r, base, authMiddleware)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/provider/google/v1beta1/models/generateContent", nil)
+	req.Header.Set("X-API-Key", "limited-key")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429 for exceeded request limit, got %d", w.Code)
+	}
+	if body := w.Body.String(); !strings.Contains(body, "request_limit_exceeded") {
+		t.Fatalf("expected request_limit_exceeded in response, got %q", body)
+	}
+}
 
 func TestRegisterManagementRoutes(t *testing.T) {
 	gin.SetMode(gin.TestMode)

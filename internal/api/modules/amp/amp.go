@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/api/modules"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/cost"
 	sdkaccess "github.com/router-for-me/CLIProxyAPI/v6/sdk/access"
 	log "github.com/sirupsen/logrus"
 )
@@ -30,6 +31,7 @@ type AmpModule struct {
 	proxyMu         sync.RWMutex // protects proxy for hot-reload
 	accessManager   *sdkaccess.Manager
 	authMiddleware_ gin.HandlerFunc
+	costManager     *cost.Manager
 	modelMapper     *DefaultModelMapper
 	enabled         bool
 	registerOnce    sync.Once
@@ -92,6 +94,13 @@ func WithAccessManager(am *sdkaccess.Manager) Option {
 func WithAuthMiddleware(middleware gin.HandlerFunc) Option {
 	return func(m *AmpModule) {
 		m.authMiddleware_ = middleware
+	}
+}
+
+// WithCostManager enables access-key cost/request limit enforcement on Amp routes.
+func WithCostManager(manager *cost.Manager) Option {
+	return func(m *AmpModule) {
+		m.costManager = manager
 	}
 }
 

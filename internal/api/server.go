@@ -293,7 +293,11 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 	s.setupRoutes()
 
 	// Register Amp module using V2 interface with Context
-	s.ampModule = ampmodule.NewLegacy(accessManager, AuthMiddleware(accessManager))
+	s.ampModule = ampmodule.New(
+		ampmodule.WithAccessManager(accessManager),
+		ampmodule.WithAuthMiddleware(AuthMiddleware(accessManager)),
+		ampmodule.WithCostManager(s.costManager),
+	)
 	ctx := modules.Context{
 		Engine:         engine,
 		BaseHandler:    s.handlers,

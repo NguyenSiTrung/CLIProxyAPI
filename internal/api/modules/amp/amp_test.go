@@ -137,6 +137,7 @@ func TestAmpModule_Register_InvalidUpstream(t *testing.T) {
 }
 
 func TestAmpModule_OnConfigUpdated_CacheInvalidation(t *testing.T) {
+	t.Setenv("AMP_API_KEY", "")
 	tmpDir := t.TempDir()
 	p := filepath.Join(tmpDir, "secrets.json")
 	if err := os.WriteFile(p, []byte(`{"apiKey@https://ampcode.com/":"v1"}`), 0600); err != nil {

@@ -15,6 +15,7 @@ import (
 )
 
 func TestMultiSourceSecret_PrecedenceOrder(t *testing.T) {
+	t.Setenv("AMP_API_KEY", "")
 	ctx := context.Background()
 
 	cases := []struct {
@@ -60,6 +61,7 @@ func TestMultiSourceSecret_PrecedenceOrder(t *testing.T) {
 }
 
 func TestMultiSourceSecret_CacheBehavior(t *testing.T) {
+	t.Setenv("AMP_API_KEY", "")
 	ctx := context.Background()
 	tmpDir := t.TempDir()
 	p := filepath.Join(tmpDir, "secrets.json")
@@ -108,6 +110,7 @@ func TestMultiSourceSecret_CacheBehavior(t *testing.T) {
 }
 
 func TestMultiSourceSecret_FileHandling(t *testing.T) {
+	t.Setenv("AMP_API_KEY", "")
 	ctx := context.Background()
 
 	t.Run("missing_file_no_error", func(t *testing.T) {
@@ -168,6 +171,7 @@ func TestMultiSourceSecret_FileHandling(t *testing.T) {
 }
 
 func TestMultiSourceSecret_Concurrency(t *testing.T) {
+	t.Setenv("AMP_API_KEY", "")
 	tmpDir := t.TempDir()
 	p := filepath.Join(tmpDir, "secrets.json")
 	if err := os.WriteFile(p, []byte(`{"apiKey@https://ampcode.com/":"concurrent"}`), 0600); err != nil {
@@ -248,6 +252,7 @@ func TestStaticSecretSource(t *testing.T) {
 }
 
 func TestMultiSourceSecret_CacheEmptyResult(t *testing.T) {
+	t.Setenv("AMP_API_KEY", "")
 	// Test that missing file results are cached to avoid repeated file reads
 	tmpDir := t.TempDir()
 	p := filepath.Join(tmpDir, "nonexistent.json")
