@@ -240,13 +240,43 @@ func (s *RequestStatistics) updateAPIStats(stats *apiStats, model string, detail
 
 // Snapshot returns a copy of the aggregated metrics for external consumption.
 func (s *RequestStatistics) Snapshot() StatisticsSnapshot {
-	result := StatisticsSnapshot{}
 	if s == nil {
-		return result
+		return StatisticsSnapshot{}
 	}
 
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
+	return s.snapshotLocked()
+}
+
+// Reset clears all in-memory usage statistics and returns the snapshot before reset.
+func (s *RequestStatistics) Reset() StatisticsSnapshot {
+	if s == nil {
+		return StatisticsSnapshot{}
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	snapshot := s.snapshotLocked()
+
+	s.totalRequests = 0
+	s.successCount = 0
+	s.failureCount = 0
+	s.totalTokens = 0
+
+	s.apis = make(map[string]*apiStats)
+	s.requestsByDay = make(map[string]int64)
+	s.requestsByHour = make(map[int]int64)
+	s.tokensByDay = make(map[string]int64)
+	s.tokensByHour = make(map[int]int64)
+
+	return snapshot
+}
+
+func (s *RequestStatistics) snapshotLocked() StatisticsSnapshot {
+	result := StatisticsSnapshot{}
 
 	result.TotalRequests = s.totalRequests
 	result.SuccessCount = s.successCount

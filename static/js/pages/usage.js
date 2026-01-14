@@ -22,6 +22,13 @@ let tokensChartInstance = null;
 // Cost limits cache
 let costLimitsCache = null;
 
+// Auto-backup state cache
+const autoBackupState = {
+  enabled: false,
+  folder: '',
+  intervalMinutes: null
+};
+
 // Default pricing for well-known models (prices per 1M tokens in USD)
 const DEFAULT_MODEL_PRICING = {
   // OpenAI Models
@@ -1139,6 +1146,86 @@ function escapeHtml(str) {
 }
 
 // ============================================================================
+// RESET USAGE DATA
+// ============================================================================
+
+/**
+ * Show confirmation modal for resetting usage statistics.
+ */
+export function openResetUsageModal() {
+  const backupAvailable = autoBackupState.enabled;
+  const content = `
+    <div style="padding:12px 0; text-align:left; color:var(--text-secondary); font-size:13px; line-height:1.5;">
+      <p style="margin:0 0 8px 0; color:var(--text-primary);">Resetting clears all usage statistics immediately without restarting the server.</p>
+      <label style="display:flex; gap:10px; align-items:flex-start; margin-top:10px;">
+        <input type="checkbox" id="resetUsageBackupToggle" ${backupAvailable ? 'checked' : ''} ${backupAvailable ? '' : 'disabled'}>
+        <div>
+          <div style="color:var(--text-primary); font-weight:600;">Create server backup before reset</div>
+          <div style="font-size:12px; color:var(--text-secondary);">
+            ${backupAvailable ? 'A backup file will be saved to the configured folder before clearing data.' : 'Enable auto-backup to allow creating a backup before reset.'}
+          </div>
+        </div>
+      </label>
+      <p style="margin:12px 0 0 0; font-size:12px;">You can restore later from the <strong>Available Backups</strong> list.</p>
+    </div>
+  `;
+
+  const footer = `
+    <button class="btn btn-secondary" onclick="window.closeModal()">Cancel</button>
+    <button class="btn btn-danger" id="confirmResetUsageBtn">Reset</button>
+  `;
+
+  showModal('Reset usage statistics', content, footer);
+
+  const confirmBtn = document.getElementById('confirmResetUsageBtn');
+  if (confirmBtn) {
+    confirmBtn.onclick = () => {
+      const backupToggle = document.getElementById('resetUsageBackupToggle');
+      const backup = backupToggle ? backupToggle.checked && !backupToggle.disabled : false;
+      window.closeModal();
+      resetUsageData({ backup });
+    };
+  }
+}
+
+/**
+ * Reset usage data in the server without a restart.
+ */
+export async function resetUsageData({ backup = false } = {}) {
+  let backupRequested = backup;
+  if (backupRequested && !autoBackupState.enabled) {
+    toast('Auto-backup is disabled; proceeding without backup', 'warning');
+    backupRequested = false;
+  }
+
+  const btn = document.getElementById('usageResetBtn');
+  const originalText = btn ? btn.textContent : '';
+  if (btn) {
+    btn.disabled = true;
+    btn.classList.add('loading');
+    btn.textContent = backupRequested ? 'Backing up…' : 'Resetting…';
+  }
+
+  try {
+    const endpoint = backupRequested ? '/usage/reset?backup=true' : '/usage/reset';
+    const result = await api('POST', endpoint);
+    toast(result.message || 'Usage statistics reset', 'success');
+    loadUsageStats();
+    if (result.backup_created) {
+      loadBackupFiles();
+    }
+  } catch (err) {
+    toast('Reset failed: ' + err.message, 'error');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.classList.remove('loading');
+      btn.textContent = originalText || 'Reset';
+    }
+  }
+}
+
+// ============================================================================
 // AUTO-BACKUP STATUS (Server-Side)
 // ============================================================================
 
@@ -1179,6 +1266,10 @@ async function loadAutoBackupStatus() {
     const config = await api('GET', '/config');
     const autoBackup = config?.['usage-auto-backup'] || {};
     const enabled = autoBackup.enabled === true;
+
+    autoBackupState.enabled = enabled;
+    autoBackupState.intervalMinutes = autoBackup['interval-minutes'] || null;
+    autoBackupState.folder = autoBackup['folder-path'] || '';
     
     if (statusEl) {
       statusEl.textContent = enabled ? 'Enabled' : 'Disabled';
@@ -1354,6 +1445,8 @@ export const usageModule = {
   exportUsageData,
   importUsageData,
   triggerUsageImport,
+  openResetUsageModal,
+  resetUsageData,
   toggleAutoBackupSettings,
   initAutoBackup,
   loadBackupFiles,
@@ -1370,6 +1463,8 @@ window.setChartView = setChartView;
 window.exportUsageData = exportUsageData;
 window.triggerUsageImport = triggerUsageImport;
 window.importUsageData = importUsageData;
+window.openResetUsageModal = openResetUsageModal;
+window.resetUsageData = resetUsageData;
 window.toggleAutoBackupSettings = toggleAutoBackupSettings;
 window.initAutoBackup = initAutoBackup;
 window.refreshBackupFiles = refreshBackupFiles;

@@ -3,6 +3,7 @@ package management
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -18,6 +19,10 @@ type usageExportPayload struct {
 type usageImportPayload struct {
 	Version int                      `json:"version"`
 	Usage   usage.StatisticsSnapshot `json:"usage"`
+}
+
+type usageResetRequest struct {
+	Backup bool `json:"backup"`
 }
 
 // GetUsageStatistics returns the in-memory request statistics snapshot.
@@ -75,6 +80,58 @@ func (h *Handler) ImportUsageStatistics(c *gin.Context) {
 		"skipped":         result.Skipped,
 		"total_requests":  snapshot.TotalRequests,
 		"failed_requests": snapshot.FailureCount,
+	})
+}
+
+// ResetUsageStatistics clears in-memory usage statistics and optionally takes a backup before reset.
+func (h *Handler) ResetUsageStatistics(c *gin.Context) {
+	if h == nil || h.usageStats == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "usage statistics unavailable"})
+		return
+	}
+
+	backupRequested := false
+	if raw := c.Query("backup"); raw != "" {
+		if parsed, err := strconv.ParseBool(raw); err == nil {
+			backupRequested = parsed
+		}
+	}
+
+	if c.Request != nil && c.Request.Body != nil && c.Request.ContentLength != 0 {
+		var body usageResetRequest
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid json"})
+			return
+		}
+		backupRequested = backupRequested || body.Backup
+	}
+
+	backupPerformed := false
+	var backupTime time.Time
+	if backupRequested {
+		svc := usage.GetGlobalAutoBackupService()
+		if svc == nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "auto-backup service not enabled"})
+			return
+		}
+
+		if err := svc.PerformBackupNow(); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "backup failed: " + err.Error()})
+			return
+		}
+		backupPerformed = true
+		backupTime = svc.LastBackupTime()
+	}
+
+	cleared := h.usageStats.Reset()
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":          true,
+		"message":          "Usage statistics reset successfully",
+		"cleared_requests": cleared.TotalRequests,
+		"cleared_tokens":   cleared.TotalTokens,
+		"backup_created":   backupPerformed,
+		"backup_time":      backupTime,
 	})
 }
 

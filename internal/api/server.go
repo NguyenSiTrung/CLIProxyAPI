@@ -516,6 +516,7 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.GET("/usage", s.mgmt.GetUsageStatistics)
 		mgmt.GET("/usage/export", s.mgmt.ExportUsageStatistics)
 		mgmt.POST("/usage/import", s.mgmt.ImportUsageStatistics)
+		mgmt.POST("/usage/reset", s.mgmt.ResetUsageStatistics)
 		mgmt.GET("/usage/backups", s.mgmt.ListBackupFiles)
 		mgmt.POST("/usage/backups/import", s.mgmt.ImportBackupFile)
 		mgmt.POST("/usage/backups/trigger", s.mgmt.TriggerManualBackup)
