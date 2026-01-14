@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/cost"
 )
 
@@ -77,7 +78,9 @@ func (h *Handler) PutAccessKeyLimitsEnabled(c *gin.Context) {
 		return
 	}
 
-	costManager.SetEnabled(*body.Enabled)
+	// Modify h.cfg directly to ensure persist saves the correct config.
+	// The OnConfigChange callback will sync this to costManager via SetConfig.
+	h.cfg.AccessKeyLimits.Enabled = *body.Enabled
 	h.persist(c)
 }
 
@@ -110,16 +113,46 @@ func (h *Handler) PutAccessKeyLimit(c *gin.Context) {
 		return
 	}
 
-	if body.MaxCost != nil {
-		costManager.SetLimit(apiKey, *body.MaxCost)
-	}
-	if body.MaxRequests != nil {
-		costManager.SetRequestLimit(apiKey, *body.MaxRequests)
-	}
-	if body.AutoResetInterval != nil {
-		costManager.SetAutoResetInterval(apiKey, *body.AutoResetInterval)
-	}
+	// Modify h.cfg directly to ensure persist saves the correct config.
+	// The OnConfigChange callback will sync this to costManager via SetConfig.
+	// This fixes a bug where costManager.cfg and h.cfg could be different objects
+	// after hot-reloads, causing changes to be lost when persist saves h.cfg.
+	h.updateAccessKeyLimit(apiKey, body.MaxCost, body.MaxRequests, body.AutoResetInterval)
 	h.persist(c)
+}
+
+// updateAccessKeyLimit updates the limit configuration in h.cfg for a specific API key.
+// It finds or creates the key entry and applies the provided limit changes.
+func (h *Handler) updateAccessKeyLimit(apiKey string, maxCost *float64, maxRequests *int64, autoResetInterval *string) {
+	// Find existing key entry
+	for i, keyLimit := range h.cfg.AccessKeyLimits.Keys {
+		if keyLimit.APIKey == apiKey {
+			// Update existing entry
+			if maxCost != nil {
+				h.cfg.AccessKeyLimits.Keys[i].MaxCost = *maxCost
+			}
+			if maxRequests != nil {
+				h.cfg.AccessKeyLimits.Keys[i].MaxRequests = *maxRequests
+			}
+			if autoResetInterval != nil {
+				h.cfg.AccessKeyLimits.Keys[i].AutoResetInterval = *autoResetInterval
+			}
+			return
+		}
+	}
+
+	// Key not found, create new entry
+	newEntry := config.AccessKeyLimit{APIKey: apiKey}
+	if maxCost != nil {
+		newEntry.MaxCost = *maxCost
+	}
+	if maxRequests != nil {
+		newEntry.MaxRequests = *maxRequests
+	}
+	if autoResetInterval != nil {
+		newEntry.AutoResetInterval = *autoResetInterval
+	}
+	h.cfg.AccessKeyLimits.Keys = append(h.cfg.AccessKeyLimits.Keys, newEntry)
 }
 
 // ResetAccessKeyLimit resets the accumulated cost/requests for a specific API key to zero.

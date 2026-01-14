@@ -32,6 +32,8 @@ func (p *CostLimitPlugin) SetManager(manager *Manager) {
 
 // HandleUsage implements coreusage.Plugin.
 // It records the cost for successful requests and increments request count.
+// Counting only happens when access-key-limits.enabled is true.
+// Once enabled, all keys are counted regardless of whether they have individual limits set.
 func (p *CostLimitPlugin) HandleUsage(ctx context.Context, record coreusage.Record) {
 	if p == nil {
 		return
@@ -58,7 +60,7 @@ func (p *CostLimitPlugin) HandleUsage(ctx context.Context, record coreusage.Reco
 		return
 	}
 
-	// Record request count (always, regardless of cost)
+	// Record request count (always when enabled, regardless of individual key limits)
 	manager.RecordRequest(apiKey)
 
 	// Record cost (only if cost > 0)

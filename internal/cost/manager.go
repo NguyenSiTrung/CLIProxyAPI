@@ -215,8 +215,9 @@ func (m *Manager) CheckRequestLimit(apiKey string) (allowed bool, current int64,
 }
 
 // RecordRequest increments the request count for an API key.
+// Called by plugin after checking IsEnabled(), so no need to check here.
 func (m *Manager) RecordRequest(apiKey string) {
-	if m == nil || !m.IsEnabled() {
+	if m == nil {
 		return
 	}
 	m.requestAccumulator.Add(apiKey, 1)
@@ -233,8 +234,9 @@ func (m *Manager) GetCurrentRequestCount(apiKey string) int64 {
 
 // RecordUsage calculates the cost for a usage record and accumulates it.
 // The cost is calculated based on the model and token usage.
+// Called by plugin after checking IsEnabled(), so no need to check here.
 func (m *Manager) RecordUsage(apiKey, model string, tokens coreusage.Detail) {
-	if m == nil || !m.IsEnabled() {
+	if m == nil {
 		return
 	}
 
