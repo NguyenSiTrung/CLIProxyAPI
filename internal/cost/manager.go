@@ -214,6 +214,34 @@ func (m *Manager) CheckRequestLimit(apiKey string) (allowed bool, current int64,
 	return current < limit, current, limit
 }
 
+// CheckAndRecordRequest atomically checks the request limit for an API key and,
+// when allowed, increments the request count by 1. It returns whether the
+// request is allowed, the resulting request count, and the configured limit.
+// When limits are disabled or limit is zero (unlimited), it still increments
+// the counter for tracking purposes.
+func (m *Manager) CheckAndRecordRequest(apiKey string) (allowed bool, current int64, limit int64) {
+	if m == nil {
+		return true, 0, 0
+	}
+	if !m.IsEnabled() {
+		return true, 0, 0
+	}
+
+	limit = m.GetRequestLimit(apiKey)
+	if limit == 0 {
+		m.requestAccumulator.Add(apiKey, 1)
+		current = m.requestAccumulator.Get(apiKey)
+		_ = m.saveRequests()
+		return true, current, limit
+	}
+
+	allowed, current = m.requestAccumulator.CheckAndAdd(apiKey, limit)
+	if allowed {
+		_ = m.saveRequests()
+	}
+	return allowed, current, limit
+}
+
 // RecordRequest increments the request count for an API key.
 // Called by plugin after checking IsEnabled(), so no need to check here.
 func (m *Manager) RecordRequest(apiKey string) {

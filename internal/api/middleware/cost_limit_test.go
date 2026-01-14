@@ -142,6 +142,37 @@ func TestCostLimitMiddleware_RequestLimitExceeded(t *testing.T) {
 	}
 }
 
+func TestCostLimitMiddleware_RequestLimitEnforcedPerRequest(t *testing.T) {
+	cfg := &config.Config{
+		AccessKeyLimits: config.AccessKeyLimits{
+			Enabled:            true,
+			DefaultMaxRequests: 1,
+		},
+	}
+	manager := cost.NewManager(cfg, "")
+
+	r := setupTestRouter(manager)
+
+	req1, _ := http.NewRequest("GET", "/test", nil)
+	req1.Header.Set("X-API-Key", "test-key")
+	w1 := httptest.NewRecorder()
+	r.ServeHTTP(w1, req1)
+
+	if w1.Code != http.StatusOK {
+		t.Fatalf("expected first request to succeed, got %d", w1.Code)
+	}
+
+	// Second request should now be blocked because middleware increments count atomically
+	req2, _ := http.NewRequest("GET", "/test", nil)
+	req2.Header.Set("X-API-Key", "test-key")
+	w2 := httptest.NewRecorder()
+	r.ServeHTTP(w2, req2)
+
+	if w2.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected second request to be blocked with 429, got %d", w2.Code)
+	}
+}
+
 func TestCostLimitMiddleware_AllowedWithinLimits(t *testing.T) {
 	cfg := &config.Config{
 		AccessKeyLimits: config.AccessKeyLimits{

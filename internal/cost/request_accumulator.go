@@ -27,6 +27,23 @@ func (r *RequestAccumulator) Add(apiKey string, count int64) {
 	r.counts[apiKey] += count
 }
 
+// CheckAndAdd increments the request count for an API key if it has not
+// reached the provided limit. When limit is 0, it behaves like Add().
+// It returns whether the increment was applied and the resulting count.
+func (r *RequestAccumulator) CheckAndAdd(apiKey string, limit int64) (bool, int64) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	current := r.counts[apiKey]
+	if limit > 0 && current >= limit {
+		return false, current
+	}
+
+	current++
+	r.counts[apiKey] = current
+	return true, current
+}
+
 // Get returns the current request count for an API key.
 func (r *RequestAccumulator) Get(apiKey string) int64 {
 	r.mu.RLock()

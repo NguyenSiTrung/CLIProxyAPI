@@ -60,9 +60,6 @@ func (p *CostLimitPlugin) HandleUsage(ctx context.Context, record coreusage.Reco
 		return
 	}
 
-	// Record request count (always when enabled, regardless of individual key limits)
-	manager.RecordRequest(apiKey)
-
 	// Record cost (only if cost > 0)
 	manager.RecordUsage(apiKey, record.Model, record.Detail)
 }
