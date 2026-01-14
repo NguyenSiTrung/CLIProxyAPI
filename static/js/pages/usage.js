@@ -1199,11 +1199,14 @@ export async function resetUsageData({ backup = false } = {}) {
   }
 
   const btn = document.getElementById('usageResetBtn');
-  const originalText = btn ? btn.textContent : '';
+  const label = document.getElementById('usageResetBtnLabel');
+  const originalText = label ? label.textContent : 'Reset';
   if (btn) {
     btn.disabled = true;
     btn.classList.add('loading');
-    btn.textContent = backupRequested ? 'Backing up…' : 'Resetting…';
+  }
+  if (label) {
+    label.textContent = backupRequested ? 'Backing up…' : 'Resetting…';
   }
 
   try {
@@ -1220,7 +1223,9 @@ export async function resetUsageData({ backup = false } = {}) {
     if (btn) {
       btn.disabled = false;
       btn.classList.remove('loading');
-      btn.textContent = originalText || 'Reset';
+    }
+    if (label) {
+      label.textContent = originalText || 'Reset';
     }
   }
 }
