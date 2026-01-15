@@ -724,7 +724,15 @@
                   </svg>
                   Add Limit
                 </button>
-                <button class="btn btn-secondary btn-sm" onclick="window.keysModule.refreshCostLimits()" title="Refresh cost limits">
+                <button class="btn btn-warning btn-sm" onclick="window.keysModule.confirmResetAllCostLimits()" title="Reset all quotas for all keys">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="23 4 23 10 17 10"></polyline>
+                    <polyline points="1 20 1 14 7 14"></polyline>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+                  </svg>
+                  Reset All
+                </button>
+                <button class="btn btn-secondary btn-sm" id="costLimitsRefreshBtn" onclick="window.keysModule.refreshCostLimits()" title="Refresh cost limits">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
                     <polyline points="23 4 23 10 17 10"></polyline>
                     <polyline points="1 20 1 14 7 14"></polyline>

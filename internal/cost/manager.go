@@ -306,6 +306,41 @@ func (m *Manager) ResetAll(apiKey string) error {
 	return m.saveRequests()
 }
 
+// ResetAllKeys resets both cost and request count for ALL keys to zero.
+// Returns the number of keys that were reset.
+func (m *Manager) ResetAllKeys() (int, error) {
+	if m == nil {
+		return 0, nil
+	}
+	// Get all keys from both accumulators
+	allCosts := m.accumulator.GetAll()
+	allRequests := m.requestAccumulator.GetAll()
+
+	// Merge keys from both
+	allKeys := make(map[string]struct{})
+	for k := range allCosts {
+		allKeys[k] = struct{}{}
+	}
+	for k := range allRequests {
+		allKeys[k] = struct{}{}
+	}
+
+	// Reset each key
+	for apiKey := range allKeys {
+		m.accumulator.Reset(apiKey)
+		m.requestAccumulator.Reset(apiKey)
+	}
+
+	// Save both
+	if err := m.save(); err != nil {
+		return len(allKeys), err
+	}
+	if err := m.saveRequests(); err != nil {
+		return len(allKeys), err
+	}
+	return len(allKeys), nil
+}
+
 // GetCurrentCost returns the current accumulated cost for an API key.
 func (m *Manager) GetCurrentCost(apiKey string) float64 {
 	if m == nil {

@@ -550,11 +550,23 @@ export function hasExistingLimit(apiKey) {
 }
 
 /**
- * Refresh cost limits (alias for loadCostLimits)
+ * Refresh cost limits (alias for loadCostLimits with loading animation)
  */
-export function refreshCostLimits() {
-  loadCostLimits();
-  toast('Cost limits refreshed', 'success');
+export async function refreshCostLimits() {
+  const refreshBtn = document.getElementById('costLimitsRefreshBtn');
+  if (refreshBtn) {
+    refreshBtn.classList.add('loading');
+    refreshBtn.disabled = true;
+  }
+  try {
+    await loadCostLimits();
+    toast('Cost limits refreshed', 'success');
+  } finally {
+    if (refreshBtn) {
+      refreshBtn.classList.remove('loading');
+      refreshBtn.disabled = false;
+    }
+  }
 }
 
 /**
@@ -860,6 +872,45 @@ export async function resetCost(apiKey) {
 }
 
 /**
+ * Show confirmation dialog for resetting ALL cost limits
+ */
+export function confirmResetAllCostLimits() {
+  const content = `
+    <div style="text-align:center; padding: 24px 0;">
+      <div style="width:64px; height:64px; background:rgba(251, 191, 36, 0.1); border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px auto;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-yellow)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"></polyline>
+          <polyline points="1 20 1 14 7 14"></polyline>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+        </svg>
+      </div>
+      <h4 style="margin-bottom:8px; font-size:18px;">Reset All Quotas?</h4>
+      <p style="color:var(--text-secondary); font-size:14px; max-width:300px; margin:0 auto;">This will reset accumulated cost and request count for <strong>ALL</strong> API keys to zero.</p>
+    </div>`;
+
+  const footer = `
+    <button class="btn btn-secondary" onclick="window.closeModal()">Cancel</button>
+    <button class="btn btn-warning" onclick="window.keysModule.resetAllCostLimits()">Yes, Reset All</button>`;
+
+  showModal('Reset All Quotas', content, footer);
+}
+
+/**
+ * Reset all cost limits for all keys
+ */
+export async function resetAllCostLimits() {
+  try {
+    const response = await api('POST', '/access-key-limits/reset-all');
+    closeModal();
+    const count = response.keys_reset || 0;
+    toast(`Successfully reset ${count} key(s)`, 'success');
+    refreshAllCostData();
+  } catch (e) {
+    toast('Failed: ' + e.message, 'error');
+  }
+}
+
+/**
  * Open modal to add a new cost limit (shows key dropdown)
  */
 export async function openAddLimitModal() {
@@ -1082,6 +1133,8 @@ export const keysModule = {
   saveEditLimit,
   confirmResetCost,
   resetCost,
+  confirmResetAllCostLimits,
+  resetAllCostLimits,
   openAddLimitModal,
   proceedWithLimitSelection,
   openAddLimitForKeyModal,

@@ -209,3 +209,48 @@ func (h *Handler) ResetAccessKeyLimit(c *gin.Context) {
 		"message": message,
 	})
 }
+
+// ResetAllAccessKeyLimits resets the accumulated cost/requests for ALL API keys to zero.
+// POST /v0/management/access-key-limits/reset-all
+// Body: {\"type\": \"cost\" | \"requests\" | \"all\"} - defaults to \"all\" if not specified
+func (h *Handler) ResetAllAccessKeyLimits(c *gin.Context) {
+	if costManager == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "cost manager not initialized"})
+		return
+	}
+
+	var body struct {
+		Type string `json:"type"`
+	}
+	// Ignore parse errors - default to \"all\"
+	_ = c.ShouldBindJSON(&body)
+
+	resetType := body.Type
+	if resetType == "" {
+		resetType = "all"
+	}
+
+	var count int
+	var err error
+	var message string
+
+	switch resetType {
+	case "all":
+		count, err = costManager.ResetAllKeys()
+		message = "all keys reset (cost and request count)"
+	default:
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid type: expected 'all'"})
+		return
+	}
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to reset: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"status":     "ok",
+		"message":    message,
+		"keys_reset": count,
+	})
+}
