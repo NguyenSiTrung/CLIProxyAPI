@@ -433,24 +433,16 @@ export function getDefaultPricing(modelId) {
  */
 export function renderPricingModels() {
   const container = document.getElementById('pricingContainer');
-  const allModels = getAllModels();
+  const allModels = getAllModels() || [];
   const modelPricingConfig = getModelPricingConfig();
 
-  if (!allModels || allModels.length === 0) {
-    container.innerHTML = `
-      <div class="models-empty">
-        <div class="models-empty-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-          </svg>
-        </div>
-        <h4>No models available</h4>
-        <p>Load models from the "Available Models" tab first.</p>
-      </div>
-    `;
-    return;
-  }
+  // Get all model IDs from the API
+  const apiModelIds = new Set(allModels.map(m => m.id || m.name || 'unknown'));
 
+  // Find custom models (models with pricing that are not in the API list)
+  const customModelIds = Object.keys(modelPricingConfig).filter(id => !apiModelIds.has(id));
+
+  // Group models by provider
   const grouped = {};
   allModels.forEach(m => {
     const id = m.id || m.name || 'unknown';
@@ -459,16 +451,46 @@ export function renderPricingModels() {
     grouped[owner].push(id);
   });
 
-  container.innerHTML = Object.entries(grouped).sort((a, b) => a[0].localeCompare(b[0])).map(([owner, modelList]) => {
-    const { icon, class: iconClass } = getProviderIcon(owner);
+  // Add custom models group if there are any
+  if (customModelIds.length > 0) {
+    grouped['custom'] = customModelIds;
+  }
+
+  if (Object.keys(grouped).length === 0) {
+    container.innerHTML = `
+      <div class="models-empty">
+        <div class="models-empty-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+          </svg>
+        </div>
+        <h4>No models available</h4>
+        <p>Load models from the "Available Models" tab first, or add custom models using the button above.</p>
+      </div>
+    `;
+    return;
+  }
+
+  // Sort with 'custom' group at the top
+  const sortedEntries = Object.entries(grouped).sort((a, b) => {
+    if (a[0] === 'custom') return -1;
+    if (b[0] === 'custom') return 1;
+    return a[0].localeCompare(b[0]);
+  });
+
+  container.innerHTML = sortedEntries.map(([owner, modelList]) => {
+    const isCustomGroup = owner === 'custom';
+    const { icon, class: iconClass } = isCustomGroup 
+      ? { icon: '✏️', class: 'custom' } 
+      : getProviderIcon(owner);
     const configuredCount = modelList.filter(id => modelPricingConfig[id]).length;
 
     return `
-      <div class="pricing-card">
+      <div class="pricing-card ${isCustomGroup ? 'custom-models-card' : ''}">
         <div class="pricing-card-header">
           <div class="pricing-card-title">
             <div class="pricing-card-icon ${iconClass}">${icon}</div>
-            <h3>${owner}</h3>
+            <h3>${isCustomGroup ? 'Custom Models' : owner}</h3>
             <span class="pricing-badge ${configuredCount > 0 ? 'configured' : 'not-configured'}">
               ${configuredCount}/${modelList.length} configured
             </span>
@@ -663,6 +685,91 @@ export async function removePricing(modelId) {
 }
 
 /**
+ * Open modal to add pricing for a custom model ID (manually entered)
+ */
+export function openCustomPricingModal() {
+  const content = `
+    <div class="pricing-modal-content">
+      <h3 style="margin-bottom:20px;color:var(--text-primary)">Add Custom Model Pricing</h3>
+
+      <p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px">
+        Enter a model ID manually to configure pricing. Useful for aliased models or models not in the list.
+      </p>
+
+      <div class="pricing-form-grid">
+        <div class="pricing-form-group" style="grid-column: 1 / -1">
+          <label class="pricing-form-label">Model ID</label>
+          <input type="text" class="pricing-form-input" id="customModelId"
+            placeholder="e.g., claude-opus-4-5-thinking">
+        </div>
+        <div class="pricing-form-group">
+          <label class="pricing-form-label">Input Tokens <span>(per 1M)</span></label>
+          <input type="number" step="0.001" min="0" class="pricing-form-input" id="pricingInput"
+            placeholder="e.g., 3.00">
+        </div>
+        <div class="pricing-form-group">
+          <label class="pricing-form-label">Output Tokens <span>(per 1M)</span></label>
+          <input type="number" step="0.001" min="0" class="pricing-form-input" id="pricingOutput"
+            placeholder="e.g., 15.00">
+        </div>
+        <div class="pricing-form-group">
+          <label class="pricing-form-label">Cached Input <span>(per 1M, optional)</span></label>
+          <input type="number" step="0.001" min="0" class="pricing-form-input" id="pricingCached"
+            placeholder="e.g., 0.30">
+        </div>
+        <div class="pricing-form-group">
+          <label class="pricing-form-label">Cached Write <span>(per 1M, optional)</span></label>
+          <input type="number" step="0.001" min="0" class="pricing-form-input" id="pricingCacheWrite"
+            placeholder="e.g., 3.75">
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-top:24px;justify-content:flex-end">
+        <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveCustomModelPricing()">Save Pricing</button>
+      </div>
+    </div>
+  `;
+
+  showModal('Add Custom Model Pricing', content);
+}
+
+/**
+ * Save pricing for a custom model ID entered manually
+ */
+export async function saveCustomModelPricing() {
+  const modelId = document.getElementById('customModelId').value.trim();
+  if (!modelId) {
+    toast('Please enter a model ID', 'error');
+    return;
+  }
+
+  const input = parseFloat(document.getElementById('pricingInput').value) || 0;
+  const output = parseFloat(document.getElementById('pricingOutput').value) || 0;
+  const cached = parseFloat(document.getElementById('pricingCached').value) || 0;
+  const cacheWrite = parseFloat(document.getElementById('pricingCacheWrite').value) || 0;
+
+  if (input === 0 && output === 0) {
+    toast('Please set at least input or output pricing', 'error');
+    return;
+  }
+
+  const modelPricingConfig = getModelPricingConfig();
+  modelPricingConfig[modelId] = {
+    input: input,
+    output: output,
+    cached_input: cached || undefined,
+    cache_write: cacheWrite || undefined
+  };
+  setModelPricingConfig(modelPricingConfig);
+
+  await savePricingConfig();
+  closeModal();
+  renderPricingModels();
+  toast(`Pricing saved for ${modelId}`, 'success');
+}
+
+/**
  * Apply default pricing to all models that don't have custom pricing
  */
 export async function applyDefaultPricing() {
@@ -769,6 +876,8 @@ window.modelsModule = {
   applyPresetPricing,
   savePricingForModel,
   removePricing,
+  openCustomPricingModal,
+  saveCustomModelPricing,
   applyDefaultPricing,
   clearAllPricing,
   exportPricing,
@@ -787,6 +896,8 @@ window.openPricingModal = openPricingModal;
 window.applyPresetPricing = applyPresetPricing;
 window.savePricingForModel = savePricingForModel;
 window.removePricing = removePricing;
+window.openCustomPricingModal = openCustomPricingModal;
+window.saveCustomModelPricing = saveCustomModelPricing;
 window.applyDefaultPricing = applyDefaultPricing;
 window.clearAllPricing = clearAllPricing;
 window.exportPricing = exportPricing;
