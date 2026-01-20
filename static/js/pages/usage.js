@@ -292,8 +292,10 @@ function renderUsageData(usageData) {
       if (!apiStats || typeof apiStats !== 'object') continue;
 
       const pKey = apiKey || 'unknown';
-      if (!providerUsage[pKey]) providerUsage[pKey] = { requests: 0, tokens: 0, cost: 0 };
+      if (!providerUsage[pKey]) providerUsage[pKey] = { requests: 0, successCount: 0, failureCount: 0, tokens: 0, cost: 0 };
       providerUsage[pKey].requests += (apiStats.total_requests || 0);
+      providerUsage[pKey].successCount += (apiStats.success_count || 0);
+      providerUsage[pKey].failureCount += (apiStats.failure_count || 0);
       providerUsage[pKey].tokens += (apiStats.total_tokens || 0);
 
       const providerModels = apiStats.models || {};
@@ -530,7 +532,9 @@ function renderProviderStats(providerUsage) {
       <div style="display:flex;align-items:center;gap:12px">
         ${limitBarHtml}
         ${costDisplayHtml}
-        <span class="badge badge-purple">${stats.requests.toLocaleString()}</span>
+        <span class="badge badge-green" title="Success">${stats.successCount.toLocaleString()}</span>
+        <span class="badge badge-red" title="Failed">${stats.failureCount.toLocaleString()}</span>
+        <span class="badge badge-purple" title="Total">${stats.requests.toLocaleString()}</span>
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
       </div>
     </div>
