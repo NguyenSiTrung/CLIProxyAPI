@@ -23,6 +23,7 @@ const (
 
 // ParseResetInterval converts a string to ResetInterval.
 // Returns ResetNone for empty or invalid values.
+// Custom durations (e.g. "5h", "90m") are accepted.
 func ParseResetInterval(s string) ResetInterval {
 	switch s {
 	case "hourly":
@@ -34,6 +35,9 @@ func ParseResetInterval(s string) ResetInterval {
 	case "monthly":
 		return ResetMonthly
 	default:
+		if isCustomResetDuration(s) {
+			return ResetInterval(s)
+		}
 		return ResetNone
 	}
 }
@@ -127,6 +131,9 @@ func NextResetTime(lastReset time.Time, interval ResetInterval) time.Time {
 	case ResetMonthly:
 		return lastReset.AddDate(0, 1, 0)
 	default:
+		if duration, ok := parseResetDuration(string(interval)); ok {
+			return lastReset.Add(duration)
+		}
 		return time.Time{}
 	}
 }
@@ -143,6 +150,25 @@ func ShouldReset(lastReset time.Time, interval ResetInterval, now time.Time) boo
 
 	nextReset := NextResetTime(lastReset, interval)
 	return !nextReset.IsZero() && now.After(nextReset)
+}
+
+func isCustomResetDuration(value string) bool {
+	_, ok := parseResetDuration(value)
+	return ok
+}
+
+func parseResetDuration(value string) (time.Duration, bool) {
+	if value == "" {
+		return 0, false
+	}
+	duration, err := time.ParseDuration(value)
+	if err != nil {
+		return 0, false
+	}
+	if duration <= 0 {
+		return 0, false
+	}
+	return duration, true
 }
 
 // AutoResetScheduler manages background auto-reset operations.

@@ -48,7 +48,7 @@ api-keys:
 
 # Access Key Cost Limits
 # Configure per-access-key cost and request count limits to block requests when limits are exceeded.
-# Supports automatic reset intervals (hourly/daily/weekly/monthly) or manual reset.
+# Supports automatic reset intervals (hourly/daily/weekly/monthly) or a custom duration like 5h.
 # access-key-limits:
 #   # Enable cost limit enforcement (default: false)
 #   enabled: false
@@ -63,7 +63,7 @@ api-keys:
 #     - api-key: "your-api-key-1"
 #       max-cost: 25.00          # Higher limit for power users
 #       max-requests: 5000       # Request count limit
-#       auto-reset-interval: daily  # Reset counters daily (hourly/daily/weekly/monthly/none)
+#       auto-reset-interval: daily  # Reset counters daily (hourly/daily/weekly/monthly/none/5h)
 #     - api-key: "your-api-key-2"
 #       max-cost: 5.00           # Lower limit for testing
 #       max-requests: 100        # Lower request limit

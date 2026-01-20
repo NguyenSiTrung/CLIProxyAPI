@@ -164,7 +164,7 @@ type AccessKeyLimit struct {
 	// A value of 0 means unlimited (no limit enforced for this key).
 	MaxRequests int64 `yaml:"max-requests" json:"max-requests"`
 	// AutoResetInterval defines when usage counters automatically reset.
-	// Valid values: "hourly", "daily", "weekly", "monthly", "none" (default: "none").
+	// Valid values: "hourly", "daily", "weekly", "monthly", "none", or a duration like "5h" (default: "none").
 	AutoResetInterval string `yaml:"auto-reset-interval" json:"auto-reset-interval"`
 }
 

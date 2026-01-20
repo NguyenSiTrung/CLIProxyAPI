@@ -620,6 +620,36 @@ function getRequestUsageInfo(currentRequests, maxRequests) {
   return { percentage, colorClass, isUnlimited: false };
 }
 
+function formatAutoResetInterval(interval) {
+  if (!interval || interval === 'none') {
+    return '—';
+  }
+  switch (interval) {
+    case 'hourly':
+      return 'Hourly';
+    case 'daily':
+      return 'Daily';
+    case 'weekly':
+      return 'Weekly';
+    case 'monthly':
+      return 'Monthly';
+    default:
+      return `Every ${interval}`;
+  }
+}
+
+function normalizeAutoResetInterval(value) {
+  const trimmed = (value || '').trim();
+  if (!trimmed) {
+    return 'none';
+  }
+  const normalized = trimmed.toLowerCase();
+  if (/^\d+$/.test(normalized)) {
+    return `${normalized}h`;
+  }
+  return normalized;
+}
+
 /**
  * Render cost limits list
  */
@@ -690,15 +720,12 @@ function renderCostLimitsList(data) {
     const isBlocked = isCostBlocked || isRequestBlocked;
     
     // Format auto-reset display
-    let autoResetDisplay = '—';
-    if (auto_reset_interval && auto_reset_interval !== 'none') {
-      autoResetDisplay = auto_reset_interval.charAt(0).toUpperCase() + auto_reset_interval.slice(1);
-      if (next_reset_time) {
-        try {
-          const nextReset = new Date(next_reset_time);
-          autoResetDisplay += `<br><span class="next-reset-time">${nextReset.toLocaleDateString()}</span>`;
-        } catch (e) { /* ignore */ }
-      }
+    let autoResetDisplay = formatAutoResetInterval(auto_reset_interval);
+    if (auto_reset_interval && auto_reset_interval !== 'none' && next_reset_time) {
+      try {
+        const nextReset = new Date(next_reset_time);
+        autoResetDisplay += `<br><span class="next-reset-time">${nextReset.toLocaleDateString()}</span>`;
+      } catch (e) { /* ignore */ }
     }
     
     const row = document.createElement('tr');
@@ -766,6 +793,7 @@ export function openEditLimitModal(apiKey, currentMaxCost, currentMaxRequests = 
   const maskedKey = maskApiKey(apiKey);
   const isCostUnlimited = !currentMaxCost || currentMaxCost === 0;
   const isRequestsUnlimited = !currentMaxRequests || currentMaxRequests === 0;
+  const autoResetValue = currentAutoReset || 'none';
   
   const content = `
     <div class="form-group">
@@ -784,13 +812,15 @@ export function openEditLimitModal(apiKey, currentMaxCost, currentMaxRequests = 
     </div>
     <div class="form-group">
       <label>Auto-Reset Interval</label>
-      <select id="editAutoReset" class="form-input">
-        <option value="none" ${!currentAutoReset || currentAutoReset === 'none' ? 'selected' : ''}>None (manual reset only)</option>
-        <option value="hourly" ${currentAutoReset === 'hourly' ? 'selected' : ''}>Hourly</option>
-        <option value="daily" ${currentAutoReset === 'daily' ? 'selected' : ''}>Daily</option>
-        <option value="weekly" ${currentAutoReset === 'weekly' ? 'selected' : ''}>Weekly</option>
-        <option value="monthly" ${currentAutoReset === 'monthly' ? 'selected' : ''}>Monthly</option>
-      </select>
+      <input type="text" id="editAutoReset" class="form-input" list="editAutoResetOptions" value="${autoResetValue}" placeholder="none, hourly, daily, weekly, monthly, or 5h">
+      <datalist id="editAutoResetOptions">
+        <option value="none"></option>
+        <option value="hourly"></option>
+        <option value="daily"></option>
+        <option value="weekly"></option>
+        <option value="monthly"></option>
+        <option value="5h"></option>
+      </datalist>
     </div>`;
 
   const footer = `
@@ -817,7 +847,7 @@ export async function saveEditLimit(apiKey) {
   
   const maxCost = parseFloat(maxCostEl?.value || '0') || 0;
   const maxRequests = parseInt(maxRequestsEl?.value || '0', 10) || 0;
-  const autoResetInterval = autoResetEl?.value || 'none';
+  const autoResetInterval = normalizeAutoResetInterval(autoResetEl?.value);
 
   try {
     await api('PUT', `/access-key-limits/keys/${encodeURIComponent(apiKey)}`, { 
@@ -1059,13 +1089,15 @@ export function openAddLimitForKeyModal(apiKey) {
     </div>
     <div class="form-group">
       <label>Auto-Reset Interval</label>
-      <select id="newAutoReset" class="form-input">
-        <option value="none" selected>None (manual reset only)</option>
-        <option value="hourly">Hourly</option>
-        <option value="daily">Daily</option>
-        <option value="weekly">Weekly</option>
-        <option value="monthly">Monthly</option>
-      </select>
+      <input type="text" id="newAutoReset" class="form-input" list="newAutoResetOptions" value="none" placeholder="none, hourly, daily, weekly, monthly, or 5h">
+      <datalist id="newAutoResetOptions">
+        <option value="none"></option>
+        <option value="hourly"></option>
+        <option value="daily"></option>
+        <option value="weekly"></option>
+        <option value="monthly"></option>
+        <option value="5h"></option>
+      </datalist>
     </div>`;
 
   const footer = `
@@ -1091,7 +1123,7 @@ export async function saveNewLimit(apiKey) {
   
   const maxCost = parseFloat(maxCostEl?.value || '0') || 0;
   const maxRequests = parseInt(maxRequestsEl?.value || '0', 10) || 0;
-  const autoResetInterval = autoResetEl?.value || 'none';
+  const autoResetInterval = normalizeAutoResetInterval(autoResetEl?.value);
 
   if (maxCost === 0 && maxRequests === 0 && autoResetInterval === 'none') {
     toast('Please set at least one limit or auto-reset interval', 'error');

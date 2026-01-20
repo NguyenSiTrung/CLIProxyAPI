@@ -16,8 +16,11 @@ func TestParseResetInterval(t *testing.T) {
 		{"daily", ResetDaily},
 		{"weekly", ResetWeekly},
 		{"monthly", ResetMonthly},
+		{"5h", ResetInterval("5h")},
+		{"90m", ResetInterval("90m")},
 		{"none", ResetNone},
 		{"", ResetNone},
+		{"0h", ResetNone},
 		{"invalid", ResetNone},
 		{"HOURLY", ResetNone}, // case-sensitive
 	}
@@ -59,6 +62,11 @@ func TestNextResetTime(t *testing.T) {
 			name:     "monthly",
 			interval: ResetMonthly,
 			expected: time.Date(2026, 2, 13, 10, 30, 0, 0, time.UTC),
+		},
+		{
+			name:     "custom duration",
+			interval: ResetInterval("6h"),
+			expected: baseTime.Add(6 * time.Hour),
 		},
 		{
 			name:     "none returns zero time",
@@ -127,6 +135,13 @@ func TestShouldReset(t *testing.T) {
 			lastReset: baseTime,
 			interval:  ResetMonthly,
 			now:       baseTime.AddDate(0, 1, 0).Add(time.Minute),
+			expected:  true,
+		},
+		{
+			name:      "custom duration - should reset after 5 hours",
+			lastReset: baseTime,
+			interval:  ResetInterval("5h"),
+			now:       baseTime.Add(5*time.Hour + time.Minute),
 			expected:  true,
 		},
 		{
