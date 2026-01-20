@@ -58,6 +58,9 @@ api-keys:
 #   # Default maximum request count for keys not explicitly configured.
 #   # Set to 0 for unlimited (no limit enforced).
 #   default-max-requests: 1000
+#   # When true, only count successful requests (HTTP status < 400) against request limits.
+#   # When false (default), all requests are counted including 4xx/5xx errors.
+#   count-only-success-requests: false
 #   # Per-key cost limit overrides
 #   keys:
 #     - api-key: "your-api-key-1"

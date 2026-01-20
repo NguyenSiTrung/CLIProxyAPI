@@ -9,14 +9,16 @@ import (
 
 // RequestAccumulator tracks accumulated request counts per API key.
 type RequestAccumulator struct {
-	mu     sync.RWMutex
-	counts map[string]int64
+	mu       sync.RWMutex
+	counts   map[string]int64
+	inflight map[string]int64 // in-memory reservations (not persisted; resets on restart)
 }
 
 // NewRequestAccumulator creates a new RequestAccumulator.
 func NewRequestAccumulator() *RequestAccumulator {
 	return &RequestAccumulator{
-		counts: make(map[string]int64),
+		counts:   make(map[string]int64),
+		inflight: make(map[string]int64),
 	}
 }
 
@@ -42,6 +44,45 @@ func (r *RequestAccumulator) CheckAndAdd(apiKey string, limit int64) (bool, int6
 	current++
 	r.counts[apiKey] = current
 	return true, current
+}
+
+// TryReserve attempts to reserve a slot for a request. It checks if the combined
+// count of persisted requests plus in-flight reservations is below the limit.
+// If allowed, it increments the inflight counter and returns true.
+// When limit is 0 (unlimited), it always allows the reservation.
+// Returns: allowed, current persisted count, limit.
+func (r *RequestAccumulator) TryReserve(apiKey string, limit int64) (bool, int64) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	current := r.counts[apiKey]
+	inflight := r.inflight[apiKey]
+	total := current + inflight
+
+	if limit > 0 && total >= limit {
+		return false, current
+	}
+
+	r.inflight[apiKey] = inflight + 1
+	return true, current
+}
+
+// Complete finalizes a reserved request. It decrements the inflight counter
+// and, if success is true, increments the persisted count.
+// Returns the new persisted count.
+func (r *RequestAccumulator) Complete(apiKey string, success bool) int64 {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if r.inflight[apiKey] > 0 {
+		r.inflight[apiKey]--
+	}
+
+	if success {
+		r.counts[apiKey]++
+	}
+
+	return r.counts[apiKey]
 }
 
 // Get returns the current request count for an API key.

@@ -55,10 +55,11 @@ func (h *Handler) GetAccessKeyLimits(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"enabled":              costManager.IsEnabled(),
-		"default_max_cost":     costManager.GetDefaultMaxCost(),
-		"default_max_requests": costManager.GetDefaultMaxRequests(),
-		"keys":                 keyInfos,
+		"enabled":                      costManager.IsEnabled(),
+		"default_max_cost":             costManager.GetDefaultMaxCost(),
+		"default_max_requests":         costManager.GetDefaultMaxRequests(),
+		"count_only_success_requests":  costManager.CountOnlySuccessRequests(),
+		"keys":                         keyInfos,
 	})
 }
 
@@ -81,6 +82,29 @@ func (h *Handler) PutAccessKeyLimitsEnabled(c *gin.Context) {
 	// Lock to ensure thread-safe modification of config and atomic persist
 	h.mu.Lock()
 	h.cfg.AccessKeyLimits.Enabled = *body.Enabled
+	h.mu.Unlock()
+	h.persist(c)
+}
+
+// PutAccessKeyLimitsCountOnlySuccess updates whether only successful requests are counted.
+// PUT /v0/management/access-key-limits/count-only-success-requests
+func (h *Handler) PutAccessKeyLimitsCountOnlySuccess(c *gin.Context) {
+	if costManager == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "cost manager not initialized"})
+		return
+	}
+
+	var body struct {
+		CountOnlySuccessRequests *bool `json:"count_only_success_requests"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil || body.CountOnlySuccessRequests == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid body: expected {\"count_only_success_requests\": bool}"})
+		return
+	}
+
+	// Lock to ensure thread-safe modification of config and atomic persist
+	h.mu.Lock()
+	h.cfg.AccessKeyLimits.CountOnlySuccessRequests = *body.CountOnlySuccessRequests
 	h.mu.Unlock()
 	h.persist(c)
 }

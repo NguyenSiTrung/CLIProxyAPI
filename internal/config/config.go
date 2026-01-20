@@ -149,6 +149,9 @@ type AccessKeyLimits struct {
 	// DefaultMaxRequests is the default maximum request count for keys not explicitly configured.
 	// A value of 0 means unlimited (no limit enforced).
 	DefaultMaxRequests int64 `yaml:"default-max-requests" json:"default-max-requests"`
+	// CountOnlySuccessRequests when true, only counts successful requests (HTTP status < 400)
+	// against the request limit. When false (default), all requests are counted.
+	CountOnlySuccessRequests bool `yaml:"count-only-success-requests" json:"count-only-success-requests"`
 	// Keys defines per-key cost limit overrides.
 	Keys []AccessKeyLimit `yaml:"keys" json:"keys"`
 }

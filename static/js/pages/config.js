@@ -267,11 +267,16 @@ export async function loadCostLimitsState() {
   try {
     const data = await api('GET', '/access-key-limits');
     const enabled = data.enabled || false;
+    const countOnlySuccess = data.count_only_success_requests || false;
     
     const toggle = document.getElementById('toggleCostLimits');
     if (toggle) toggle.checked = enabled;
     
+    const countOnlySuccessToggle = document.getElementById('toggleCountOnlySuccessRequests');
+    if (countOnlySuccessToggle) countOnlySuccessToggle.checked = countOnlySuccess;
+    
     updateStatusDot('statusCostLimits', enabled);
+    updateStatusDot('statusCountOnlySuccessRequests', countOnlySuccess);
   } catch (e) {
     console.warn('Could not load cost limits state:', e.message);
   }
@@ -297,6 +302,33 @@ export async function toggleCostLimitsEnabled(value, inputEl) {
     }
     
     toast(`Cost limits ${value ? 'enabled' : 'disabled'}`, 'success');
+  } catch (e) {
+    inputEl.checked = !value;
+    if (label) label.classList.remove('loading');
+    toast('Failed: ' + e.message, 'error');
+  }
+}
+
+/**
+ * Toggle count only success requests state
+ */
+export async function toggleCountOnlySuccessRequests(value, inputEl) {
+  const label = inputEl.closest('.toggle-enhanced');
+  
+  if (label) label.classList.add('loading');
+  
+  try {
+    await api('PUT', '/access-key-limits/count-only-success-requests', { count_only_success_requests: value });
+    
+    updateStatusDot('statusCountOnlySuccessRequests', value);
+    
+    if (label) {
+      label.classList.remove('loading');
+      label.classList.add('success');
+      setTimeout(() => label.classList.remove('success'), 400);
+    }
+    
+    toast(`Request limit now counts ${value ? 'only successful requests' : 'all requests'}`, 'success');
   } catch (e) {
     inputEl.checked = !value;
     if (label) label.classList.remove('loading');
@@ -1569,6 +1601,7 @@ export const configModule = {
   toggleSettingEnhanced,
   loadCostLimitsState,
   toggleCostLimitsEnabled,
+  toggleCountOnlySuccessRequests,
   onConfigEditorInput,
   setupConfigKeyboardShortcuts,
   handleConfigEditorKeydown,
@@ -1609,6 +1642,7 @@ window.reloadConfig = reloadConfig;
 window.toggleSettingEnhanced = toggleSettingEnhanced;
 window.loadCostLimitsState = loadCostLimitsState;
 window.toggleCostLimitsEnabled = toggleCostLimitsEnabled;
+window.toggleCountOnlySuccessRequests = toggleCountOnlySuccessRequests;
 window.onConfigEditorInput = onConfigEditorInput;
 window.handleConfigEditorKeydown = handleConfigEditorKeydown;
 window.editorToggleComment = editorToggleComment;

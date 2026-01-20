@@ -674,6 +674,8 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.GET("/access-key-limits", s.mgmt.GetAccessKeyLimits)
 		mgmt.PUT("/access-key-limits/enabled", s.mgmt.PutAccessKeyLimitsEnabled)
 		mgmt.PATCH("/access-key-limits/enabled", s.mgmt.PutAccessKeyLimitsEnabled)
+		mgmt.PUT("/access-key-limits/count-only-success-requests", s.mgmt.PutAccessKeyLimitsCountOnlySuccess)
+		mgmt.PATCH("/access-key-limits/count-only-success-requests", s.mgmt.PutAccessKeyLimitsCountOnlySuccess)
 		mgmt.PUT("/access-key-limits/keys/:key", s.mgmt.PutAccessKeyLimit)
 		mgmt.PATCH("/access-key-limits/keys/:key", s.mgmt.PutAccessKeyLimit)
 		mgmt.DELETE("/access-key-limits/keys/:key", s.mgmt.DeleteAccessKeyLimit)

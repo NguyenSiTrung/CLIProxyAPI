@@ -131,6 +131,11 @@
   color: #f97316;
 }
 
+.quick-toggle-icon.success {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
 .quick-toggle-content {
   margin-bottom: 12px;
 }

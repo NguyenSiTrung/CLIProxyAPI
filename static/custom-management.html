@@ -895,6 +895,29 @@
                 <span class="status-text">Off</span>
               </div>
             </div>
+
+            <div class="quick-toggle-card" data-setting="count-only-success">
+              <div class="quick-toggle-header">
+                <div class="quick-toggle-icon success">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                  </svg>
+                </div>
+                <label class="toggle-enhanced" id="toggleCountOnlySuccessRequestsLabel">
+                  <input type="checkbox" id="toggleCountOnlySuccessRequests" onchange="toggleCountOnlySuccessRequests(this.checked, this)">
+                  <span class="toggle-enhanced-slider"></span>
+                </label>
+              </div>
+              <div class="quick-toggle-content">
+                <h4>Count Only Success</h4>
+                <p>Request limit excludes 4xx/5xx errors</p>
+              </div>
+              <div class="quick-toggle-status">
+                <span class="status-indicator" id="statusCountOnlySuccessRequests"></span>
+                <span class="status-text">Off</span>
+              </div>
+            </div>
           </div>
         </div>
 

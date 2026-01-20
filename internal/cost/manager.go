@@ -69,6 +69,26 @@ func (m *Manager) SetEnabled(enabled bool) {
 	m.cfg.AccessKeyLimits.Enabled = enabled
 }
 
+// CountOnlySuccessRequests returns whether only successful requests are counted.
+func (m *Manager) CountOnlySuccessRequests() bool {
+	if m == nil || m.cfg == nil {
+		return false
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.cfg.AccessKeyLimits.CountOnlySuccessRequests
+}
+
+// SetCountOnlySuccessRequests updates whether only successful requests are counted.
+func (m *Manager) SetCountOnlySuccessRequests(value bool) {
+	if m == nil || m.cfg == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.cfg.AccessKeyLimits.CountOnlySuccessRequests = value
+}
+
 // SetConfig updates the config reference for hot-reload support.
 func (m *Manager) SetConfig(cfg *config.Config) {
 	if m == nil || cfg == nil {
@@ -287,6 +307,42 @@ func (m *Manager) GetCurrentRequestCount(apiKey string) int64 {
 		return 0
 	}
 	return m.requestAccumulator.Get(apiKey)
+}
+
+// TryReserveRequestSlot attempts to reserve a slot for a request in "count only success" mode.
+// It checks if the combined count of persisted requests plus in-flight reservations is below the limit.
+// Returns: allowed, current persisted count, limit.
+func (m *Manager) TryReserveRequestSlot(apiKey string) (allowed bool, current int64, limit int64) {
+	if m == nil {
+		return true, 0, 0
+	}
+	if !m.IsEnabled() {
+		return true, 0, 0
+	}
+
+	limit = m.GetRequestLimit(apiKey)
+	if limit == 0 {
+		// Unlimited - still reserve for tracking but always allow
+		m.requestAccumulator.TryReserve(apiKey, 0)
+		current = m.requestAccumulator.Get(apiKey)
+		return true, current, limit
+	}
+
+	allowed, current = m.requestAccumulator.TryReserve(apiKey, limit)
+	return allowed, current, limit
+}
+
+// CompleteRequestSlot finalizes a reserved request slot.
+// If success is true (HTTP status < 400), the request count is incremented.
+// Otherwise, the reservation is released without incrementing the count.
+func (m *Manager) CompleteRequestSlot(apiKey string, success bool) {
+	if m == nil {
+		return
+	}
+	m.requestAccumulator.Complete(apiKey, success)
+	if success {
+		_ = m.saveRequests()
+	}
 }
 
 // RecordUsage calculates the cost for a usage record and accumulates it.
