@@ -72,6 +72,16 @@ api-keys:
 #       max-cost: 0              # Unlimited cost (no limit enforced)
 #       max-requests: 0          # Unlimited requests (no limit enforced)
 
+# Access Key Auth Routing
+# Restrict which auth JSON files are used for requests authenticated by a client API key.
+# Use auth file IDs (relative paths or file names) as returned by /v0/management/auth-files.
+# access-key-auths:
+#   - api-key: "your-api-key-1"
+#     provider: "antigravity" # Optional; omit to apply to all providers
+#     auth-ids:
+#       - "antigravity-you_example_com.json"
+#       - "antigravity-other.json"
+
 # Enable debug logging
 debug: false
 

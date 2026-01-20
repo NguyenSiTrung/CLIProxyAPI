@@ -247,6 +247,87 @@ func (m *Manager) lookupAPIKeyUpstreamModel(authID, requestedModel string) strin
 
 }
 
+func accessKeyFromOptions(opts cliproxyexecutor.Options) string {
+	if opts.Metadata == nil {
+		return ""
+	}
+	if raw, ok := opts.Metadata[AccessKeyMetadataKey]; ok {
+		if value, ok := raw.(string); ok {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+func (m *Manager) accessKeyAuthAllowlist(accessKey, provider string) (map[string]struct{}, bool) {
+	if m == nil {
+		return nil, false
+	}
+	accessKey = strings.TrimSpace(accessKey)
+	if accessKey == "" {
+		return nil, false
+	}
+	provider = strings.ToLower(strings.TrimSpace(provider))
+	cfg, _ := m.runtimeConfig.Load().(*internalconfig.Config)
+	if cfg == nil || len(cfg.AccessKeyAuths) == 0 {
+		return nil, false
+	}
+	allowed := make(map[string]struct{})
+	matched := false
+	for _, entry := range cfg.AccessKeyAuths {
+		key := strings.TrimSpace(entry.APIKey)
+		if key == "" || key != accessKey {
+			continue
+		}
+		entryProvider := strings.ToLower(strings.TrimSpace(entry.Provider))
+		if entryProvider != "" && entryProvider != provider {
+			continue
+		}
+		matched = true
+		for _, authID := range entry.AuthIDs {
+			id := strings.ToLower(strings.TrimSpace(authID))
+			if id == "" {
+				continue
+			}
+			allowed[id] = struct{}{}
+		}
+	}
+	if !matched {
+		return nil, false
+	}
+	return allowed, true
+}
+
+func authAllowedByAccessKey(auth *Auth, allowed map[string]struct{}) bool {
+	if auth == nil || len(allowed) == 0 {
+		return false
+	}
+	id := strings.ToLower(strings.TrimSpace(auth.ID))
+	if id != "" {
+		if _, ok := allowed[id]; ok {
+			return true
+		}
+		if base := strings.ToLower(strings.TrimSpace(filepath.Base(id))); base != "" {
+			if _, ok := allowed[base]; ok {
+				return true
+			}
+		}
+	}
+	if auth.Attributes != nil {
+		if path := strings.ToLower(strings.TrimSpace(auth.Attributes["path"])); path != "" {
+			if _, ok := allowed[path]; ok {
+				return true
+			}
+			if base := strings.ToLower(strings.TrimSpace(filepath.Base(path))); base != "" {
+				if _, ok := allowed[base]; ok {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 func (m *Manager) rebuildAPIKeyModelAliasFromRuntimeConfig() {
 	if m == nil {
 		return
@@ -1536,6 +1617,8 @@ func (m *Manager) pickNext(ctx context.Context, provider, model string, opts cli
 		return nil, nil, &Error{Code: "executor_not_found", Message: "executor not registered"}
 	}
 	candidates := make([]*Auth, 0, len(m.auths))
+	accessKey := accessKeyFromOptions(opts)
+	allowedAuths, restricted := m.accessKeyAuthAllowlist(accessKey, provider)
 	modelKey := strings.TrimSpace(model)
 	// Always use base model name (without thinking suffix) for auth matching.
 	if modelKey != "" {
@@ -1550,6 +1633,9 @@ func (m *Manager) pickNext(ctx context.Context, provider, model string, opts cli
 			continue
 		}
 		if _, used := tried[candidate.ID]; used {
+			continue
+		}
+		if restricted && !authAllowedByAccessKey(candidate, allowedAuths) {
 			continue
 		}
 		if modelKey != "" && registryRef != nil && !registryRef.ClientSupportsModel(candidate.ID, modelKey) {
@@ -1597,6 +1683,13 @@ func (m *Manager) pickNextMixed(ctx context.Context, providers []string, model s
 	}
 
 	m.mu.RLock()
+	accessKey := accessKeyFromOptions(opts)
+	var allowedByProvider map[string]map[string]struct{}
+	var restrictedByProvider map[string]bool
+	if accessKey != "" {
+		allowedByProvider = make(map[string]map[string]struct{})
+		restrictedByProvider = make(map[string]bool)
+	}
 	candidates := make([]*Auth, 0, len(m.auths))
 	modelKey := strings.TrimSpace(model)
 	// Always use base model name (without thinking suffix) for auth matching.
@@ -1623,6 +1716,18 @@ func (m *Manager) pickNextMixed(ctx context.Context, providers []string, model s
 		}
 		if _, ok := m.executors[providerKey]; !ok {
 			continue
+		}
+		if accessKey != "" {
+			allowed, okAllowed := allowedByProvider[providerKey]
+			restricted, okRestricted := restrictedByProvider[providerKey]
+			if !okAllowed || !okRestricted {
+				allowed, restricted = m.accessKeyAuthAllowlist(accessKey, providerKey)
+				allowedByProvider[providerKey] = allowed
+				restrictedByProvider[providerKey] = restricted
+			}
+			if restricted && !authAllowedByAccessKey(candidate, allowed) {
+				continue
+			}
 		}
 		if modelKey != "" && registryRef != nil && !registryRef.ClientSupportsModel(candidate.ID, modelKey) {
 			continue

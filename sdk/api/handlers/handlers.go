@@ -144,15 +144,28 @@ func requestExecutionMetadata(ctx context.Context) map[string]any {
 	// Idempotency-Key is an optional client-supplied header used to correlate retries.
 	// It is forwarded as execution metadata; when absent we generate a UUID.
 	key := ""
+	var ginCtx *gin.Context
 	if ctx != nil {
-		if ginCtx, ok := ctx.Value("gin").(*gin.Context); ok && ginCtx != nil && ginCtx.Request != nil {
+		if value, ok := ctx.Value("gin").(*gin.Context); ok && value != nil && value.Request != nil {
+			ginCtx = value
 			key = strings.TrimSpace(ginCtx.GetHeader("Idempotency-Key"))
 		}
 	}
 	if key == "" {
 		key = uuid.NewString()
 	}
-	return map[string]any{idempotencyKeyMetadataKey: key}
+	meta := map[string]any{idempotencyKeyMetadataKey: key}
+	if ginCtx != nil {
+		if apiKey, exists := ginCtx.Get("apiKey"); exists {
+			if apiKeyStr, ok := apiKey.(string); ok {
+				apiKeyStr = strings.TrimSpace(apiKeyStr)
+				if apiKeyStr != "" {
+					meta[coreauth.AccessKeyMetadataKey] = apiKeyStr
+				}
+			}
+		}
+	}
+	return meta
 }
 
 func mergeMetadata(base, overlay map[string]any) map[string]any {

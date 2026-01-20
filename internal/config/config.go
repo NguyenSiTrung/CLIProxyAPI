@@ -115,6 +115,11 @@ type Config struct {
 	// AccessKeyLimits configures per-access-key cost limits.
 	AccessKeyLimits AccessKeyLimits `yaml:"access-key-limits" json:"access-key-limits"`
 
+	// AccessKeyAuths binds client API keys to specific auth file IDs.
+	// When configured, requests authenticated with a matching API key
+	// are restricted to the listed auth files (optionally scoped by provider).
+	AccessKeyAuths []AccessKeyAuth `yaml:"access-key-auths" json:"access-key-auths"`
+
 	// Telegram configures the Telegram bot for server monitoring.
 	Telegram TelegramConfig `yaml:"telegram" json:"telegram"`
 
@@ -161,6 +166,17 @@ type AccessKeyLimit struct {
 	// AutoResetInterval defines when usage counters automatically reset.
 	// Valid values: "hourly", "daily", "weekly", "monthly", "none" (default: "none").
 	AutoResetInterval string `yaml:"auto-reset-interval" json:"auto-reset-interval"`
+}
+
+// AccessKeyAuth defines a binding between a client API key and auth file IDs.
+// When Provider is empty, the binding applies to all providers.
+type AccessKeyAuth struct {
+	// APIKey is the client access key to match.
+	APIKey string `yaml:"api-key" json:"api-key"`
+	// Provider optionally scopes the binding to a specific provider.
+	Provider string `yaml:"provider,omitempty" json:"provider,omitempty"`
+	// AuthIDs lists auth file IDs (relative paths or file names) allowed for this key.
+	AuthIDs []string `yaml:"auth-ids,omitempty" json:"auth-ids,omitempty"`
 }
 
 // UsageAutoBackupConfig holds the usage statistics auto-backup configuration.

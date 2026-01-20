@@ -12,6 +12,9 @@ import (
 	baseauth "github.com/router-for-me/CLIProxyAPI/v6/internal/auth"
 )
 
+// AccessKeyMetadataKey is the request metadata key used to pass the client access key.
+const AccessKeyMetadataKey = "access_key"
+
 // Auth encapsulates the runtime state and metadata associated with a single credential.
 type Auth struct {
 	// ID uniquely identifies the auth record across restarts.
