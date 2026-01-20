@@ -724,7 +724,7 @@ function renderCostLimitsList(data) {
     if (auto_reset_interval && auto_reset_interval !== 'none' && next_reset_time) {
       try {
         const nextReset = new Date(next_reset_time);
-        autoResetDisplay += `<br><span class="next-reset-time">${nextReset.toLocaleDateString()}</span>`;
+        autoResetDisplay += `<br><span class="next-reset-time">${nextReset.toLocaleString()}</span>`;
       } catch (e) { /* ignore */ }
     }
     
@@ -819,15 +819,14 @@ export function openEditLimitModal(apiKey, currentMaxCost, currentMaxRequests = 
     </div>
     <div class="form-group">
       <label>Auto-Reset Interval</label>
-      <input type="text" id="editAutoReset" class="form-input" list="editAutoResetOptions" value="${autoResetValue}" placeholder="none, hourly, daily, weekly, monthly, or 5h">
-      <datalist id="editAutoResetOptions">
-        <option value="none"></option>
-        <option value="hourly"></option>
-        <option value="daily"></option>
-        <option value="weekly"></option>
-        <option value="monthly"></option>
-        <option value="5h"></option>
-      </datalist>
+      <select id="editAutoReset" class="form-input">
+        <option value="none"${autoResetValue === 'none' ? ' selected' : ''}>None</option>
+        <option value="hourly"${autoResetValue === 'hourly' ? ' selected' : ''}>Hourly</option>
+        <option value="daily"${autoResetValue === 'daily' ? ' selected' : ''}>Daily</option>
+        <option value="weekly"${autoResetValue === 'weekly' ? ' selected' : ''}>Weekly</option>
+        <option value="monthly"${autoResetValue === 'monthly' ? ' selected' : ''}>Monthly</option>
+        <option value="5h"${autoResetValue === '5h' ? ' selected' : ''}>Every 5 Hours</option>
+      </select>
     </div>`;
 
   const footer = `
@@ -1133,15 +1132,14 @@ export function openAddLimitForKeyModal(apiKey) {
     </div>
     <div class="form-group">
       <label>Auto-Reset Interval</label>
-      <input type="text" id="newAutoReset" class="form-input" list="newAutoResetOptions" value="none" placeholder="none, hourly, daily, weekly, monthly, or 5h">
-      <datalist id="newAutoResetOptions">
-        <option value="none"></option>
-        <option value="hourly"></option>
-        <option value="daily"></option>
-        <option value="weekly"></option>
-        <option value="monthly"></option>
-        <option value="5h"></option>
-      </datalist>
+      <select id="newAutoReset" class="form-input">
+        <option value="none" selected>None</option>
+        <option value="hourly">Hourly</option>
+        <option value="daily">Daily</option>
+        <option value="weekly">Weekly</option>
+        <option value="monthly">Monthly</option>
+        <option value="5h">Every 5 Hours</option>
+      </select>
     </div>`;
 
   const footer = `
