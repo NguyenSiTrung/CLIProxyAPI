@@ -245,11 +245,19 @@
 }
 
 .quota-search-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 4px;
   border: none;
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
+}
+
+.quota-search-clear svg {
+  width: 14px;
+  height: 14px;
 }
 
 .quota-search-clear:hover {
@@ -399,6 +407,17 @@
   color: var(--text-secondary);
   font-size: 12px;
   cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.quota-bulk-select:hover {
+  border-color: var(--accent-cyan);
+  color: var(--text-primary);
+}
+
+.quota-bulk-select option {
+  background: var(--bg-card, #1a1a2e);
+  color: var(--text-primary);
 }
 
 .quota-fetch-status {
