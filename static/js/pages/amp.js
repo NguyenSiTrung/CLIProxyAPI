@@ -630,7 +630,7 @@ export async function openAddMappingModal(oldFrom = null, oldTo = null, oldReaso
         <div id="modelListDropdown" class="model-list"></div>
       </div>
       <div id="targetManualMode" style="display:none;">
-        <input type="text" id="mappingToManual" class="form-input" placeholder="Enter model ID (e.g. gpt-4o, claude-sonnet-4)" oninput="window.ampModule.updateReasoningEffortVisibility(this.value)">
+        <input type="text" id="mappingToManual" class="form-input" placeholder="Enter model ID (e.g. gpt-4o, claude-sonnet-4)" oninput="window.ampModule.syncManualToHidden(this.value)">
       </div>
       <input type="hidden" id="mappingTo">
       <div id="reasoningEffortGroup" class="reasoning-effort-group">
@@ -736,6 +736,11 @@ export async function openAddMappingModal(oldFrom = null, oldTo = null, oldReaso
     searchInput.value = id;
     listContainer.classList.remove('active');
     updateReasoningEffortVisibility(id);
+  };
+
+  window.ampModule.syncManualToHidden = function(value) {
+    hiddenInput.value = value;
+    updateReasoningEffortVisibility(value);
   };
 
   document.getElementById('modalFooter').innerHTML = `
