@@ -2254,6 +2254,19 @@
           <!-- Row 2: Filters + Controls -->
           <div class="quota-header-row-2">
             <div class="quota-filters-group">
+              <div class="quota-search">
+                <svg class="quota-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input type="text" id="quotaSearch" class="quota-search-input" placeholder="Search by file, email, or account..." oninput="setQuotaSearch(this.value)">
+                <button class="quota-search-clear" id="quotaSearchClear" onclick="clearQuotaSearch()" style="display:none" aria-label="Clear search">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
               <!-- Provider Filter -->
               <div class="quota-filter-selector" role="group" aria-label="Provider filter">
                 <button class="quota-filter-btn active" data-filter="all" onclick="setQuotaFilter('all')" aria-pressed="true">All</button>
@@ -2269,6 +2282,12 @@
             <div class="quota-header-actions">
               <!-- View Toggle Container (populated by JS) -->
               <div id="quotaViewToggle" class="quota-view-toggle"></div>
+              <select id="quotaBulkAction" class="quota-bulk-select" onchange="handleQuotaBulkAction(this.value)">
+                <option value="">Bulk actions</option>
+                <option value="fetch-visible">Fetch visible</option>
+                <option value="fetch-all">Fetch all</option>
+                <option value="reset-filters">Reset filters</option>
+              </select>
               
               <button class="btn btn-secondary btn-sm" onclick="fetchAllQuotas()" id="quotaFetchAllBtn">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2278,6 +2297,7 @@
                 </svg>
                 Fetch All
               </button>
+              <span id="quotaFetchStatus" class="quota-fetch-status">No fetch yet</span>
               
               <span id="quotaLastUpdated" class="quota-last-updated">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

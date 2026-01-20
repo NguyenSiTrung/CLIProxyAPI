@@ -16,6 +16,8 @@ let currentViewMode = 'detailed'; // 'compact' | 'detailed'
 let currentPage = 1;
 let pageSize = 9;
 let autoRefreshInterval = null;
+let quotaSearchQuery = '';
+let lastFetchStatus = { start: null, end: null, success: null, count: 0 };
 const AUTO_REFRESH_DELAY = 5 * 60 * 1000; // 5 minutes
 
 // Supported providers for quota checking
@@ -123,6 +125,22 @@ function applyFilter() {
       f.provider?.toLowerCase() === currentFilter
     );
   }
+
+  const query = quotaSearchQuery.trim().toLowerCase();
+  if (query) {
+    filteredAuthFiles = filteredAuthFiles.filter(f => {
+      const fields = [
+        f.file_name,
+        f.name,
+        f.email,
+        f.account,
+        f.project,
+        f.project_id,
+        f.provider
+      ];
+      return fields.some(value => (value || '').toString().toLowerCase().includes(query));
+    });
+  }
   
   if (currentStatusFilter) {
     filteredAuthFiles = filteredAuthFiles.filter(f => {
@@ -166,7 +184,11 @@ function renderQuotaPage() {
           <circle cx="12" cy="12" r="10"></circle>
           <path d="M12 6v6l4 2"></path>
         </svg>
-        <p>No auth files found${currentFilter !== 'all' ? ' for ' + currentFilter : ''}</p>
+        <p>No auth files found${currentFilter !== 'all' ? ' for ' + currentFilter : ''}${quotaSearchQuery ? ' matching search' : ''}</p>
+        <div class="quota-empty-actions">
+          <button class="btn btn-secondary btn-sm" onclick="resetQuotaFilters()">Reset filters</button>
+          <button class="btn btn-primary btn-sm" onclick="fetchAllQuotas()">Fetch all</button>
+        </div>
       </div>
     `;
     renderPagination();
@@ -209,6 +231,7 @@ function renderQuotaPage() {
   container.innerHTML = cardsHtml;
   renderPagination();
   renderSummaryBar();
+  updateFetchStatus();
 }
 
 /**
@@ -355,6 +378,27 @@ function updateLastUpdated(customMessage) {
   if (el) {
     el.textContent = customMessage || ('Updated ' + new Date().toLocaleTimeString());
   }
+}
+
+function updateFetchStatus() {
+  const el = document.getElementById('quotaFetchStatus');
+  if (!el) return;
+
+  if (!lastFetchStatus.start) {
+    el.textContent = 'No fetch yet';
+    return;
+  }
+
+  if (!lastFetchStatus.end) {
+    el.textContent = 'Fetching...';
+    return;
+  }
+
+  const ms = Math.max(0, lastFetchStatus.end - lastFetchStatus.start);
+  const seconds = (ms / 1000).toFixed(1);
+  const statusLabel = lastFetchStatus.success ? 'Success' : 'Failed';
+  const countLabel = Number.isFinite(lastFetchStatus.count) ? `${lastFetchStatus.count} item(s)` : 'unknown items';
+  el.textContent = `${statusLabel} · ${seconds}s · ${countLabel}`;
 }
 
 /**
@@ -1079,6 +1123,7 @@ export function renderAntigravityQuotaCard(authFile, data) {
   const quotaGroups = data.quotaGroups || [];
   const { worstGroup, worstIndex } = getWorstQuotaGroup(quotaGroups, 'percentage');
   const worstPercentage = getWorstQuotaPercentage(authFile, data);
+  const resetLabel = data.resetTime ? formatResetTime(data.resetTime) : '';
   
   const renderGroup = (group) => {
     const percentage = group.percentage ?? 0;
@@ -1128,7 +1173,8 @@ export function renderAntigravityQuotaCard(authFile, data) {
     `;
   }
 
-  return renderQuotaCardWrapper(authFile, 'antigravity', contentHtml, data.fetchedAt, worstPercentage);
+  const metaHtml = renderQuotaMetaChips(resetLabel, 'Provider quota');
+  return renderQuotaCardWrapper(authFile, 'antigravity', contentHtml, data.fetchedAt, worstPercentage, metaHtml);
 }
 
 /**
@@ -1143,6 +1189,7 @@ export function renderCodexQuotaCard(authFile, data) {
   const quotaGroups = data.quotaGroups || data.rateLimitWindows || [];
   const worstPercentage = getWorstQuotaPercentage(authFile, data);
   const { worstGroup, worstIndex } = getWorstQuotaGroup(quotaGroups, 'remainingPercentage');
+  const resetLabel = getCodexResetLabel(data.rateLimitWindows || quotaGroups);
 
   const renderWindow = (window) => {
     const percentage = window.remainingPercentage ?? window.percentage ?? (window.usedPercent !== null ? Math.max(0, 100 - window.usedPercent) : null);
@@ -1204,11 +1251,12 @@ export function renderCodexQuotaCard(authFile, data) {
     `;
   }
 
+  const metaHtml = renderQuotaMetaChips(resetLabel, getCodexWindowLabel(data.rateLimitWindows || quotaGroups));
   return renderQuotaCardWrapper(authFile, 'codex', `
     <div style="margin-bottom: 12px;">${planBadge}</div>
     ${groupsHtml}
     ${freeWarningHtml}
-  `, data.fetchedAt, worstPercentage);
+  `, data.fetchedAt, worstPercentage, metaHtml);
 }
 
 /**
@@ -1221,6 +1269,7 @@ export function renderGeminiCliQuotaCard(authFile, data) {
   const quotaGroups = data.quotaGroups || [];
   const { worstGroup, worstIndex } = getWorstQuotaGroup(quotaGroups, 'remainingPercentage');
   const worstPercentage = getWorstQuotaPercentage(authFile, data);
+  const resetLabel = data.resetTime ? formatResetTime(data.resetTime) : '';
   
   const renderGroup = (group) => {
     const percentage = group.remainingPercentage ?? group.percentage ?? 0;
@@ -1278,7 +1327,8 @@ export function renderGeminiCliQuotaCard(authFile, data) {
     `;
   }
 
-  return renderQuotaCardWrapper(authFile, 'gemini-cli', contentHtml, data.fetchedAt, worstPercentage);
+  const metaHtml = renderQuotaMetaChips(resetLabel, 'Model buckets');
+  return renderQuotaCardWrapper(authFile, 'gemini-cli', contentHtml, data.fetchedAt, worstPercentage, metaHtml);
 }
 
 /**
@@ -1354,7 +1404,7 @@ export function renderQuotaUnavailableCard(authFile) {
  * @param {number} worstPercentage - Worst quota percentage for circular indicator
  * @returns {string} HTML string
  */
-function renderQuotaCardWrapper(authFile, providerClass, contentHtml, fetchedAt, worstPercentage = null) {
+function renderQuotaCardWrapper(authFile, providerClass, contentHtml, fetchedAt, worstPercentage = null, metaHtml = '') {
   const updatedAgo = fetchedAt ? getTimeAgo(fetchedAt) : '';
   const isStale = fetchedAt ? (Date.now() - new Date(fetchedAt).getTime()) > 10 * 60 * 1000 : false;
   const status = worstPercentage !== null ? getQuotaStatus(worstPercentage) : '';
@@ -1379,10 +1429,61 @@ function renderQuotaCardWrapper(authFile, providerClass, contentHtml, fetchedAt,
           </button>
         </div>
       </div>
+      ${metaHtml}
       ${contentHtml}
       ${updatedAgo ? `<div class="quota-card-updated ${isStale ? 'stale' : ''}">Last updated: ${updatedAgo}</div>` : ''}
     </div>
   `;
+}
+
+function renderQuotaMetaChips(resetLabel, windowLabel) {
+  const chips = [];
+  if (resetLabel && resetLabel !== 'N/A' && resetLabel !== '-') {
+    chips.push(`
+      <span class="quota-meta-chip">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+        Next reset: <strong>${escapeHtml(resetLabel)}</strong>
+      </span>
+    `);
+  }
+  if (windowLabel) {
+    chips.push(`
+      <span class="quota-meta-chip">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="7" height="7" rx="1"></rect>
+          <rect x="14" y="3" width="7" height="7" rx="1"></rect>
+          <rect x="14" y="14" width="7" height="7" rx="1"></rect>
+          <rect x="3" y="14" width="7" height="7" rx="1"></rect>
+        </svg>
+        Usage window: <strong>${escapeHtml(windowLabel)}</strong>
+      </span>
+    `);
+  }
+  if (chips.length === 0) return '';
+  return `<div class="quota-meta">${chips.join('')}</div>`;
+}
+
+function getCodexResetLabel(windows) {
+  if (!Array.isArray(windows)) return '';
+  for (const window of windows) {
+    const label = window?.resetLabel || (window?.resetTime ? formatResetTime(window.resetTime) : '');
+    if (label && label !== '-') return label;
+  }
+  return '';
+}
+
+function getCodexWindowLabel(windows) {
+  if (!Array.isArray(windows) || windows.length === 0) return '';
+  const labels = windows
+    .map(window => window?.label || window?.name)
+    .filter(Boolean);
+  if (labels.length === 0) return '';
+  const uniqueLabels = [...new Set(labels)];
+  if (uniqueLabels.length === 1) return uniqueLabels[0];
+  return uniqueLabels.join(', ');
 }
 
 /**
@@ -1731,12 +1832,18 @@ export async function refreshQuota(authIndex) {
   }
 
   try {
+    lastFetchStatus = { start: Date.now(), end: null, success: null, count: 1 };
+    updateFetchStatus();
     quotaData.delete(authIndex);
     await fetchQuotaForAuth(authFile);
     renderQuotaPage();
     updateLastUpdated();
+    lastFetchStatus = { ...lastFetchStatus, end: Date.now(), success: true, count: 1 };
+    updateFetchStatus();
     toast('Quota refreshed', 'success');
   } catch (e) {
+    lastFetchStatus = { ...lastFetchStatus, end: Date.now(), success: false, count: 1 };
+    updateFetchStatus();
     toast('Failed to refresh: ' + e.message, 'error');
   } finally {
     if (refreshBtn) {
@@ -1758,6 +1865,9 @@ export async function fetchAllQuotas() {
   try {
     const pagedFiles = getPagedAuthFiles();
     const supportedFiles = pagedFiles.filter(f => isQuotaSupported(f.provider));
+
+    lastFetchStatus = { start: Date.now(), end: null, success: null, count: supportedFiles.length };
+    updateFetchStatus();
     
     for (const authFile of supportedFiles) {
       quotaData.delete(authFile.auth_index);
@@ -1767,8 +1877,12 @@ export async function fetchAllQuotas() {
     
     renderQuotaPage();
     updateLastUpdated();
+    lastFetchStatus = { ...lastFetchStatus, end: Date.now(), success: true, count: supportedFiles.length };
+    updateFetchStatus();
     toast(`Refreshed ${supportedFiles.length} quota(s)`, 'success');
   } catch (e) {
+    lastFetchStatus = { ...lastFetchStatus, end: Date.now(), success: false };
+    updateFetchStatus();
     toast('Failed to fetch all: ' + e.message, 'error');
   } finally {
     if (btn) {
@@ -1793,6 +1907,72 @@ export function setQuotaFilter(filter) {
   applyFilter();
   renderQuotaPage();
   // Don't auto-fetch - user must click refresh manually
+}
+
+export function setQuotaSearch(value) {
+  quotaSearchQuery = value || '';
+  const clearBtn = document.getElementById('quotaSearchClear');
+  if (clearBtn) {
+    clearBtn.style.display = quotaSearchQuery.trim() ? 'inline-flex' : 'none';
+  }
+  applyFilter();
+  renderQuotaPage();
+}
+
+export function clearQuotaSearch() {
+  quotaSearchQuery = '';
+  const input = document.getElementById('quotaSearch');
+  if (input) input.value = '';
+  const clearBtn = document.getElementById('quotaSearchClear');
+  if (clearBtn) clearBtn.style.display = 'none';
+  applyFilter();
+  renderQuotaPage();
+}
+
+export function resetQuotaFilters() {
+  currentFilter = 'all';
+  currentStatusFilter = null;
+  clearQuotaSearch();
+  document.querySelectorAll('.quota-filter-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.filter === 'all');
+    btn.setAttribute('aria-pressed', btn.dataset.filter === 'all');
+  });
+  applyFilter();
+  renderQuotaPage();
+  renderSummaryBar();
+}
+
+export async function handleQuotaBulkAction(action) {
+  const select = document.getElementById('quotaBulkAction');
+  if (select) select.value = '';
+  if (!action) return;
+  if (action === 'fetch-visible') {
+    await fetchAllQuotas();
+    return;
+  }
+  if (action === 'fetch-all') {
+    const prevPage = currentPage;
+    const prevFilter = currentFilter;
+    const prevStatus = currentStatusFilter;
+    const prevSearch = quotaSearchQuery;
+    currentFilter = 'all';
+    currentStatusFilter = null;
+    quotaSearchQuery = '';
+    applyFilter();
+    currentPage = 1;
+    await fetchAllQuotas();
+    currentFilter = prevFilter;
+    currentStatusFilter = prevStatus;
+    quotaSearchQuery = prevSearch;
+    applyFilter();
+    currentPage = Math.min(prevPage, Math.max(1, Math.ceil(filteredAuthFiles.length / pageSize)));
+    renderQuotaPage();
+    renderSummaryBar();
+    return;
+  }
+  if (action === 'reset-filters') {
+    resetQuotaFilters();
+  }
 }
 
 /**
@@ -1893,3 +2073,7 @@ window.getQuotaStatus = getQuotaStatus;
 window.setStatusFilter = setStatusFilter;
 window.toggleQuotaGroups = toggleQuotaGroups;
 window.setViewMode = setViewMode;
+window.setQuotaSearch = setQuotaSearch;
+window.clearQuotaSearch = clearQuotaSearch;
+window.resetQuotaFilters = resetQuotaFilters;
+window.handleQuotaBulkAction = handleQuotaBulkAction;

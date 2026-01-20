@@ -213,6 +213,49 @@
   flex-wrap: wrap;
 }
 
+.quota-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 220px;
+  background: rgba(20, 20, 40, 0.6);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 6px 10px;
+  gap: 6px;
+}
+
+.quota-search-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--text-muted);
+}
+
+.quota-search-input {
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+  width: 180px;
+}
+
+.quota-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.quota-search-clear {
+  padding: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.quota-search-clear:hover {
+  color: var(--text-primary);
+}
+
 .quota-status-filter {
   display: flex;
   gap: 4px;
@@ -346,6 +389,25 @@
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+}
+
+.quota-bulk-select {
+  padding: 6px 10px;
+  background: rgba(20, 20, 40, 0.6);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.quota-fetch-status {
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 6px 10px;
+  background: rgba(20, 20, 40, 0.6);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
 }
 
 .quota-last-updated {
@@ -483,6 +545,36 @@
 .quota-card-actions {
   display: flex;
   gap: 8px;
+}
+
+.quota-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.quota-meta-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  background: rgba(20, 20, 40, 0.6);
+  border: 1px solid var(--border-color);
+}
+
+.quota-meta-chip svg {
+  width: 12px;
+  height: 12px;
+  opacity: 0.7;
+}
+
+.quota-meta-chip strong {
+  color: var(--text-primary);
+  font-weight: 600;
 }
 
 .quota-refresh-btn {
@@ -774,6 +866,14 @@
 
 .quota-empty-state p {
   font-size: 14px;
+}
+
+.quota-empty-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 /* Pagination */
