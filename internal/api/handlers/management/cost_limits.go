@@ -254,3 +254,39 @@ func (h *Handler) ResetAllAccessKeyLimits(c *gin.Context) {
 		"keys_reset": count,
 	})
 }
+
+// DeleteAccessKeyLimit removes the cost/request limit configuration for a specific API key.
+// It removes the key from the config's access-key-limits.keys and clears accumulated data.
+// DELETE /v0/management/access-key-limits/keys/:key
+func (h *Handler) DeleteAccessKeyLimit(c *gin.Context) {
+	if costManager == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "cost manager not initialized"})
+		return
+	}
+
+	apiKey := c.Param("key")
+	if apiKey == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "api key is required"})
+		return
+	}
+
+	// Remove from h.cfg directly to ensure persist saves the correct config
+	found := false
+	for i, keyLimit := range h.cfg.AccessKeyLimits.Keys {
+		if keyLimit.APIKey == apiKey {
+			h.cfg.AccessKeyLimits.Keys = append(h.cfg.AccessKeyLimits.Keys[:i], h.cfg.AccessKeyLimits.Keys[i+1:]...)
+			found = true
+			break
+		}
+	}
+
+	// Also remove accumulated data via costManager
+	costManager.RemoveLimit(apiKey)
+
+	if !found {
+		c.JSON(http.StatusNotFound, gin.H{"error": "limit not found for this key"})
+		return
+	}
+
+	h.persist(c)
+}

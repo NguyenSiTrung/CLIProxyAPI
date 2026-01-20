@@ -41,6 +41,13 @@ func (a *Accumulator) Reset(apiKey string) {
 	a.costs[apiKey] = 0
 }
 
+// Delete removes an API key from the accumulator entirely.
+func (a *Accumulator) Delete(apiKey string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	delete(a.costs, apiKey)
+}
+
 // GetAll returns a copy of all accumulated costs.
 func (a *Accumulator) GetAll() map[string]float64 {
 	a.mu.RLock()

@@ -157,6 +157,35 @@ func (m *Manager) SetRequestLimit(apiKey string, maxRequests int64) {
 	})
 }
 
+// RemoveLimit removes a key's limit configuration and clears its accumulated data.
+// It removes the key from the config's AccessKeyLimits.Keys slice and deletes
+// accumulated cost/request data from the accumulators.
+func (m *Manager) RemoveLimit(apiKey string) {
+	if m == nil || m.cfg == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	// Remove from config keys
+	keys := m.cfg.AccessKeyLimits.Keys
+	for i, keyLimit := range keys {
+		if keyLimit.APIKey == apiKey {
+			m.cfg.AccessKeyLimits.Keys = append(keys[:i], keys[i+1:]...)
+			break
+		}
+	}
+
+	// Delete accumulated data
+	m.accumulator.Delete(apiKey)
+	m.requestAccumulator.Delete(apiKey)
+
+	// Remove from auto-reset scheduler
+	if m.autoResetScheduler != nil {
+		m.autoResetScheduler.Cancel(apiKey)
+	}
+}
+
 // LimitExceededType indicates which limit type was exceeded.
 type LimitExceededType string
 
@@ -361,6 +390,8 @@ type KeyLimitInfo struct {
 
 // GetAllLimits returns limit and cost information for all keys that have
 // either a configured limit or accumulated cost/requests.
+// Keys that only have accumulated data but are not in the access-keys list
+// and don't have explicit limits configured are filtered out (orphaned keys).
 func (m *Manager) GetAllLimits() []KeyLimitInfo {
 	if m == nil {
 		return nil
@@ -368,6 +399,12 @@ func (m *Manager) GetAllLimits() []KeyLimitInfo {
 
 	m.mu.RLock()
 	defer m.mu.RUnlock()
+
+	// Build a set of valid access keys from config
+	validAccessKeys := make(map[string]struct{})
+	for _, key := range m.cfg.APIKeys {
+		validAccessKeys[key] = struct{}{}
+	}
 
 	keySet := make(map[string]struct{})
 	result := []KeyLimitInfo{}
@@ -398,14 +435,17 @@ func (m *Manager) GetAllLimits() []KeyLimitInfo {
 
 	for apiKey := range allKeys {
 		if _, exists := keySet[apiKey]; !exists {
-			result = append(result, KeyLimitInfo{
-				APIKey:            apiKey,
-				MaxCost:           m.cfg.AccessKeyLimits.DefaultMaxCost,
-				CurrentCost:       allCosts[apiKey],
-				MaxRequests:       m.cfg.AccessKeyLimits.DefaultMaxRequests,
-				CurrentRequests:   allRequests[apiKey],
-				AutoResetInterval: "",
-			})
+			// Only include if the key exists in the valid access keys list
+			if _, valid := validAccessKeys[apiKey]; valid {
+				result = append(result, KeyLimitInfo{
+					APIKey:            apiKey,
+					MaxCost:           m.cfg.AccessKeyLimits.DefaultMaxCost,
+					CurrentCost:       allCosts[apiKey],
+					MaxRequests:       m.cfg.AccessKeyLimits.DefaultMaxRequests,
+					CurrentRequests:   allRequests[apiKey],
+					AutoResetInterval: "",
+				})
+			}
 		}
 	}
 

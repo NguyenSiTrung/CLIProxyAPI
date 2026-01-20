@@ -279,3 +279,10 @@ func (s *AutoResetScheduler) SaveState() error {
 	}
 	return s.state.SaveToFile(s.stateFile)
 }
+
+// Cancel removes a key from the auto-reset state, stopping any future resets for that key.
+func (s *AutoResetScheduler) Cancel(apiKey string) {
+	s.state.mu.Lock()
+	defer s.state.mu.Unlock()
+	delete(s.state.lastResets, apiKey)
+}

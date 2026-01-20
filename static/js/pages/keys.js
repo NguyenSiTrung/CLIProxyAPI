@@ -779,6 +779,13 @@ function renderCostLimitsList(data) {
             </svg>
             Reset
           </button>
+          <button class="btn btn-xs btn-danger" onclick="window.keysModule.confirmDeleteLimit('${api_key}', '${maskedKey}')" title="Delete limit">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            Delete
+          </button>
         </div>
       </td>
     `;
@@ -895,6 +902,43 @@ export async function resetCost(apiKey) {
     await api('POST', `/access-key-limits/keys/${encodeURIComponent(apiKey)}/reset`);
     closeModal();
     toast('Cost reset successfully', 'success');
+    refreshAllCostData();
+  } catch (e) {
+    toast('Failed: ' + e.message, 'error');
+  }
+}
+
+/**
+ * Show confirmation dialog to delete a cost limit
+ */
+export function confirmDeleteLimit(apiKey, maskedKey) {
+  const content = `
+    <div style="text-align:center; padding: 24px 0;">
+      <div style="width:64px; height:64px; background:rgba(239, 68, 68, 0.1); border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 20px auto;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--accent-red)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        </svg>
+      </div>
+      <h4 style="margin-bottom:8px; font-size:18px;">Delete Cost Limit?</h4>
+      <p style="color:var(--text-secondary); font-size:14px; max-width:300px; margin:0 auto;">This will remove the cost limit configuration for <strong>${maskedKey}</strong> and clear all accumulated cost/request data.</p>
+    </div>`;
+
+  const footer = `
+    <button class="btn btn-secondary" onclick="window.closeModal()">Cancel</button>
+    <button class="btn btn-danger" onclick="window.keysModule.deleteLimit('${apiKey}')">Yes, Delete</button>`;
+
+  showModal('Delete Cost Limit', content, footer);
+}
+
+/**
+ * Delete a cost limit for a key
+ */
+export async function deleteLimit(apiKey) {
+  try {
+    await api('DELETE', `/access-key-limits/keys/${encodeURIComponent(apiKey)}`);
+    closeModal();
+    toast('Cost limit deleted', 'success');
     refreshAllCostData();
   } catch (e) {
     toast('Failed: ' + e.message, 'error');
@@ -1165,6 +1209,8 @@ export const keysModule = {
   saveEditLimit,
   confirmResetCost,
   resetCost,
+  confirmDeleteLimit,
+  deleteLimit,
   confirmResetAllCostLimits,
   resetAllCostLimits,
   openAddLimitModal,

@@ -58,6 +58,13 @@ func (r *RequestAccumulator) Reset(apiKey string) {
 	r.counts[apiKey] = 0
 }
 
+// Delete removes an API key from the accumulator entirely.
+func (r *RequestAccumulator) Delete(apiKey string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.counts, apiKey)
+}
+
 // GetAll returns a copy of all request counts.
 func (r *RequestAccumulator) GetAll() map[string]int64 {
 	r.mu.RLock()
