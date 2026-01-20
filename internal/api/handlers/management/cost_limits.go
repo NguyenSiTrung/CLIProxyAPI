@@ -78,9 +78,10 @@ func (h *Handler) PutAccessKeyLimitsEnabled(c *gin.Context) {
 		return
 	}
 
-	// Modify h.cfg directly to ensure persist saves the correct config.
-	// The OnConfigChange callback will sync this to costManager via SetConfig.
+	// Lock to ensure thread-safe modification of config and atomic persist
+	h.mu.Lock()
 	h.cfg.AccessKeyLimits.Enabled = *body.Enabled
+	h.mu.Unlock()
 	h.persist(c)
 }
 
@@ -113,17 +114,27 @@ func (h *Handler) PutAccessKeyLimit(c *gin.Context) {
 		return
 	}
 
-	// Modify h.cfg directly to ensure persist saves the correct config.
-	// The OnConfigChange callback will sync this to costManager via SetConfig.
-	// This fixes a bug where costManager.cfg and h.cfg could be different objects
-	// after hot-reloads, causing changes to be lost when persist saves h.cfg.
-	h.updateAccessKeyLimit(apiKey, body.MaxCost, body.MaxRequests, body.AutoResetInterval)
+	// Validate non-negative values
+	if body.MaxCost != nil && *body.MaxCost < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "max_cost cannot be negative"})
+		return
+	}
+	if body.MaxRequests != nil && *body.MaxRequests < 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "max_requests cannot be negative"})
+		return
+	}
+
+	// Lock to ensure thread-safe modification of config and atomic persist
+	h.mu.Lock()
+	h.updateAccessKeyLimitLocked(apiKey, body.MaxCost, body.MaxRequests, body.AutoResetInterval)
+	h.mu.Unlock()
 	h.persist(c)
 }
 
-// updateAccessKeyLimit updates the limit configuration in h.cfg for a specific API key.
+// updateAccessKeyLimitLocked updates the limit configuration in h.cfg for a specific API key.
 // It finds or creates the key entry and applies the provided limit changes.
-func (h *Handler) updateAccessKeyLimit(apiKey string, maxCost *float64, maxRequests *int64, autoResetInterval *string) {
+// IMPORTANT: Caller must hold h.mu lock.
+func (h *Handler) updateAccessKeyLimitLocked(apiKey string, maxCost *float64, maxRequests *int64, autoResetInterval *string) {
 	// Find existing key entry
 	for i, keyLimit := range h.cfg.AccessKeyLimits.Keys {
 		if keyLimit.APIKey == apiKey {
@@ -270,7 +281,8 @@ func (h *Handler) DeleteAccessKeyLimit(c *gin.Context) {
 		return
 	}
 
-	// Remove from h.cfg directly to ensure persist saves the correct config
+	// Lock to ensure thread-safe modification of config
+	h.mu.Lock()
 	found := false
 	for i, keyLimit := range h.cfg.AccessKeyLimits.Keys {
 		if keyLimit.APIKey == apiKey {
@@ -279,6 +291,7 @@ func (h *Handler) DeleteAccessKeyLimit(c *gin.Context) {
 			break
 		}
 	}
+	h.mu.Unlock()
 
 	// Also remove accumulated data via costManager
 	costManager.RemoveLimit(apiKey)
