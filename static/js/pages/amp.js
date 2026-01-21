@@ -889,9 +889,13 @@ export function saveAllPresets() {
  */
 export async function saveAmpMapping(oldFromKey) {
   const from = document.getElementById('mappingFrom').value.trim();
-  let to = document.getElementById('mappingTo').value.trim();
   const manualInput = document.getElementById('mappingToManual');
-  if (!to && manualInput) {
+  const manualMode = document.getElementById('targetManualMode');
+  const isManualActive = manualMode && manualMode.style.display !== 'none';
+  let to = document.getElementById('mappingTo').value.trim();
+  if (isManualActive && manualInput) {
+    to = manualInput.value.trim();
+  } else if (!to && manualInput) {
     to = manualInput.value.trim();
   }
   const reasoningEffortEl = document.getElementById('reasoningEffort');
