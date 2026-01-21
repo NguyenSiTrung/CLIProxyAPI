@@ -537,10 +537,18 @@ export async function loadCostLimits() {
         ...limitsData,
         keys: (limitsData.keys || []).map(keyInfo => {
           const calculatedCost = calculateCostFromUsage(keyInfo.api_key, usageData);
-          return {
+          const enhanced = {
             ...keyInfo,
             current_cost: calculatedCost > 0 ? calculatedCost : keyInfo.current_cost
           };
+          // Also update quota_rules for multi-tier keys
+          if (keyInfo.quota_rules && keyInfo.quota_rules.length > 0) {
+            enhanced.quota_rules = keyInfo.quota_rules.map(rule => ({
+              ...rule,
+              current_cost: calculatedCost > 0 ? calculatedCost : rule.current_cost
+            }));
+          }
+          return enhanced;
         })
       };
       
