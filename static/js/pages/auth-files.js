@@ -188,7 +188,7 @@ export async function loadAuthFiles() {
 }
 
 /**
- * View an auth file's contents in a modal
+ * View an auth file's contents in a modal (with edit capability)
  * @param {string} name - Auth file name
  */
 export async function viewAuthFile(name) {
@@ -198,13 +198,138 @@ export async function viewAuthFile(name) {
       headers: { 'Authorization': `Bearer ${apiKey}` }
     });
     const data = await res.json();
+    const jsonStr = JSON.stringify(data, null, 2);
 
     document.getElementById('modalTitle').textContent = `Auth File: ${name}`;
-    document.getElementById('modalContent').innerHTML = `<pre style="background:rgba(0,0,0,0.4);padding:16px;border-radius:8px;overflow-x:auto;font-size:12px;max-height:400px;overflow-y:auto">${JSON.stringify(data, null, 2)}</pre>`;
-    document.getElementById('modalFooter').innerHTML = `<button class="btn btn-secondary" onclick="closeModal()">Close</button>`;
+    document.getElementById('modalContent').innerHTML = `
+      <div id="authFileViewMode">
+        <pre style="background:rgba(0,0,0,0.4);padding:16px;border-radius:8px;overflow-x:auto;font-size:12px;max-height:400px;overflow-y:auto">${jsonStr}</pre>
+      </div>
+      <div id="authFileEditMode" style="display:none">
+        <textarea id="authFileEditTextarea" style="width:100%;min-height:400px;background:rgba(0,0,0,0.4);color:var(--text-primary);border:1px solid var(--border-color);border-radius:8px;padding:16px;font-family:monospace;font-size:12px;resize:vertical">${jsonStr}</textarea>
+        <div id="authFileEditError" style="color:var(--accent-red);font-size:12px;margin-top:8px;display:none"></div>
+      </div>
+    `;
+    document.getElementById('modalFooter').innerHTML = `
+      <button class="btn btn-secondary" id="authFileEditBtn" onclick="toggleAuthFileEditMode('${name}')">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+        </svg>
+        Edit
+      </button>
+      <button class="btn btn-primary" id="authFileSaveBtn" onclick="saveAuthFile('${name}')" style="display:none">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+          <polyline points="17 21 17 13 7 13 7 21"/>
+          <polyline points="7 3 7 8 15 8"/>
+        </svg>
+        Save
+      </button>
+      <button class="btn btn-secondary" onclick="closeModal()">Close</button>
+    `;
     document.getElementById('modal').classList.add('active');
   } catch (e) {
     toast('Failed to view: ' + e.message, 'error');
+  }
+}
+
+/**
+ * Toggle between view and edit mode for auth file
+ * @param {string} name - Auth file name
+ */
+export function toggleAuthFileEditMode(name) {
+  const viewMode = document.getElementById('authFileViewMode');
+  const editMode = document.getElementById('authFileEditMode');
+  const editBtn = document.getElementById('authFileEditBtn');
+  const saveBtn = document.getElementById('authFileSaveBtn');
+  
+  if (editMode.style.display === 'none') {
+    viewMode.style.display = 'none';
+    editMode.style.display = 'block';
+    editBtn.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+        <circle cx="12" cy="12" r="3"/>
+      </svg>
+      View
+    `;
+    saveBtn.style.display = 'inline-flex';
+  } else {
+    viewMode.style.display = 'block';
+    editMode.style.display = 'none';
+    editBtn.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+      </svg>
+      Edit
+    `;
+    saveBtn.style.display = 'none';
+    document.getElementById('authFileEditError').style.display = 'none';
+  }
+}
+
+/**
+ * Save edited auth file content
+ * @param {string} name - Auth file name
+ */
+export async function saveAuthFile(name) {
+  const textarea = document.getElementById('authFileEditTextarea');
+  const errorDiv = document.getElementById('authFileEditError');
+  const saveBtn = document.getElementById('authFileSaveBtn');
+  
+  const content = textarea.value.trim();
+  
+  // Validate JSON
+  try {
+    JSON.parse(content);
+  } catch (e) {
+    errorDiv.textContent = `Invalid JSON: ${e.message}`;
+    errorDiv.style.display = 'block';
+    return;
+  }
+  
+  errorDiv.style.display = 'none';
+  saveBtn.disabled = true;
+  saveBtn.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin">
+      <path d="M21 12a9 9 0 11-6.219-8.56"/>
+    </svg>
+    Saving...
+  `;
+  
+  try {
+    const apiKey = getApiKey();
+    const res = await fetch(`/v0/management/auth-files?name=${encodeURIComponent(name)}`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: content
+    });
+    
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+    
+    toast('Auth file saved successfully', 'success');
+    closeModal();
+    loadAuthFiles();
+  } catch (e) {
+    errorDiv.textContent = `Failed to save: ${e.message}`;
+    errorDiv.style.display = 'block';
+    toast('Failed to save: ' + e.message, 'error');
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+        <polyline points="17 21 17 13 7 13 7 21"/>
+        <polyline points="7 3 7 8 15 8"/>
+      </svg>
+      Save
+    `;
   }
 }
 
@@ -575,6 +700,8 @@ export async function refreshAuthToken(name) {
 // Expose functions to window for HTML onclick handlers
 window.loadAuthFiles = loadAuthFiles;
 window.viewAuthFile = viewAuthFile;
+window.toggleAuthFileEditMode = toggleAuthFileEditMode;
+window.saveAuthFile = saveAuthFile;
 window.downloadAuth = downloadAuth;
 window.deleteAuth = deleteAuth;
 window.renameAuth = renameAuth;
