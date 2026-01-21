@@ -453,13 +453,24 @@ function renderLoadingCard(authFile) {
  * Render pagination controls
  */
 function renderPagination() {
-  const container = document.getElementById('quotaPageControls');
-  if (!container) return;
-
+  const controlsContainer = document.getElementById('quotaPageControls');
+  const infoContainer = document.getElementById('quotaPageInfo');
+  
   const totalPages = Math.ceil(filteredAuthFiles.length / pageSize);
   
+  // Render page info
+  if (infoContainer) {
+    const start = filteredAuthFiles.length > 0 ? (currentPage - 1) * pageSize + 1 : 0;
+    const end = Math.min(currentPage * pageSize, filteredAuthFiles.length);
+    infoContainer.textContent = filteredAuthFiles.length > 0 
+      ? `Showing ${start}-${end} of ${filteredAuthFiles.length}`
+      : 'No results';
+  }
+  
+  if (!controlsContainer) return;
+  
   if (totalPages <= 1) {
-    container.innerHTML = '';
+    controlsContainer.innerHTML = '';
     return;
   }
 
@@ -477,7 +488,7 @@ function renderPagination() {
   
   html += `<button class="quota-page-btn" onclick="setQuotaPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>›</button>`;
   
-  container.innerHTML = html;
+  controlsContainer.innerHTML = html;
 }
 
 /**
@@ -568,31 +579,20 @@ async function fetchQuotaForAuth(authFile) {
  * @param {string} [customMessage] - Optional custom message to display
  */
 function updateLastUpdated(customMessage) {
+  const timeText = customMessage || ('Updated ' + new Date().toLocaleTimeString());
+  
+  // Update old UI element if exists
   const el = document.getElementById('quotaUpdateTime');
   if (el) {
-    el.textContent = customMessage || ('Updated ' + new Date().toLocaleTimeString());
+    el.textContent = timeText;
   }
+  
+  // Update new sync status
+  updateSyncStatus();
 }
 
 function updateFetchStatus() {
-  const el = document.getElementById('quotaFetchStatus');
-  if (!el) return;
-
-  if (!lastFetchStatus.start) {
-    el.textContent = 'No fetch yet';
-    return;
-  }
-
-  if (!lastFetchStatus.end) {
-    el.textContent = 'Fetching...';
-    return;
-  }
-
-  const ms = Math.max(0, lastFetchStatus.end - lastFetchStatus.start);
-  const seconds = (ms / 1000).toFixed(1);
-  const statusLabel = lastFetchStatus.success ? 'Success' : 'Failed';
-  const countLabel = Number.isFinite(lastFetchStatus.count) ? `${lastFetchStatus.count} item(s)` : 'unknown items';
-  el.textContent = `${statusLabel} · ${seconds}s · ${countLabel}`;
+  updateSyncStatus();
 }
 
 /**
@@ -1811,89 +1811,131 @@ function renderSummaryBar() {
   const fetchedCount = summary.critical + summary.warning + summary.healthy;
   
   container.innerHTML = `
-    <div class="quota-summary-total">
-      <span class="quota-summary-count">${summary.total}</span> total
-      ${fetchedCount < summary.total ? `<span class="quota-summary-fetched">(${fetchedCount} fetched)</span>` : ''}
+    <div class="quota-summary-stat">
+      <span class="quota-summary-stat-value">${summary.total}</span>
+      <span>total${fetchedCount < summary.total ? ` (${fetchedCount} fetched)` : ''}</span>
     </div>
     <span class="quota-summary-divider"></span>
-    <button class="quota-summary-badge critical ${currentStatusFilter === 'critical' ? 'active' : ''}" 
+    <button class="quota-status-badge critical ${currentStatusFilter === 'critical' ? 'active' : ''}" 
             onclick="setStatusFilter('critical')" 
             aria-pressed="${currentStatusFilter === 'critical'}">
-      🔴 <span class="quota-summary-count">${summary.critical}</span> Critical
+      <span class="status-dot"></span>
+      <span class="quota-status-count">${summary.critical}</span> Critical
     </button>
-    <button class="quota-summary-badge warning ${currentStatusFilter === 'warning' ? 'active' : ''}" 
+    <button class="quota-status-badge warning ${currentStatusFilter === 'warning' ? 'active' : ''}" 
             onclick="setStatusFilter('warning')"
             aria-pressed="${currentStatusFilter === 'warning'}">
-      🟡 <span class="quota-summary-count">${summary.warning}</span> Warning
+      <span class="status-dot"></span>
+      <span class="quota-status-count">${summary.warning}</span> Warning
     </button>
-    <button class="quota-summary-badge healthy ${currentStatusFilter === 'healthy' ? 'active' : ''}" 
+    <button class="quota-status-badge healthy ${currentStatusFilter === 'healthy' ? 'active' : ''}" 
             onclick="setStatusFilter('healthy')"
             aria-pressed="${currentStatusFilter === 'healthy'}">
-      🟢 <span class="quota-summary-count">${summary.healthy}</span> Healthy
+      <span class="status-dot"></span>
+      <span class="quota-status-count">${summary.healthy}</span> Healthy
     </button>
     ${summary.notFetched > 0 ? `
-      <button class="quota-summary-badge not-fetched ${currentStatusFilter === 'not-fetched' ? 'active' : ''}" 
+      <button class="quota-status-badge not-fetched ${currentStatusFilter === 'not-fetched' ? 'active' : ''}" 
               onclick="setStatusFilter('not-fetched')"
               aria-pressed="${currentStatusFilter === 'not-fetched'}">
-        ⚪ <span class="quota-summary-count">${summary.notFetched}</span> Not fetched
+        <span class="status-dot"></span>
+        <span class="quota-status-count">${summary.notFetched}</span> Pending
       </button>
     ` : ''}
     ${summary.error > 0 ? `
-      <button class="quota-summary-badge error ${currentStatusFilter === 'error' ? 'active' : ''}" 
+      <button class="quota-status-badge error ${currentStatusFilter === 'error' ? 'active' : ''}" 
               onclick="setStatusFilter('error')"
               aria-pressed="${currentStatusFilter === 'error'}">
-        ⛔ <span class="quota-summary-count">${summary.error}</span> Error
+        <span class="status-dot"></span>
+        <span class="quota-status-count">${summary.error}</span> Error
       </button>
     ` : ''}
   `;
   
-  renderStatusFilterChips();
+  renderActiveFilters();
+  updateSyncStatus();
 }
 
 /**
- * Render status filter chips in the controls row
+ * Update the sync status indicator
  */
-function renderStatusFilterChips() {
-  const container = document.getElementById('quotaStatusFilter');
-  if (!container) return;
+function updateSyncStatus() {
+  const container = document.getElementById('quotaSyncStatus');
+  const textEl = document.getElementById('quotaSyncText');
+  if (!container || !textEl) return;
   
   const summary = calculateQuotaSummary();
+  const fetchedCount = summary.critical + summary.warning + summary.healthy + summary.error;
   
-  container.innerHTML = `
-    <button class="quota-status-filter-btn critical ${currentStatusFilter === 'critical' ? 'active' : ''}" 
-            onclick="setStatusFilter('critical')" 
-            aria-pressed="${currentStatusFilter === 'critical'}">
-      🔴 Critical
-    </button>
-    <button class="quota-status-filter-btn warning ${currentStatusFilter === 'warning' ? 'active' : ''}" 
-            onclick="setStatusFilter('warning')"
-            aria-pressed="${currentStatusFilter === 'warning'}">
-      🟡 Warning
-    </button>
-    <button class="quota-status-filter-btn healthy ${currentStatusFilter === 'healthy' ? 'active' : ''}" 
-            onclick="setStatusFilter('healthy')"
-            aria-pressed="${currentStatusFilter === 'healthy'}">
-      🟢 Healthy
-    </button>
-    ${summary.notFetched > 0 ? `
-      <button class="quota-status-filter-btn not-fetched ${currentStatusFilter === 'not-fetched' ? 'active' : ''}" 
-              onclick="setStatusFilter('not-fetched')"
-              aria-pressed="${currentStatusFilter === 'not-fetched'}">
-        ⚪ Not fetched
-      </button>
-    ` : ''}
-    ${summary.error > 0 ? `
-      <button class="quota-status-filter-btn error ${currentStatusFilter === 'error' ? 'active' : ''}" 
-              onclick="setStatusFilter('error')"
-              aria-pressed="${currentStatusFilter === 'error'}">
-        ⛔ Error
-      </button>
-    ` : ''}
-  `;
+  container.classList.remove('syncing', 'success', 'error');
+  
+  if (fetchedCount === 0) {
+    textEl.textContent = 'Click Fetch All to load';
+  } else if (summary.error > 0 && fetchedCount === summary.error) {
+    container.classList.add('error');
+    textEl.textContent = `${summary.error} failed`;
+  } else {
+    container.classList.add('success');
+    textEl.textContent = `${fetchedCount}/${summary.total} fetched`;
+  }
 }
 
 /**
- * Render view toggle button
+ * Render active filter chips (provider, status, search)
+ */
+function renderActiveFilters() {
+  const container = document.getElementById('quotaActiveFilters');
+  if (!container) return;
+  
+  const chips = [];
+  
+  if (currentFilter !== 'all') {
+    chips.push(`
+      <div class="quota-filter-chip">
+        Provider: ${escapeHtml(currentFilter)}
+        <button class="quota-filter-chip-remove" onclick="setQuotaFilter('all')" aria-label="Remove provider filter">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    `);
+  }
+  
+  if (currentStatusFilter) {
+    chips.push(`
+      <div class="quota-filter-chip">
+        Status: ${escapeHtml(currentStatusFilter)}
+        <button class="quota-filter-chip-remove" onclick="setStatusFilter(null)" aria-label="Remove status filter">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    `);
+  }
+  
+  if (quotaSearchQuery) {
+    chips.push(`
+      <div class="quota-filter-chip">
+        Search: "${escapeHtml(quotaSearchQuery)}"
+        <button class="quota-filter-chip-remove" onclick="clearQuotaSearch()" aria-label="Clear search">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    `);
+  }
+  
+  container.innerHTML = chips.join('');
+}
+
+/**
+ * Render view toggle button (icon only version)
  */
 function renderViewToggle() {
   const container = document.getElementById('quotaViewToggle');
@@ -1902,21 +1944,22 @@ function renderViewToggle() {
   const isCompact = currentViewMode === 'compact';
   
   container.innerHTML = `
-    <button class="quota-view-toggle-btn ${isCompact ? '' : 'active'}" 
+    <button class="quota-view-btn ${isCompact ? '' : 'active'}" 
             onclick="setViewMode('detailed')"
-            aria-pressed="${!isCompact}">
-      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            aria-pressed="${!isCompact}"
+            title="Detailed view">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="3" y="3" width="7" height="7"></rect>
         <rect x="14" y="3" width="7" height="7"></rect>
         <rect x="14" y="14" width="7" height="7"></rect>
         <rect x="3" y="14" width="7" height="7"></rect>
       </svg>
-      Detailed
     </button>
-    <button class="quota-view-toggle-btn ${isCompact ? 'active' : ''}" 
+    <button class="quota-view-btn ${isCompact ? 'active' : ''}" 
             onclick="setViewMode('compact')"
-            aria-pressed="${isCompact}">
-      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            aria-pressed="${isCompact}"
+            title="Compact view">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <line x1="8" y1="6" x2="21" y2="6"></line>
         <line x1="8" y1="12" x2="21" y2="12"></line>
         <line x1="8" y1="18" x2="21" y2="18"></line>
@@ -1924,13 +1967,70 @@ function renderViewToggle() {
         <line x1="3" y1="12" x2="3.01" y2="12"></line>
         <line x1="3" y1="18" x2="3.01" y2="18"></line>
       </svg>
-      Compact
     </button>
   `;
   
   const quotaContainer = document.getElementById('quotaContainer');
   if (quotaContainer) {
     quotaContainer.classList.toggle('compact-view', isCompact);
+  }
+}
+
+/**
+ * Toggle the more actions menu
+ */
+export function toggleQuotaMoreMenu() {
+  const menu = document.getElementById('quotaMoreMenu');
+  if (menu) {
+    menu.classList.toggle('open');
+    
+    // Close on click outside
+    if (menu.classList.contains('open')) {
+      setTimeout(() => {
+        document.addEventListener('click', closeQuotaMoreMenuOnClickOutside);
+      }, 0);
+    }
+  }
+}
+
+/**
+ * Close the more actions menu
+ */
+export function closeQuotaMoreMenu() {
+  const menu = document.getElementById('quotaMoreMenu');
+  if (menu) {
+    menu.classList.remove('open');
+    document.removeEventListener('click', closeQuotaMoreMenuOnClickOutside);
+  }
+}
+
+function closeQuotaMoreMenuOnClickOutside(e) {
+  const menu = document.getElementById('quotaMoreMenu');
+  const btn = document.getElementById('quotaMoreBtn');
+  if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) {
+    closeQuotaMoreMenu();
+  }
+}
+
+/**
+ * Open mobile filter drawer
+ */
+export function openQuotaFilterDrawer() {
+  const drawer = document.getElementById('quotaFilterDrawer');
+  if (drawer) {
+    drawer.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+}
+
+/**
+ * Close mobile filter drawer
+ */
+export function closeQuotaFilterDrawer() {
+  const drawer = document.getElementById('quotaFilterDrawer');
+  if (drawer) {
+    drawer.classList.remove('open');
+    document.body.style.overflow = '';
   }
 }
 
@@ -2146,14 +2246,14 @@ export async function fetchAllQuotas() {
 export function setQuotaFilter(filter) {
   currentFilter = filter;
   
-  document.querySelectorAll('.quota-filter-btn').forEach(btn => {
+  document.querySelectorAll('.quota-provider-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.filter === filter);
     btn.setAttribute('aria-pressed', btn.dataset.filter === filter);
   });
   
   applyFilter();
   renderQuotaPage();
-  // Don't auto-fetch - user must click refresh manually
+  renderSummaryBar();
 }
 
 export function setQuotaSearch(value) {
@@ -2188,7 +2288,7 @@ export function resetQuotaFilters() {
   currentFilter = 'all';
   currentStatusFilter = null;
   clearQuotaSearch();
-  document.querySelectorAll('.quota-filter-btn').forEach(btn => {
+  document.querySelectorAll('.quota-provider-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.filter === 'all');
     btn.setAttribute('aria-pressed', btn.dataset.filter === 'all');
   });
@@ -2322,6 +2422,7 @@ window.loadQuotaPage = loadQuotaPage;
 window.unloadQuotaPage = unloadQuotaPage;
 window.refreshQuota = refreshQuota;
 window.fetchAllQuotas = fetchAllQuotas;
+window.fetchVisibleQuotas = fetchVisibleQuotas;
 window.setQuotaFilter = setQuotaFilter;
 window.setQuotaPageSize = setQuotaPageSize;
 window.setQuotaPage = setQuotaPage;
@@ -2333,3 +2434,7 @@ window.setQuotaSearch = setQuotaSearch;
 window.clearQuotaSearch = clearQuotaSearch;
 window.resetQuotaFilters = resetQuotaFilters;
 window.handleQuotaBulkAction = handleQuotaBulkAction;
+window.toggleQuotaMoreMenu = toggleQuotaMoreMenu;
+window.closeQuotaMoreMenu = closeQuotaMoreMenu;
+window.openQuotaFilterDrawer = openQuotaFilterDrawer;
+window.closeQuotaFilterDrawer = closeQuotaFilterDrawer;

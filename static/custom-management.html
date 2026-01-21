@@ -2259,32 +2259,40 @@
 
       <div id="page-quota" class="page">
         <div class="quota-page-header">
-          <!-- Row 1: Title + Summary Bar -->
-          <div class="quota-header-row-1">
-            <div class="quota-header-left">
-              <div class="quota-header-title">
-                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none"
+          <!-- Zone 1: Title Block -->
+          <div class="quota-title-zone">
+            <div class="quota-title-content">
+              <div class="quota-title-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none"
                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <circle cx="12" cy="12" r="10" />
                   <path d="M12 6v6l4 2" />
                 </svg>
-                <h1>Quota</h1>
               </div>
-              <p class="quota-header-subtitle">Monitor remaining quota for your provider authentication files</p>
+              <div>
+                <h1 class="quota-title">Quota</h1>
+                <p class="quota-subtitle">Monitor remaining quota for your provider authentication files</p>
+              </div>
             </div>
-            <!-- Summary Bar Container (populated by JS) -->
-            <div id="quotaSummaryBar" class="quota-summary-bar"></div>
+            <div class="quota-sync-status" id="quotaSyncStatus">
+              <span class="quota-sync-indicator" id="quotaSyncIndicator"></span>
+              <span id="quotaSyncText">Click Fetch All to load</span>
+            </div>
           </div>
-          
-          <!-- Row 2: Filters + Controls -->
-          <div class="quota-header-row-2">
-            <div class="quota-filters-group">
+
+          <!-- Zone 2: Overview Summary (clickable status filters) -->
+          <div id="quotaSummaryBar" class="quota-summary-bar"></div>
+
+          <!-- Zone 3: Toolbar -->
+          <div class="quota-toolbar">
+            <!-- Left cluster: Search + Filters -->
+            <div class="quota-toolbar-left">
               <div class="quota-search">
                 <svg class="quota-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="11" cy="11" r="8" />
                   <line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
-                <input type="text" id="quotaSearch" class="quota-search-input" placeholder="Search by file, email, or account..." oninput="setQuotaSearch(this.value)">
+                <input type="text" id="quotaSearch" class="quota-search-input" placeholder="Search files..." oninput="setQuotaSearch(this.value)">
                 <button class="quota-search-clear" id="quotaSearchClear" onclick="clearQuotaSearch()" style="display:none" aria-label="Clear search">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18" />
@@ -2292,47 +2300,83 @@
                   </svg>
                 </button>
               </div>
-              <!-- Provider Filter -->
-              <div class="quota-filter-selector" role="group" aria-label="Provider filter">
-                <button class="quota-filter-btn active" data-filter="all" onclick="setQuotaFilter('all')" aria-pressed="true">All</button>
-                <button class="quota-filter-btn" data-filter="antigravity" onclick="setQuotaFilter('antigravity')" aria-pressed="false">Antigravity</button>
-                <button class="quota-filter-btn" data-filter="codex" onclick="setQuotaFilter('codex')" aria-pressed="false">Codex</button>
-                <button class="quota-filter-btn" data-filter="gemini-cli" onclick="setQuotaFilter('gemini-cli')" aria-pressed="false">Gemini CLI</button>
+              <div class="quota-provider-filter" role="group" aria-label="Provider filter">
+                <button class="quota-provider-btn active" data-filter="all" onclick="setQuotaFilter('all')" aria-pressed="true">All</button>
+                <button class="quota-provider-btn" data-filter="antigravity" onclick="setQuotaFilter('antigravity')" aria-pressed="false">
+                  <span class="provider-dot antigravity"></span>Antigravity
+                </button>
+                <button class="quota-provider-btn" data-filter="codex" onclick="setQuotaFilter('codex')" aria-pressed="false">
+                  <span class="provider-dot codex"></span>Codex
+                </button>
+                <button class="quota-provider-btn" data-filter="gemini-cli" onclick="setQuotaFilter('gemini-cli')" aria-pressed="false">
+                  <span class="provider-dot gemini-cli"></span>Gemini CLI
+                </button>
               </div>
-              
-              <!-- Status Filter Container (populated by JS) -->
-              <div id="quotaStatusFilter" class="quota-status-filter" role="group" aria-label="Status filter"></div>
             </div>
             
-            <div class="quota-header-actions">
-              <!-- View Toggle Container (populated by JS) -->
+            <!-- Right cluster: View + Actions -->
+            <div class="quota-toolbar-right">
               <div id="quotaViewToggle" class="quota-view-toggle"></div>
-              <select id="quotaBulkAction" class="quota-bulk-select" onchange="handleQuotaBulkAction(this.value)">
-                <option value="">Bulk actions</option>
-                <option value="fetch-visible">Fetch visible</option>
-                <option value="fetch-all">Fetch all</option>
-                <option value="reset-filters">Reset filters</option>
-              </select>
-              
-              <button class="btn btn-secondary btn-sm" onclick="fetchAllQuotas()" id="quotaFetchAllBtn">
+              <button class="quota-fetch-btn" onclick="fetchAllQuotas()" id="quotaFetchAllBtn">
                 <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M23 4v6h-6" />
                   <path d="M1 20v-6h6" />
                   <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
                 </svg>
-                Fetch All
+                <span>Fetch All</span>
               </button>
-              <span id="quotaFetchStatus" class="quota-fetch-status">No fetch yet</span>
-              
-              <span id="quotaLastUpdated" class="quota-last-updated">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="12" cy="12" r="10"></circle>
-                  <polyline points="12 6 12 12 16 14"></polyline>
-                </svg>
-                <span id="quotaUpdateTime">--</span>
-              </span>
+              <div class="quota-more-actions">
+                <button class="quota-more-btn" onclick="toggleQuotaMoreMenu()" aria-label="More actions" id="quotaMoreBtn">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="1"></circle>
+                    <circle cx="12" cy="5" r="1"></circle>
+                    <circle cx="12" cy="19" r="1"></circle>
+                  </svg>
+                </button>
+                <div class="quota-more-menu" id="quotaMoreMenu">
+                  <button class="quota-menu-item" onclick="fetchVisibleQuotas(); closeQuotaMoreMenu()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                    Fetch visible only
+                  </button>
+                  <button class="quota-menu-item" onclick="resetQuotaFilters(); closeQuotaMoreMenu()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M3 6h18" />
+                      <path d="M7 12h10" />
+                      <path d="M10 18h4" />
+                    </svg>
+                    Reset all filters
+                  </button>
+                  <div class="quota-menu-divider"></div>
+                  <button class="quota-menu-item" onclick="setViewMode('detailed'); closeQuotaMoreMenu()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="3" width="7" height="7"></rect>
+                      <rect x="14" y="3" width="7" height="7"></rect>
+                      <rect x="14" y="14" width="7" height="7"></rect>
+                      <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    Detailed view
+                  </button>
+                  <button class="quota-menu-item" onclick="setViewMode('compact'); closeQuotaMoreMenu()">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <line x1="8" y1="6" x2="21" y2="6"></line>
+                      <line x1="8" y1="12" x2="21" y2="12"></line>
+                      <line x1="8" y1="18" x2="21" y2="18"></line>
+                      <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                      <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                      <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                    </svg>
+                    Compact view
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
+
+          <!-- Active Filters Chips -->
+          <div id="quotaActiveFilters" class="quota-active-filters"></div>
         </div>
 
         <div id="quotaContainer" class="quota-cards-grid">
@@ -2347,6 +2391,8 @@
         </div>
 
         <div class="quota-pagination" id="quotaPagination">
+          <div class="quota-page-info" id="quotaPageInfo"></div>
+          <div class="quota-page-controls" id="quotaPageControls"></div>
           <div class="quota-page-size">
             <span>Show:</span>
             <select id="quotaPageSize" onchange="setQuotaPageSize(this.value)">
@@ -2357,7 +2403,26 @@
               <option value="24">24</option>
             </select>
           </div>
-          <div class="quota-page-controls" id="quotaPageControls">
+        </div>
+
+        <!-- Mobile Filter Drawer -->
+        <div class="quota-filter-drawer" id="quotaFilterDrawer">
+          <div class="quota-drawer-backdrop" onclick="closeQuotaFilterDrawer()"></div>
+          <div class="quota-drawer-content">
+            <div class="quota-drawer-header">
+              <h3>Filters</h3>
+              <button class="quota-drawer-close" onclick="closeQuotaFilterDrawer()" aria-label="Close filters">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div class="quota-drawer-body" id="quotaDrawerFilters"></div>
+            <div class="quota-drawer-footer">
+              <button class="btn btn-secondary" onclick="resetQuotaFilters(); closeQuotaFilterDrawer()">Reset</button>
+              <button class="btn btn-primary" onclick="closeQuotaFilterDrawer()">Apply</button>
+            </div>
           </div>
         </div>
       </div>
