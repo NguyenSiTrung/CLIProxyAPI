@@ -55,6 +55,9 @@ func StartService(cfg *config.Config, configPath string, localPassword string) {
 	var telegramBot *telegram.Bot
 	if cfg.Telegram.Enabled && cfg.Telegram.Token != "" {
 		telegramBot = telegram.NewBot(cfg.Telegram)
+		if cm := service.CostManager(); cm != nil {
+			telegramBot.SetCostManager(cm)
+		}
 		telegramBot.Start()
 		defer telegramBot.Stop()
 	}

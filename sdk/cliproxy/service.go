@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/api"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/cost"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/runtime/executor"
 	_ "github.com/router-for-me/CLIProxyAPI/v6/internal/usage"
@@ -656,6 +657,15 @@ func (s *Service) Shutdown(ctx context.Context) error {
 		usage.StopDefault()
 	})
 	return shutdownErr
+}
+
+// CostManager returns the cost manager from the underlying server.
+// Returns nil if the server is not initialized.
+func (s *Service) CostManager() *cost.Manager {
+	if s == nil || s.server == nil {
+		return nil
+	}
+	return s.server.CostManager()
 }
 
 func (s *Service) ensureAuthDir() error {

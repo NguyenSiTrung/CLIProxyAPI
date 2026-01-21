@@ -15,6 +15,7 @@ import (
 
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/buildinfo"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/cost"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/usage"
 	log "github.com/sirupsen/logrus"
@@ -22,12 +23,13 @@ import (
 
 // Bot represents the Telegram bot instance.
 type Bot struct {
-	config    config.TelegramConfig
-	client    *http.Client
-	startTime time.Time
-	stopCh    chan struct{}
-	wg        sync.WaitGroup
-	mu        sync.RWMutex
+	config      config.TelegramConfig
+	client      *http.Client
+	startTime   time.Time
+	stopCh      chan struct{}
+	wg          sync.WaitGroup
+	mu          sync.RWMutex
+	costManager *cost.Manager
 }
 
 // Update represents a Telegram update.
@@ -85,6 +87,13 @@ func (b *Bot) Stop() {
 	close(b.stopCh)
 	b.wg.Wait()
 	log.Info("Telegram bot stopped")
+}
+
+// SetCostManager sets the cost manager reference used for quota information.
+func (b *Bot) SetCostManager(manager *cost.Manager) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.costManager = manager
 }
 
 func (b *Bot) pollUpdates() {
@@ -419,6 +428,56 @@ func (b *Bot) handleUserStats(apiKey string) string {
 	sb.WriteString(fmt.Sprintf("   • Est. Cost: $%.4f\n", totalCost))
 	if lastCallTime != nil {
 		sb.WriteString(fmt.Sprintf("   • Last Call: %s\n", formatRelativeTime(*lastCallTime)))
+	}
+
+	b.mu.RLock()
+	cm := b.costManager
+	b.mu.RUnlock()
+	if cm != nil && cm.IsEnabled() {
+		limits := cm.GetAllLimits()
+		for _, limit := range limits {
+			if limit.APIKey == apiKey {
+				sb.WriteString(fmt.Sprintf("\n📈 <b>Quota Status:</b>\n"))
+				if len(limit.QuotaRules) > 0 {
+					for _, rule := range limit.QuotaRules {
+						sb.WriteString(fmt.Sprintf("   <b>%s</b>:\n", rule.ID))
+						if rule.MaxRequests > 0 {
+							pct := float64(rule.CurrentRequests) / float64(rule.MaxRequests) * 100
+							sb.WriteString(fmt.Sprintf("     • Requests: %d/%d (%.1f%%)\n", rule.CurrentRequests, rule.MaxRequests, pct))
+						}
+						if rule.MaxCost > 0 {
+							pct := rule.CurrentCost / rule.MaxCost * 100
+							sb.WriteString(fmt.Sprintf("     • Cost: $%.4f/$%.2f (%.1f%%)\n", rule.CurrentCost, rule.MaxCost, pct))
+						}
+						if rule.NextResetTime != "" {
+							if t, err := time.Parse("2006-01-02T15:04:05Z07:00", rule.NextResetTime); err == nil {
+								sb.WriteString(fmt.Sprintf("     • Resets: %s\n", formatRelativeTime(t)))
+							}
+						} else if rule.AutoResetInterval != "" && rule.AutoResetInterval != "none" {
+							sb.WriteString(fmt.Sprintf("     • Interval: %s\n", rule.AutoResetInterval))
+						}
+					}
+				} else {
+					if limit.MaxRequests > 0 {
+						pct := float64(limit.CurrentRequests) / float64(limit.MaxRequests) * 100
+						sb.WriteString(fmt.Sprintf("   • Requests: %d/%d (%.1f%%)\n", limit.CurrentRequests, limit.MaxRequests, pct))
+					}
+					if limit.MaxCost > 0 {
+						pct := limit.CurrentCost / limit.MaxCost * 100
+						sb.WriteString(fmt.Sprintf("   • Cost: $%.4f/$%.2f (%.1f%%)\n", limit.CurrentCost, limit.MaxCost, pct))
+					}
+					if limit.AutoResetInterval != "" && limit.AutoResetInterval != "none" {
+						nextReset := cm.GetNextResetTime(apiKey)
+						if !nextReset.IsZero() {
+							sb.WriteString(fmt.Sprintf("   • Resets: %s\n", formatRelativeTime(nextReset)))
+						} else {
+							sb.WriteString(fmt.Sprintf("   • Interval: %s\n", limit.AutoResetInterval))
+						}
+					}
+				}
+				break
+			}
+		}
 	}
 
 	sb.WriteString(fmt.Sprintf("\n🔢 <b>Token Breakdown:</b>\n"))
