@@ -11,7 +11,7 @@ let quotaData = new Map();
 let authFiles = [];
 let filteredAuthFiles = [];
 let currentFilter = 'all';
-let currentStatusFilter = null; // 'critical' | 'warning' | 'healthy' | null
+let currentStatusFilter = null; // 'critical' | 'warning' | 'healthy' | 'not-fetched' | 'error' | null
 let currentViewMode = 'detailed'; // 'compact' | 'detailed'
 let currentPage = 1;
 let pageSize = 9;
@@ -19,6 +19,14 @@ let autoRefreshInterval = null;
 let quotaSearchQuery = '';
 let lastFetchStatus = { start: null, end: null, success: null, count: 0 };
 const AUTO_REFRESH_DELAY = 5 * 60 * 1000; // 5 minutes
+
+// Request tracking for race condition prevention
+const pendingRequests = new Map(); // auth_index -> { requestId, abortController }
+let currentRequestId = 0;
+
+// Search debounce timer
+let searchDebounceTimer = null;
+const SEARCH_DEBOUNCE_MS = 300;
 
 // Supported providers for quota checking
 const SUPPORTED_PROVIDERS = ['antigravity', 'codex', 'gemini-cli'];
@@ -72,6 +80,117 @@ const GEMINI_CLI_QUOTA_GROUPS = [
 
 const GEMINI_CLI_IGNORED_MODEL_PREFIXES = ['gemini-2.0-flash'];
 
+// ============================================================================
+// Security Helpers - XSS prevention
+// ============================================================================
+
+/**
+ * Escape HTML special characters (for text content)
+ * @param {any} str - String to escape
+ * @returns {string} Escaped string
+ */
+function escapeHtml(str) {
+  if (str === null || str === undefined) return '';
+  const s = String(str);
+  const div = document.createElement('div');
+  div.textContent = s;
+  return div.innerHTML;
+}
+
+/**
+ * Escape string for use in HTML attributes (handles quotes)
+ * @param {any} str - String to escape for attribute context
+ * @returns {string} Escaped string safe for HTML attributes
+ */
+function escapeAttr(str) {
+  if (str === null || str === undefined) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/**
+ * Safe text conversion - coerces to string and escapes
+ * @param {any} value - Value to convert to safe text
+ * @returns {string} Escaped string
+ */
+function safeText(value) {
+  return escapeHtml(value ?? '');
+}
+
+/**
+ * Safe JSON parse with error context
+ * @param {string} body - JSON string to parse
+ * @param {string} context - Context for error messages
+ * @returns {{ ok: true, value: any } | { ok: false, error: string }}
+ */
+function safeJsonParse(body, context = 'JSON parse') {
+  if (typeof body !== 'string') {
+    if (body && typeof body === 'object') {
+      return { ok: true, value: body };
+    }
+    return { ok: false, error: `${context}: Invalid input type` };
+  }
+  try {
+    const value = JSON.parse(body);
+    return { ok: true, value };
+  } catch (e) {
+    const snippet = body.substring(0, 100);
+    return { ok: false, error: `${context}: ${e.message} (near: "${snippet}...")` };
+  }
+}
+
+// ============================================================================
+// Request Management - Race condition prevention
+// ============================================================================
+
+/**
+ * Generate a unique request ID
+ * @returns {number} Unique request ID
+ */
+function generateRequestId() {
+  return ++currentRequestId;
+}
+
+/**
+ * Cancel pending request for an auth file
+ * @param {string} authIndex - Auth index to cancel
+ */
+function cancelPendingRequest(authIndex) {
+  const pending = pendingRequests.get(authIndex);
+  if (pending?.abortController) {
+    try {
+      pending.abortController.abort();
+    } catch (e) {
+      // Ignore abort errors
+    }
+  }
+  pendingRequests.delete(authIndex);
+}
+
+/**
+ * Cancel all pending requests
+ */
+function cancelAllPendingRequests() {
+  for (const authIndex of pendingRequests.keys()) {
+    cancelPendingRequest(authIndex);
+  }
+}
+
+/**
+ * Check if request is still valid (not superseded by a newer request)
+ * @param {string} authIndex - Auth index
+ * @param {number} requestId - Request ID to check
+ * @returns {boolean} True if request is still valid
+ */
+function isRequestValid(authIndex, requestId) {
+  const pending = pendingRequests.get(authIndex);
+  return pending?.requestId === requestId;
+}
+
 /**
  * Load the quota page
  */
@@ -92,6 +211,14 @@ export async function loadQuotaPage() {
     const response = await api('GET', '/auth-files');
     authFiles = response.files || [];
     
+    // Clean up stale quotaData entries for auth files that no longer exist
+    const validIndices = new Set(authFiles.map(f => f.auth_index));
+    for (const key of quotaData.keys()) {
+      if (!validIndices.has(key)) {
+        quotaData.delete(key);
+      }
+    }
+    
     applyFilter();
     renderQuotaPage();
     renderViewToggle();
@@ -100,7 +227,7 @@ export async function loadQuotaPage() {
     // Show a hint message
     updateLastUpdated('Click "Fetch All" to load quota data');
   } catch (e) {
-    toast('Failed to load auth files: ' + e.message, 'error');
+    toast('Failed to load auth files: ' + safeText(e.message), 'error');
     container.innerHTML = `
       <div class="quota-empty-state">
         <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -111,6 +238,24 @@ export async function loadQuotaPage() {
         <p>Failed to load auth files</p>
       </div>
     `;
+  }
+}
+
+/**
+ * Cleanup function - call when leaving the quota page
+ * Prevents memory leaks and stale state
+ */
+export function unloadQuotaPage() {
+  // Cancel all pending requests
+  cancelAllPendingRequests();
+  
+  // Stop auto-refresh if running
+  stopAutoRefresh();
+  
+  // Clear search debounce timer
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = null;
   }
 }
 
@@ -144,9 +289,20 @@ function applyFilter() {
   
   if (currentStatusFilter) {
     filteredAuthFiles = filteredAuthFiles.filter(f => {
-      const data = quotaData.get(f.auth_index);
-      if (!data || data.error || data.loading) return false;
       if (!isQuotaSupported(f.provider)) return false;
+      
+      const data = quotaData.get(f.auth_index);
+      
+      // Handle 'not-fetched' and 'error' status filters
+      if (currentStatusFilter === 'not-fetched') {
+        return !data || data.loading;
+      }
+      if (currentStatusFilter === 'error') {
+        return data?.error;
+      }
+      
+      // For quota status filters, need valid fetched data
+      if (!data || data.error || data.loading) return false;
       
       const worstPercentage = getWorstQuotaPercentage(f, data);
       const status = getQuotaStatus(worstPercentage);
@@ -240,15 +396,17 @@ function renderQuotaPage() {
  * @returns {string} HTML string
  */
 function renderIdleCard(authFile) {
+  const authIndex = escapeAttr(authFile.auth_index);
+  
   return `
-    <div class="quota-card idle" data-auth-index="${authFile.auth_index}">
+    <div class="quota-card idle" data-auth-index="${authIndex}">
       <div class="quota-card-header">
         <div class="quota-card-info">
           <div class="quota-card-name">${escapeHtml(authFile.file_name || authFile.name)}</div>
-          <span class="quota-card-provider ${authFile.provider?.toLowerCase()}">${escapeHtml(authFile.provider || 'Unknown')}</span>
+          <span class="quota-card-provider ${escapeAttr(authFile.provider?.toLowerCase() || '')}">${escapeHtml(authFile.provider || 'Unknown')}</span>
         </div>
         <div class="quota-card-actions">
-          <button class="quota-refresh-btn" onclick="refreshQuota('${authFile.auth_index}')" title="Fetch Quota">
+          <button class="quota-refresh-btn" onclick="refreshQuota('${authIndex}')" title="Fetch Quota">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M23 4v6h-6"></path>
               <path d="M1 20v-6h6"></path>
@@ -274,15 +432,17 @@ function renderIdleCard(authFile) {
  * @returns {string} HTML string
  */
 function renderLoadingCard(authFile) {
+  const authIndex = escapeAttr(authFile.auth_index);
+  
   return `
-    <div class="quota-card loading" data-auth-index="${authFile.auth_index}">
+    <div class="quota-card loading" data-auth-index="${authIndex}">
       <div class="quota-card-header">
         <div class="quota-card-info">
           <div class="quota-card-name">${escapeHtml(authFile.file_name || authFile.name)}</div>
-          <span class="quota-card-provider ${authFile.provider?.toLowerCase()}">${escapeHtml(authFile.provider || 'Unknown')}</span>
+          <span class="quota-card-provider ${escapeAttr(authFile.provider?.toLowerCase() || '')}">${escapeHtml(authFile.provider || 'Unknown')}</span>
         </div>
       </div>
-      <div class="quota-loading-overlay">
+      <div class="quota-loading-overlay" aria-busy="true" aria-label="Loading quota data">
         <div class="quota-loading-spinner"></div>
       </div>
     </div>
@@ -335,17 +495,34 @@ async function fetchVisibleQuotas() {
 }
 
 /**
- * Fetch quota for a single auth file
+ * Fetch quota for a single auth file with race condition protection
  * @param {object} authFile - Auth file object
  */
 async function fetchQuotaForAuth(authFile) {
+  const authIndex = authFile.auth_index;
+  
+  // Cancel any pending request for this auth file
+  cancelPendingRequest(authIndex);
+  
+  // Generate unique request ID for this fetch
+  const requestId = generateRequestId();
+  const abortController = new AbortController();
+  
+  // Track this request
+  pendingRequests.set(authIndex, { requestId, abortController });
+  
   // Set loading state
-  quotaData.set(authFile.auth_index, { loading: true });
+  quotaData.set(authIndex, { loading: true, requestId });
   renderQuotaPage();
   
   try {
     let data;
     const fetchFn = async () => {
+      // Check if request was superseded before each provider call
+      if (!isRequestValid(authIndex, requestId)) {
+        throw new Error('Request superseded');
+      }
+      
       switch (authFile.provider?.toLowerCase()) {
         case 'antigravity':
           return await fetchAntigravityQuota(authFile);
@@ -359,13 +536,30 @@ async function fetchQuotaForAuth(authFile) {
     };
     
     data = await retryWithBackoff(fetchFn, 3, 1000);
+    
+    // Only update state if this request is still the latest
+    if (!isRequestValid(authIndex, requestId)) {
+      return; // Request was superseded, discard result
+    }
+    
     if (data) {
-      quotaData.set(authFile.auth_index, data);
+      quotaData.set(authIndex, data);
     } else {
-      quotaData.delete(authFile.auth_index);
+      quotaData.delete(authIndex);
     }
   } catch (e) {
-    quotaData.set(authFile.auth_index, { error: e });
+    // Only update error state if request is still valid
+    if (isRequestValid(authIndex, requestId)) {
+      // Don't show error for superseded requests
+      if (e.message !== 'Request superseded') {
+        quotaData.set(authIndex, { error: e });
+      }
+    }
+  } finally {
+    // Clean up pending request tracking
+    if (isRequestValid(authIndex, requestId)) {
+      pendingRequests.delete(authIndex);
+    }
   }
 }
 
@@ -556,7 +750,12 @@ export async function fetchAntigravityQuota(authFile) {
       }
 
       hadSuccess = true;
-      const data = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
+      const parsed = safeJsonParse(response.body, 'Antigravity quota');
+      if (!parsed.ok) {
+        lastError = parsed.error;
+        continue;
+      }
+      const data = parsed.value;
       const models = data?.models;
       
       if (!models || typeof models !== 'object' || Array.isArray(models)) {
@@ -878,7 +1077,11 @@ export async function fetchCodexQuota(authFile) {
     throw err;
   }
 
-  const data = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
+  const parsed = safeJsonParse(response.body, 'Codex usage');
+  if (!parsed.ok) {
+    throw new Error(parsed.error);
+  }
+  const data = parsed.value;
   
   if (!data) {
     throw new Error('Empty response from usage API');
@@ -1057,7 +1260,11 @@ export async function fetchGeminiCliQuota(authFile) {
     throw err;
   }
 
-  const data = typeof response.body === 'string' ? JSON.parse(response.body) : response.body;
+  const parsed = safeJsonParse(response.body, 'Gemini CLI quota');
+  if (!parsed.ok) {
+    throw new Error(parsed.error);
+  }
+  const data = parsed.value;
   const rawBuckets = Array.isArray(data?.buckets) ? data.buckets : [];
   
   if (rawBuckets.length === 0) {
@@ -1339,18 +1546,19 @@ export function renderGeminiCliQuotaCard(authFile, data) {
  */
 export function renderQuotaErrorCard(authFile, error) {
   const statusMatch = error.message?.match(/HTTP (\d+)/);
-  const statusCode = statusMatch ? statusMatch[1] : 'Error';
+  const statusCode = statusMatch ? escapeHtml(statusMatch[1]) : 'Error';
   const errorMessage = error.message || 'Unknown error occurred';
+  const authIndex = escapeAttr(authFile.auth_index);
 
   return `
-    <div class="quota-card error" data-auth-index="${authFile.auth_index}">
+    <div class="quota-card error" data-auth-index="${authIndex}">
       <div class="quota-card-header">
         <div class="quota-card-info">
           <div class="quota-card-name">${escapeHtml(authFile.file_name || authFile.name)}</div>
-          <span class="quota-card-provider ${authFile.provider?.toLowerCase()}">${escapeHtml(authFile.provider || 'Unknown')}</span>
+          <span class="quota-card-provider ${escapeAttr(authFile.provider?.toLowerCase() || '')}">${escapeHtml(authFile.provider || 'Unknown')}</span>
         </div>
         <div class="quota-card-actions">
-          <button class="quota-refresh-btn" onclick="refreshQuota('${authFile.auth_index}')" title="Retry">
+          <button class="quota-refresh-btn" onclick="refreshQuota('${authIndex}')" title="Retry">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M23 4v6h-6"></path>
               <path d="M1 20v-6h6"></path>
@@ -1379,8 +1587,10 @@ export function renderQuotaErrorCard(authFile, error) {
  * @returns {string} HTML string
  */
 export function renderQuotaUnavailableCard(authFile) {
+  const authIndex = escapeAttr(authFile.auth_index);
+  
   return `
-    <div class="quota-card unavailable" data-auth-index="${authFile.auth_index}">
+    <div class="quota-card unavailable" data-auth-index="${authIndex}">
       <div class="quota-card-header">
         <div class="quota-card-info">
           <div class="quota-card-name">${escapeHtml(authFile.file_name || authFile.name)}</div>
@@ -1410,17 +1620,18 @@ function renderQuotaCardWrapper(authFile, providerClass, contentHtml, fetchedAt,
   const status = worstPercentage !== null ? getQuotaStatus(worstPercentage) : '';
   const statusClass = status ? `status-${status}` : '';
   const circularHtml = worstPercentage !== null ? renderCircularProgress(worstPercentage, status) : '';
+  const authIndex = escapeAttr(authFile.auth_index);
 
   return `
-    <div class="quota-card ${statusClass}" data-auth-index="${authFile.auth_index}">
+    <div class="quota-card ${statusClass}" data-auth-index="${authIndex}">
       <div class="quota-card-header">
         <div class="quota-card-info">
           <div class="quota-card-name">${escapeHtml(authFile.file_name || authFile.name)}</div>
-          <span class="quota-card-provider ${providerClass}">${escapeHtml(authFile.provider || 'Unknown')}</span>
+          <span class="quota-card-provider ${escapeAttr(providerClass)}">${escapeHtml(authFile.provider || 'Unknown')}</span>
         </div>
         <div class="quota-card-actions">
           ${circularHtml}
-          <button class="quota-refresh-btn" onclick="refreshQuota('${authFile.auth_index}')" title="Refresh">
+          <button class="quota-refresh-btn" onclick="refreshQuota('${authIndex}')" title="Refresh">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M23 4v6h-6"></path>
               <path d="M1 20v-6h6"></path>
@@ -1431,7 +1642,7 @@ function renderQuotaCardWrapper(authFile, providerClass, contentHtml, fetchedAt,
       </div>
       ${metaHtml}
       ${contentHtml}
-      ${updatedAgo ? `<div class="quota-card-updated ${isStale ? 'stale' : ''}">Last updated: ${updatedAgo}</div>` : ''}
+      ${updatedAgo ? `<div class="quota-card-updated ${isStale ? 'stale' : ''}">Last updated: ${escapeHtml(updatedAgo)}</div>` : ''}
     </div>
   `;
 }
@@ -1503,31 +1714,34 @@ function getTimeAgo(timestamp) {
 }
 
 /**
- * Escape HTML special characters
- * @param {string} str - String to escape
- * @returns {string} Escaped string
- */
-function escapeHtml(str) {
-  if (!str) return '';
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
-
-/**
  * Calculate quota summary from current quota data
- * @returns {{ critical: number, warning: number, healthy: number, total: number }}
+ * @returns {{ critical: number, warning: number, healthy: number, notFetched: number, error: number, total: number }}
  */
 function calculateQuotaSummary() {
-  const summary = { critical: 0, warning: 0, healthy: 0, total: 0 };
+  const summary = { critical: 0, warning: 0, healthy: 0, notFetched: 0, error: 0, total: 0 };
   
   for (const authFile of authFiles) {
     if (!isQuotaSupported(authFile.provider)) continue;
     
-    const data = quotaData.get(authFile.auth_index);
-    if (!data || data.error || data.loading) continue;
-    
     summary.total++;
+    const data = quotaData.get(authFile.auth_index);
+    
+    if (!data) {
+      summary.notFetched++;
+      continue;
+    }
+    
+    if (data.error) {
+      summary.error++;
+      continue;
+    }
+    
+    if (data.loading) {
+      // Count loading as not-fetched for summary purposes
+      summary.notFetched++;
+      continue;
+    }
+    
     const worstPercentage = getWorstQuotaPercentage(authFile, data);
     const status = getQuotaStatus(worstPercentage);
     summary[status]++;
@@ -1594,9 +1808,12 @@ function renderSummaryBar() {
     return;
   }
   
+  const fetchedCount = summary.critical + summary.warning + summary.healthy;
+  
   container.innerHTML = `
     <div class="quota-summary-total">
-      <span class="quota-summary-count">${summary.total}</span> monitored
+      <span class="quota-summary-count">${summary.total}</span> total
+      ${fetchedCount < summary.total ? `<span class="quota-summary-fetched">(${fetchedCount} fetched)</span>` : ''}
     </div>
     <span class="quota-summary-divider"></span>
     <button class="quota-summary-badge critical ${currentStatusFilter === 'critical' ? 'active' : ''}" 
@@ -1614,6 +1831,20 @@ function renderSummaryBar() {
             aria-pressed="${currentStatusFilter === 'healthy'}">
       🟢 <span class="quota-summary-count">${summary.healthy}</span> Healthy
     </button>
+    ${summary.notFetched > 0 ? `
+      <button class="quota-summary-badge not-fetched ${currentStatusFilter === 'not-fetched' ? 'active' : ''}" 
+              onclick="setStatusFilter('not-fetched')"
+              aria-pressed="${currentStatusFilter === 'not-fetched'}">
+        ⚪ <span class="quota-summary-count">${summary.notFetched}</span> Not fetched
+      </button>
+    ` : ''}
+    ${summary.error > 0 ? `
+      <button class="quota-summary-badge error ${currentStatusFilter === 'error' ? 'active' : ''}" 
+              onclick="setStatusFilter('error')"
+              aria-pressed="${currentStatusFilter === 'error'}">
+        ⛔ <span class="quota-summary-count">${summary.error}</span> Error
+      </button>
+    ` : ''}
   `;
   
   renderStatusFilterChips();
@@ -1625,6 +1856,8 @@ function renderSummaryBar() {
 function renderStatusFilterChips() {
   const container = document.getElementById('quotaStatusFilter');
   if (!container) return;
+  
+  const summary = calculateQuotaSummary();
   
   container.innerHTML = `
     <button class="quota-status-filter-btn critical ${currentStatusFilter === 'critical' ? 'active' : ''}" 
@@ -1642,6 +1875,20 @@ function renderStatusFilterChips() {
             aria-pressed="${currentStatusFilter === 'healthy'}">
       🟢 Healthy
     </button>
+    ${summary.notFetched > 0 ? `
+      <button class="quota-status-filter-btn not-fetched ${currentStatusFilter === 'not-fetched' ? 'active' : ''}" 
+              onclick="setStatusFilter('not-fetched')"
+              aria-pressed="${currentStatusFilter === 'not-fetched'}">
+        ⚪ Not fetched
+      </button>
+    ` : ''}
+    ${summary.error > 0 ? `
+      <button class="quota-status-filter-btn error ${currentStatusFilter === 'error' ? 'active' : ''}" 
+              onclick="setStatusFilter('error')"
+              aria-pressed="${currentStatusFilter === 'error'}">
+        ⛔ Error
+      </button>
+    ` : ''}
   `;
 }
 
@@ -1915,8 +2162,16 @@ export function setQuotaSearch(value) {
   if (clearBtn) {
     clearBtn.style.display = quotaSearchQuery.trim() ? 'inline-flex' : 'none';
   }
-  applyFilter();
-  renderQuotaPage();
+  
+  // Debounce search to avoid excessive re-renders
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer);
+  }
+  searchDebounceTimer = setTimeout(() => {
+    searchDebounceTimer = null;
+    applyFilter();
+    renderQuotaPage();
+  }, SEARCH_DEBOUNCE_MS);
 }
 
 export function clearQuotaSearch() {
@@ -2064,6 +2319,7 @@ export function formatResetTime(resetTime) {
 
 // Expose functions to window for HTML onclick handlers
 window.loadQuotaPage = loadQuotaPage;
+window.unloadQuotaPage = unloadQuotaPage;
 window.refreshQuota = refreshQuota;
 window.fetchAllQuotas = fetchAllQuotas;
 window.setQuotaFilter = setQuotaFilter;
