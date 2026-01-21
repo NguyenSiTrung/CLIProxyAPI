@@ -156,19 +156,45 @@ type AccessKeyLimits struct {
 	Keys []AccessKeyLimit `yaml:"keys" json:"keys"`
 }
 
+// QuotaRule defines a single quota rule with its own limit and reset interval.
+// Multiple rules can be applied to the same API key for multi-tier quotas
+// (e.g., 500 requests per 5h AND 2000 requests per day).
+type QuotaRule struct {
+	// ID is a stable identifier for this rule (e.g., "daily", "5h", "burst").
+	// Required when using quota-rules. Used for persistence key generation.
+	ID string `yaml:"id" json:"id"`
+	// MaxCost is the maximum accumulated cost before requests are blocked.
+	// A value of 0 means this rule doesn't enforce cost limits.
+	MaxCost float64 `yaml:"max-cost,omitempty" json:"max_cost,omitempty"`
+	// MaxRequests is the maximum request count before requests are blocked.
+	// A value of 0 means this rule doesn't enforce request limits.
+	MaxRequests int64 `yaml:"max-requests,omitempty" json:"max_requests,omitempty"`
+	// AutoResetInterval defines when this rule's counters automatically reset.
+	// Valid values: "hourly", "daily", "weekly", "monthly", "none", or a duration like "5h".
+	AutoResetInterval string `yaml:"auto-reset-interval,omitempty" json:"auto_reset_interval,omitempty"`
+}
+
 // AccessKeyLimit defines a cost limit for a specific API key.
 type AccessKeyLimit struct {
 	// APIKey is the access key identifier (from top-level api-keys).
 	APIKey string `yaml:"api-key" json:"api-key"`
 	// MaxCost is the maximum accumulated cost before requests are blocked.
 	// A value of 0 means unlimited (no limit enforced for this key).
+	// Ignored when QuotaRules is non-empty.
 	MaxCost float64 `yaml:"max-cost" json:"max-cost"`
 	// MaxRequests is the maximum request count before requests are blocked.
 	// A value of 0 means unlimited (no limit enforced for this key).
+	// Ignored when QuotaRules is non-empty.
 	MaxRequests int64 `yaml:"max-requests" json:"max-requests"`
 	// AutoResetInterval defines when usage counters automatically reset.
 	// Valid values: "hourly", "daily", "weekly", "monthly", "none", or a duration like "5h" (default: "none").
+	// Ignored when QuotaRules is non-empty.
 	AutoResetInterval string `yaml:"auto-reset-interval" json:"auto-reset-interval"`
+	// QuotaRules defines multiple quota tiers that are enforced simultaneously.
+	// When set, the legacy MaxCost/MaxRequests/AutoResetInterval fields are ignored.
+	// All rules are checked and the request is blocked if ANY rule is exceeded.
+	// Each rule resets independently based on its own interval.
+	QuotaRules []QuotaRule `yaml:"quota-rules,omitempty" json:"quota_rules,omitempty"`
 }
 
 // AccessKeyAuth defines a binding between a client API key and auth file IDs.

@@ -180,25 +180,41 @@ func (m *Manager) SetRequestLimit(apiKey string, maxRequests int64) {
 // RemoveLimit removes a key's limit configuration and clears its accumulated data.
 // It removes the key from the config's AccessKeyLimits.Keys slice and deletes
 // accumulated cost/request data from the accumulators.
+// For multi-tier quotas, removes all tier data as well.
 func (m *Manager) RemoveLimit(apiKey string) {
 	if m == nil || m.cfg == nil {
 		return
 	}
 	m.mu.Lock()
-	defer m.mu.Unlock()
 
-	// Remove from config keys
+	// Find the key config before removing to clean up tier data
+	var keyLimit *config.AccessKeyLimit
 	keys := m.cfg.AccessKeyLimits.Keys
-	for i, keyLimit := range keys {
-		if keyLimit.APIKey == apiKey {
+	for i := range keys {
+		if keys[i].APIKey == apiKey {
+			keyLimit = &keys[i]
+			// Remove from config keys
 			m.cfg.AccessKeyLimits.Keys = append(keys[:i], keys[i+1:]...)
 			break
 		}
 	}
+	m.mu.Unlock()
 
-	// Delete accumulated data
+	// Delete accumulated data - legacy key
 	m.accumulator.Delete(apiKey)
 	m.requestAccumulator.Delete(apiKey)
+
+	// Delete tier data if multi-tier was configured
+	if keyLimit != nil && len(keyLimit.QuotaRules) > 0 {
+		for _, rule := range keyLimit.QuotaRules {
+			tk := tierKey(apiKey, rule.ID)
+			m.accumulator.Delete(tk)
+			m.requestAccumulator.Delete(tk)
+			if m.autoResetScheduler != nil {
+				m.autoResetScheduler.Cancel(tk)
+			}
+		}
+	}
 
 	// Remove from auto-reset scheduler
 	if m.autoResetScheduler != nil {
@@ -215,33 +231,86 @@ const (
 	LimitRequest LimitExceededType = "request"
 )
 
+// CheckLimitResult contains detailed information about limit check results.
+type CheckLimitResult struct {
+	Allowed         bool              // whether the request is allowed
+	Exceeded        LimitExceededType // which limit type was exceeded
+	CurrentCost     float64           // current cost (for the exceeded tier, or first tier)
+	CostLimit       float64           // cost limit (for the exceeded tier, or first tier)
+	CurrentRequests int64             // current requests (for the exceeded tier, or first tier)
+	RequestLimit    int64             // request limit (for the exceeded tier, or first tier)
+	TierID          string            // tier ID that was exceeded (empty for legacy mode)
+}
+
 // CheckLimit checks if an API key is within both cost and request limits.
 // Returns whether the key is allowed to make requests, the current accumulated cost,
 // the configured cost limit, and which limit type was exceeded (if any).
+// For multi-tier quotas, checks ALL tiers and blocks if ANY tier is exceeded.
 func (m *Manager) CheckLimit(apiKey string) (allowed bool, currentCost float64, costLimit float64, exceeded LimitExceededType) {
+	result := m.CheckLimitDetailed(apiKey)
+	return result.Allowed, result.CurrentCost, result.CostLimit, result.Exceeded
+}
+
+// CheckLimitDetailed checks all quota tiers and returns detailed results.
+// For multi-tier quotas, checks ALL tiers and blocks if ANY tier is exceeded.
+func (m *Manager) CheckLimitDetailed(apiKey string) CheckLimitResult {
 	if m == nil {
-		return true, 0, 0, LimitNone
+		return CheckLimitResult{Allowed: true}
 	}
 	if !m.IsEnabled() {
-		return true, 0, 0, LimitNone
+		return CheckLimitResult{Allowed: true}
 	}
 
-	currentCost = m.accumulator.Get(apiKey)
-	costLimit = m.GetLimit(apiKey)
-	currentRequests := m.requestAccumulator.Get(apiKey)
-	requestLimit := m.GetRequestLimit(apiKey)
-
-	// Check cost limit first
-	if costLimit > 0 && currentCost >= costLimit {
-		return false, currentCost, costLimit, LimitCost
+	rules := m.resolveRules(apiKey)
+	if len(rules) == 0 {
+		return CheckLimitResult{Allowed: true}
 	}
 
-	// Check request limit
-	if requestLimit > 0 && currentRequests >= requestLimit {
-		return false, currentCost, costLimit, LimitRequest
+	// Check all tiers - block if ANY tier is exceeded
+	// Check cost limits first, then request limits (existing precedence)
+	for _, rule := range rules {
+		if rule.maxCost > 0 {
+			current := m.accumulator.Get(rule.key)
+			if current >= rule.maxCost {
+				return CheckLimitResult{
+					Allowed:     false,
+					Exceeded:    LimitCost,
+					CurrentCost: current,
+					CostLimit:   rule.maxCost,
+					TierID:      rule.id,
+				}
+			}
+		}
 	}
 
-	return true, currentCost, costLimit, LimitNone
+	for _, rule := range rules {
+		if rule.maxReq > 0 {
+			current := m.requestAccumulator.Get(rule.key)
+			if current >= rule.maxReq {
+				// Get cost info from first rule for backward compatibility
+				firstCost := m.accumulator.Get(rules[0].key)
+				return CheckLimitResult{
+					Allowed:         false,
+					Exceeded:        LimitRequest,
+					CurrentCost:     firstCost,
+					CostLimit:       rules[0].maxCost,
+					CurrentRequests: current,
+					RequestLimit:    rule.maxReq,
+					TierID:          rule.id,
+				}
+			}
+		}
+	}
+
+	// All tiers OK - return first tier's values for backward compatibility
+	return CheckLimitResult{
+		Allowed:         true,
+		Exceeded:        LimitNone,
+		CurrentCost:     m.accumulator.Get(rules[0].key),
+		CostLimit:       rules[0].maxCost,
+		CurrentRequests: m.requestAccumulator.Get(rules[0].key),
+		RequestLimit:    rules[0].maxReq,
+	}
 }
 
 // CheckRequestLimit checks only the request count limit for an API key.
@@ -268,6 +337,7 @@ func (m *Manager) CheckRequestLimit(apiKey string) (allowed bool, current int64,
 // request is allowed, the resulting request count, and the configured limit.
 // When limits are disabled or limit is zero (unlimited), it still increments
 // the counter for tracking purposes.
+// For multi-tier quotas, increments ALL tiers atomically and blocks if ANY tier would exceed.
 func (m *Manager) CheckAndRecordRequest(apiKey string) (allowed bool, current int64, limit int64) {
 	if m == nil {
 		return true, 0, 0
@@ -276,19 +346,38 @@ func (m *Manager) CheckAndRecordRequest(apiKey string) (allowed bool, current in
 		return true, 0, 0
 	}
 
-	limit = m.GetRequestLimit(apiKey)
-	if limit == 0 {
-		m.requestAccumulator.Add(apiKey, 1)
-		current = m.requestAccumulator.Get(apiKey)
-		_ = m.saveRequests()
-		return true, current, limit
+	rules := m.resolveRules(apiKey)
+	if len(rules) == 0 {
+		return true, 0, 0
 	}
 
-	allowed, current = m.requestAccumulator.CheckAndAdd(apiKey, limit)
-	if allowed {
-		_ = m.saveRequests()
+	// For multi-tier, use per-key lock to ensure atomic check+increment across all tiers
+	if len(rules) > 1 {
+		globalKeyLocks.lock(apiKey)
+		defer globalKeyLocks.unlock(apiKey)
 	}
-	return allowed, current, limit
+
+	// First pass: check all tiers
+	for _, rule := range rules {
+		if rule.maxReq > 0 {
+			curr := m.requestAccumulator.Get(rule.key)
+			if curr >= rule.maxReq {
+				// Return the exceeded tier's values
+				return false, curr, rule.maxReq
+			}
+		}
+	}
+
+	// Second pass: increment all tiers
+	for _, rule := range rules {
+		m.requestAccumulator.Add(rule.key, 1)
+	}
+	_ = m.saveRequests()
+
+	// Return first tier's values for backward compatibility
+	current = m.requestAccumulator.Get(rules[0].key)
+	limit = rules[0].maxReq
+	return true, current, limit
 }
 
 // RecordRequest increments the request count for an API key.
@@ -311,6 +400,7 @@ func (m *Manager) GetCurrentRequestCount(apiKey string) int64 {
 
 // TryReserveRequestSlot attempts to reserve a slot for a request in "count only success" mode.
 // It checks if the combined count of persisted requests plus in-flight reservations is below the limit.
+// For multi-tier quotas, reserves across ALL tiers atomically and blocks if ANY tier would exceed.
 // Returns: allowed, current persisted count, limit.
 func (m *Manager) TryReserveRequestSlot(apiKey string) (allowed bool, current int64, limit int64) {
 	if m == nil {
@@ -320,26 +410,61 @@ func (m *Manager) TryReserveRequestSlot(apiKey string) (allowed bool, current in
 		return true, 0, 0
 	}
 
-	limit = m.GetRequestLimit(apiKey)
-	if limit == 0 {
-		// Unlimited - still reserve for tracking but always allow
-		m.requestAccumulator.TryReserve(apiKey, 0)
-		current = m.requestAccumulator.Get(apiKey)
-		return true, current, limit
+	rules := m.resolveRules(apiKey)
+	if len(rules) == 0 {
+		return true, 0, 0
 	}
 
-	allowed, current = m.requestAccumulator.TryReserve(apiKey, limit)
-	return allowed, current, limit
+	// For multi-tier, use per-key lock to ensure atomic reservation across all tiers
+	if len(rules) > 1 {
+		globalKeyLocks.lock(apiKey)
+		defer globalKeyLocks.unlock(apiKey)
+	}
+
+	// First pass: check all tiers
+	for _, rule := range rules {
+		if rule.maxReq > 0 {
+			ok, _ := m.requestAccumulator.TryReserve(rule.key, rule.maxReq)
+			if !ok {
+				// Release any reservations we made before failing
+				for _, prevRule := range rules {
+					if prevRule.key == rule.key {
+						break
+					}
+					m.requestAccumulator.Complete(prevRule.key, false)
+				}
+				return false, m.requestAccumulator.Get(rule.key), rule.maxReq
+			}
+		} else {
+			// Unlimited tier - still reserve for tracking
+			m.requestAccumulator.TryReserve(rule.key, 0)
+		}
+	}
+
+	// Return first tier's values for backward compatibility
+	current = m.requestAccumulator.Get(rules[0].key)
+	limit = rules[0].maxReq
+	return true, current, limit
 }
 
 // CompleteRequestSlot finalizes a reserved request slot.
 // If success is true (HTTP status < 400), the request count is incremented.
 // Otherwise, the reservation is released without incrementing the count.
+// For multi-tier quotas, completes ALL tier reservations.
 func (m *Manager) CompleteRequestSlot(apiKey string, success bool) {
 	if m == nil {
 		return
 	}
-	m.requestAccumulator.Complete(apiKey, success)
+
+	rules := m.resolveRules(apiKey)
+	if len(rules) == 0 {
+		return
+	}
+
+	// Complete all tiers
+	for _, rule := range rules {
+		m.requestAccumulator.Complete(rule.key, success)
+	}
 	if success {
 		_ = m.saveRequests()
 	}
@@ -348,6 +473,7 @@ func (m *Manager) CompleteRequestSlot(apiKey string, success bool) {
 // RecordUsage calculates the cost for a usage record and accumulates it.
 // The cost is calculated based on the model and token usage.
 // Called by plugin after checking IsEnabled(), so no need to check here.
+// For multi-tier quotas, adds cost to ALL tiers.
 func (m *Manager) RecordUsage(apiKey, model string, tokens coreusage.Detail) {
 	if m == nil {
 		return
@@ -355,36 +481,51 @@ func (m *Manager) RecordUsage(apiKey, model string, tokens coreusage.Detail) {
 
 	cost := m.calculator.CalculateCost(model, tokens.InputTokens, tokens.OutputTokens, tokens.CachedTokens)
 	if cost > 0 {
-		m.accumulator.Add(apiKey, cost)
+		rules := m.resolveRules(apiKey)
+		for _, rule := range rules {
+			m.accumulator.Add(rule.key, cost)
+		}
 		m.save()
 	}
 }
 
 // ResetKey resets the accumulated cost for an API key to zero.
+// For multi-tier quotas, resets cost for all tiers.
 func (m *Manager) ResetKey(apiKey string) error {
 	if m == nil {
 		return nil
 	}
-	m.accumulator.Reset(apiKey)
+	rules := m.resolveRules(apiKey)
+	for _, rule := range rules {
+		m.accumulator.Reset(rule.key)
+	}
 	return m.save()
 }
 
 // ResetRequestCount resets the request count for an API key to zero.
+// For multi-tier quotas, resets request count for all tiers.
 func (m *Manager) ResetRequestCount(apiKey string) error {
 	if m == nil {
 		return nil
 	}
-	m.requestAccumulator.Reset(apiKey)
+	rules := m.resolveRules(apiKey)
+	for _, rule := range rules {
+		m.requestAccumulator.Reset(rule.key)
+	}
 	return m.saveRequests()
 }
 
 // ResetAll resets both cost and request count for an API key to zero.
+// For multi-tier quotas, resets both for all tiers.
 func (m *Manager) ResetAll(apiKey string) error {
 	if m == nil {
 		return nil
 	}
-	m.accumulator.Reset(apiKey)
-	m.requestAccumulator.Reset(apiKey)
+	rules := m.resolveRules(apiKey)
+	for _, rule := range rules {
+		m.accumulator.Reset(rule.key)
+		m.requestAccumulator.Reset(rule.key)
+	}
 	if err := m.save(); err != nil {
 		return err
 	}
@@ -574,6 +715,7 @@ func (m *Manager) StopAutoReset() {
 }
 
 // checkAndPerformAutoResets checks all configured keys and resets counters as needed.
+// For multi-tier quotas, each tier resets independently based on its own interval.
 func (m *Manager) checkAndPerformAutoResets() {
 	if m == nil || m.cfg == nil || !m.IsEnabled() {
 		return
@@ -588,24 +730,57 @@ func (m *Manager) checkAndPerformAutoResets() {
 	state := m.autoResetScheduler.State()
 
 	for _, keyLimit := range keys {
-		interval := ParseResetInterval(keyLimit.AutoResetInterval)
-		if interval == ResetNone {
-			continue
-		}
+		// Check if this key uses multi-tier quotas
+		if len(keyLimit.QuotaRules) > 0 {
+			// Multi-tier mode: each tier resets independently
+			for _, rule := range keyLimit.QuotaRules {
+				interval := ParseResetInterval(rule.AutoResetInterval)
+				if interval == ResetNone {
+					continue
+				}
 
-		lastReset := state.GetLastReset(keyLimit.APIKey)
-		if lastReset.IsZero() {
-			state.SetLastReset(keyLimit.APIKey, now)
-			continue
-		}
+				tierStateKey := tierKey(keyLimit.APIKey, rule.ID)
+				lastReset := state.GetLastReset(tierStateKey)
+				if lastReset.IsZero() {
+					state.SetLastReset(tierStateKey, now)
+					continue
+				}
 
-		if ShouldReset(lastReset, interval, now) {
-			_ = m.ResetAll(keyLimit.APIKey)
-			state.SetLastReset(keyLimit.APIKey, now)
+				if ShouldReset(lastReset, interval, now) {
+					m.resetTier(keyLimit.APIKey, rule.ID)
+					state.SetLastReset(tierStateKey, now)
+				}
+			}
+		} else {
+			// Legacy single-tier mode
+			interval := ParseResetInterval(keyLimit.AutoResetInterval)
+			if interval == ResetNone {
+				continue
+			}
+
+			lastReset := state.GetLastReset(keyLimit.APIKey)
+			if lastReset.IsZero() {
+				state.SetLastReset(keyLimit.APIKey, now)
+				continue
+			}
+
+			if ShouldReset(lastReset, interval, now) {
+				_ = m.ResetAll(keyLimit.APIKey)
+				state.SetLastReset(keyLimit.APIKey, now)
+			}
 		}
 	}
 
 	_ = m.autoResetScheduler.SaveState()
+}
+
+// resetTier resets counters for a specific tier of an API key.
+func (m *Manager) resetTier(apiKey, ruleID string) {
+	key := tierKey(apiKey, ruleID)
+	m.accumulator.Reset(key)
+	m.requestAccumulator.Reset(key)
+	_ = m.save()
+	_ = m.saveRequests()
 }
 
 // GetAutoResetInterval returns the auto-reset interval for an API key.

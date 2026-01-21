@@ -63,6 +63,7 @@ api-keys:
 #   count-only-success-requests: false
 #   # Per-key cost limit overrides
 #   keys:
+#     # Simple single-tier example (legacy format)
 #     - api-key: "your-api-key-1"
 #       max-cost: 25.00          # Higher limit for power users
 #       max-requests: 5000       # Request count limit
@@ -74,6 +75,22 @@ api-keys:
 #     - api-key: "your-api-key-3"
 #       max-cost: 0              # Unlimited cost (no limit enforced)
 #       max-requests: 0          # Unlimited requests (no limit enforced)
+#
+#     # Multi-tier quota example - multiple limits enforced simultaneously
+#     # Each tier resets independently based on its own interval.
+#     # Requests are blocked if ANY tier is exceeded.
+#     - api-key: "your-api-key-4"
+#       quota-rules:
+#         - id: "burst"            # Short-term burst limit
+#           max-requests: 100
+#           auto-reset-interval: 1h
+#         - id: "daily"            # Daily limit
+#           max-requests: 2000
+#           max-cost: 50.00
+#           auto-reset-interval: daily
+#         - id: "monthly"          # Monthly budget
+#           max-cost: 500.00
+#           auto-reset-interval: monthly
 
 # Access Key Auth Routing
 # Restrict which auth JSON files are used for requests authenticated by a client API key.
