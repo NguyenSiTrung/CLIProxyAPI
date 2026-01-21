@@ -8,7 +8,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/main.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" 
+    integrity="sha384-bLopJYrmfHH9fNbBPkjvJpTUC5VP9Q1kTVi9U5iDq7M9HXy0vIALz8OEWM8mxHDO" 
+    crossorigin="anonymous"></script>
 </head>
 
 <body>
@@ -362,7 +364,7 @@
               <svg class="models-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
               </svg>
-              <input type="text" id="modelSearch" class="models-search-input" placeholder="Search models by name or provider..." oninput="filterModels()">
+              <input type="text" id="modelSearch" class="models-search-input" placeholder="Search models by name or provider..." oninput="debouncedFilterModels()">
               <button class="models-search-clear" id="modelSearchClear" onclick="clearModelSearch()" style="display:none">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -388,7 +390,7 @@
             <svg class="pricing-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
-            <input type="text" id="pricingSearch" class="pricing-search-input" placeholder="Search models to configure pricing..." oninput="filterPricingModels()">
+            <input type="text" id="pricingSearch" class="pricing-search-input" placeholder="Search models to configure pricing..." oninput="debouncedFilterPricingModels()">
           </div>
 
           <div class="pricing-presets">

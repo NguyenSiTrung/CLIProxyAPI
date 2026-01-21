@@ -19,6 +19,85 @@ import {
   setCurrentProviderFilter
 } from '../core/state.js';
 
+// Track current load request for race condition prevention
+let currentModelsLoadId = 0;
+let currentModelsAbort = null;
+
+/**
+ * Escape HTML special characters to prevent XSS
+ * @param {string} str - String to escape
+ * @returns {string} Escaped string
+ */
+function escapeHtml(str) {
+  if (!str || typeof str !== 'string') return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+/**
+ * Debounce a function call
+ * @param {Function} fn - Function to debounce
+ * @param {number} ms - Delay in milliseconds
+ * @returns {Function} Debounced function
+ */
+function debounce(fn, ms = 150) {
+  let timer;
+  return (...args) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), ms);
+  };
+}
+
+/**
+ * Validate a numeric pricing value
+ * @param {*} value - Value to validate
+ * @returns {boolean} True if valid
+ */
+function isValidPricingValue(value) {
+  const num = Number(value);
+  return Number.isFinite(num) && num >= 0 && num <= 1_000_000;
+}
+
+/**
+ * Sanitize imported pricing data to prevent prototype pollution and invalid values
+ * @param {*} raw - Raw imported data
+ * @returns {Object} Sanitized pricing config
+ */
+function sanitizeImportedPricing(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    throw new Error('Invalid format: expected an object');
+  }
+
+  const DANGEROUS_KEYS = ['__proto__', 'constructor', 'prototype'];
+  const out = Object.create(null);
+
+  for (const [key, value] of Object.entries(raw)) {
+    if (!key || typeof key !== 'string') continue;
+    if (DANGEROUS_KEYS.includes(key)) continue;
+    if (key.length > 256) continue;
+    if (!value || typeof value !== 'object' || Array.isArray(value)) continue;
+
+    const input = Number(value.input);
+    const output = Number(value.output);
+    const cached = value.cached_input == null ? undefined : Number(value.cached_input);
+    const cacheWrite = value.cache_write == null ? undefined : Number(value.cache_write);
+
+    if (!isValidPricingValue(input) || !isValidPricingValue(output)) continue;
+    if (cached !== undefined && !isValidPricingValue(cached)) continue;
+    if (cacheWrite !== undefined && !isValidPricingValue(cacheWrite)) continue;
+
+    out[key] = {
+      input,
+      output,
+      cached_input: cached,
+      cache_write: cacheWrite
+    };
+  }
+
+  return out;
+}
+
 // Default pricing for well-known models (prices per 1M tokens in USD)
 export const DEFAULT_MODEL_PRICING = {
   // OpenAI Models
@@ -135,9 +214,17 @@ export async function fetchModels() {
 }
 
 /**
- * Load the models page
+ * Load the models page with race condition prevention and improved error handling
  */
 export async function loadModels() {
+  const loadId = ++currentModelsLoadId;
+  
+  if (currentModelsAbort) {
+    currentModelsAbort.abort();
+  }
+  const abortController = new AbortController();
+  currentModelsAbort = abortController;
+  
   const refreshBtn = document.getElementById('modelsRefreshBtn');
   if (refreshBtn) {
     refreshBtn.classList.add('loading');
@@ -154,13 +241,39 @@ export async function loadModels() {
 
   try {
     const cfg = await api('GET', '/config').catch(() => ({}));
+    
+    if (loadId !== currentModelsLoadId) return;
+    
     setAccessApiKeys(cfg['api-keys'] || cfg.api_keys || []);
     const models = await fetchModels();
+    
+    if (loadId !== currentModelsLoadId) return;
+    
     setAllModels(models);
     setCurrentProviderFilter('all');
     updateProviderFilters(models);
     renderModels(models);
   } catch (e) {
+    if (abortController.signal.aborted) return;
+    
+    let errorTitle = 'Could not load models';
+    let errorMessage = 'An unexpected error occurred.';
+    
+    if (e.message?.includes('401') || e.message?.includes('403') || e.message?.includes('auth')) {
+      errorMessage = 'The /v1/models endpoint requires API authentication. Add access keys in the <strong>API Keys</strong> tab or check your auth files.';
+    } else if (e.message?.includes('500') || e.message?.includes('server')) {
+      errorTitle = 'Server error';
+      errorMessage = 'The server returned an error. Please try again later.';
+    } else if (e.message?.includes('network') || e.message?.includes('fetch') || e.name === 'TypeError') {
+      errorTitle = 'Network error';
+      errorMessage = 'Could not connect to the server. Please check your connection.';
+    } else if (e.message?.includes('timeout')) {
+      errorTitle = 'Request timeout';
+      errorMessage = 'The request took too long. Please try again.';
+    }
+    
+    console.error('Failed to load models:', e);
+    
     container.innerHTML = `
       <div class="models-empty">
         <div class="models-empty-icon">
@@ -170,8 +283,8 @@ export async function loadModels() {
             <line x1="12" y1="16" x2="12.01" y2="16"/>
           </svg>
         </div>
-        <h4>Could not load models</h4>
-        <p>The /v1/models endpoint requires API authentication. Add access keys in the <strong>API Keys</strong> tab or check your auth files.</p>
+        <h4>${escapeHtml(errorTitle)}</h4>
+        <p>${errorMessage}</p>
       </div>
     `;
   } finally {
@@ -199,25 +312,44 @@ export function getProviderIcon(provider) {
 }
 
 /**
- * Update the provider filter pills
+ * Update the provider filter pills with O(n) counting and safe DOM operations
  * @param {Array} models - List of models
  */
 export function updateProviderFilters(models) {
-  const providers = new Set();
-  models.forEach(m => {
-    const owner = m.owned_by || m.provider || 'other';
-    providers.add(owner);
-  });
-
   const pillsContainer = document.getElementById('modelsFilterPills');
-  let html = `<button class="models-filter-pill active" data-provider="all" onclick="filterModelsByProvider('all')">All</button>`;
-
-  Array.from(providers).sort().forEach(provider => {
-    const count = models.filter(m => (m.owned_by || m.provider || 'other') === provider).length;
-    html += `<button class="models-filter-pill" data-provider="${provider}" onclick="filterModelsByProvider('${provider}')">${provider} <span style="opacity:0.7">(${count})</span></button>`;
+  pillsContainer.replaceChildren();
+  
+  const counts = new Map();
+  for (const m of models) {
+    const owner = m.owned_by || m.provider || 'other';
+    counts.set(owner, (counts.get(owner) || 0) + 1);
+  }
+  
+  const createPill = (provider, isActive = false) => {
+    const btn = document.createElement('button');
+    btn.className = `models-filter-pill${isActive ? ' active' : ''}`;
+    btn.dataset.provider = provider;
+    btn.type = 'button';
+    
+    if (provider === 'all') {
+      btn.textContent = 'All';
+    } else {
+      const text = document.createElement('span');
+      text.textContent = provider;
+      const count = document.createElement('span');
+      count.style.opacity = '0.7';
+      count.textContent = ` (${counts.get(provider) || 0})`;
+      btn.append(text, count);
+    }
+    
+    btn.addEventListener('click', () => filterModelsByProvider(provider));
+    return btn;
+  };
+  
+  pillsContainer.appendChild(createPill('all', true));
+  [...counts.keys()].sort().forEach(provider => {
+    pillsContainer.appendChild(createPill(provider));
   });
-
-  pillsContainer.innerHTML = html;
 }
 
 /**
@@ -235,7 +367,7 @@ export function filterModelsByProvider(provider) {
 }
 
 /**
- * Render the models list grouped by provider
+ * Render the models list grouped by provider with safe DOM operations
  * @param {Array} models - List of models to render
  */
 export function renderModels(models) {
@@ -267,36 +399,64 @@ export function renderModels(models) {
     grouped[owner].push(id);
   });
 
-  container.innerHTML = Object.entries(grouped).sort((a, b) => a[0].localeCompare(b[0])).map(([owner, modelList]) => {
+  container.replaceChildren();
+  
+  Object.entries(grouped).sort((a, b) => a[0].localeCompare(b[0])).forEach(([owner, modelList]) => {
     const { icon, class: iconClass } = getProviderIcon(owner);
-    return `
-      <div class="models-provider-card" data-provider="${owner}">
-        <div class="models-provider-header" onclick="toggleProviderCard(this.parentElement)">
-          <div class="models-provider-info">
-            <div class="models-provider-icon ${iconClass}">${icon}</div>
-            <span class="models-provider-name">${owner}</span>
-            <span class="models-provider-count">${modelList.length} model${modelList.length !== 1 ? 's' : ''}</span>
-          </div>
-          <div class="models-provider-toggle">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="6 9 12 15 18 9"/>
-            </svg>
-          </div>
-        </div>
-        <div class="models-list">
-          ${modelList.map(id => `
-            <div class="model-badge" onclick="copyModelId(this, '${id}')" title="Click to copy">
-              <span>${id}</span>
-              <svg class="copy-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-              </svg>
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    `;
-  }).join('');
+    
+    const card = document.createElement('div');
+    card.className = 'models-provider-card';
+    card.dataset.provider = owner;
+    
+    const header = document.createElement('div');
+    header.className = 'models-provider-header';
+    header.addEventListener('click', () => toggleProviderCard(card));
+    
+    const info = document.createElement('div');
+    info.className = 'models-provider-info';
+    
+    const iconEl = document.createElement('div');
+    iconEl.className = `models-provider-icon ${iconClass}`;
+    iconEl.textContent = icon;
+    
+    const nameEl = document.createElement('span');
+    nameEl.className = 'models-provider-name';
+    nameEl.textContent = owner;
+    
+    const countSpan = document.createElement('span');
+    countSpan.className = 'models-provider-count';
+    countSpan.textContent = `${modelList.length} model${modelList.length !== 1 ? 's' : ''}`;
+    
+    info.append(iconEl, nameEl, countSpan);
+    
+    const toggle = document.createElement('div');
+    toggle.className = 'models-provider-toggle';
+    toggle.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>`;
+    
+    header.append(info, toggle);
+    
+    const list = document.createElement('div');
+    list.className = 'models-list';
+    
+    modelList.forEach(id => {
+      const badge = document.createElement('div');
+      badge.className = 'model-badge';
+      badge.title = 'Click to copy';
+      badge.addEventListener('click', () => copyModelId(badge, id));
+      
+      const span = document.createElement('span');
+      span.textContent = id;
+      
+      const copyIcon = document.createElement('span');
+      copyIcon.innerHTML = `<svg class="copy-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+      
+      badge.append(span, copyIcon);
+      list.appendChild(badge);
+    });
+    
+    card.append(header, list);
+    container.appendChild(card);
+  });
 }
 
 /**
@@ -362,6 +522,8 @@ export function filterModels() {
 
   renderModels(filtered);
 }
+
+export const debouncedFilterModels = debounce(filterModels, 150);
 
 /**
  * Load pricing configuration from server
@@ -558,6 +720,8 @@ export function filterPricingModels() {
   });
 }
 
+export const debouncedFilterPricingModels = debounce(filterPricingModels, 150);
+
 /**
  * Open the pricing modal for a model
  * @param {string} modelId - Model ID to configure
@@ -640,28 +804,41 @@ export function applyPresetPricing(modelId) {
 }
 
 /**
- * Save pricing for a specific model
+ * Save pricing for a specific model with validation and immutable state update
  * @param {string} modelId - Model ID
  */
 export async function savePricingForModel(modelId) {
-  const input = parseFloat(document.getElementById('pricingInput').value) || 0;
-  const output = parseFloat(document.getElementById('pricingOutput').value) || 0;
-  const cached = parseFloat(document.getElementById('pricingCached').value) || 0;
-  const cacheWrite = parseFloat(document.getElementById('pricingCacheWrite').value) || 0;
+  const input = parseFloat(document.getElementById('pricingInput').value);
+  const output = parseFloat(document.getElementById('pricingOutput').value);
+  const cached = parseFloat(document.getElementById('pricingCached').value);
+  const cacheWrite = parseFloat(document.getElementById('pricingCacheWrite').value);
 
-  if (input === 0 && output === 0) {
-    toast('Please set at least input or output pricing', 'error');
+  if (!isValidPricingValue(input) && !isValidPricingValue(output)) {
+    toast('Please set at least valid input or output pricing', 'error');
+    return;
+  }
+  
+  if (isValidPricingValue(input) && input < 0) {
+    toast('Input price cannot be negative', 'error');
+    return;
+  }
+  
+  if (isValidPricingValue(output) && output < 0) {
+    toast('Output price cannot be negative', 'error');
     return;
   }
 
-  const modelPricingConfig = getModelPricingConfig();
-  modelPricingConfig[modelId] = {
-    input: input,
-    output: output,
-    cached_input: cached || undefined,
-    cache_write: cacheWrite || undefined
+  const newPricing = {
+    input: isValidPricingValue(input) ? input : 0,
+    output: isValidPricingValue(output) ? output : 0,
+    cached_input: isValidPricingValue(cached) && cached > 0 ? cached : undefined,
+    cache_write: isValidPricingValue(cacheWrite) && cacheWrite > 0 ? cacheWrite : undefined
   };
-  setModelPricingConfig(modelPricingConfig);
+  
+  setModelPricingConfig({
+    ...getModelPricingConfig(),
+    [modelId]: newPricing
+  });
 
   await savePricingConfig();
   closeModal();
@@ -670,14 +847,14 @@ export async function savePricingForModel(modelId) {
 }
 
 /**
- * Remove pricing configuration for a model
+ * Remove pricing configuration for a model with immutable state update
  * @param {string} modelId - Model ID
  */
 export async function removePricing(modelId) {
   if (confirm(`Remove pricing configuration for ${modelId}?`)) {
-    const modelPricingConfig = getModelPricingConfig();
-    delete modelPricingConfig[modelId];
-    setModelPricingConfig(modelPricingConfig);
+    const newConfig = { ...getModelPricingConfig() };
+    delete newConfig[modelId];
+    setModelPricingConfig(newConfig);
     await savePricingConfig();
     renderPricingModels();
     toast(`Pricing removed for ${modelId}`, 'success');
@@ -735,33 +912,48 @@ export function openCustomPricingModal() {
 }
 
 /**
- * Save pricing for a custom model ID entered manually
+ * Save pricing for a custom model ID entered manually with validation
  */
 export async function saveCustomModelPricing() {
+  const DANGEROUS_KEYS = ['__proto__', 'constructor', 'prototype'];
   const modelId = document.getElementById('customModelId').value.trim();
+  
   if (!modelId) {
     toast('Please enter a model ID', 'error');
     return;
   }
-
-  const input = parseFloat(document.getElementById('pricingInput').value) || 0;
-  const output = parseFloat(document.getElementById('pricingOutput').value) || 0;
-  const cached = parseFloat(document.getElementById('pricingCached').value) || 0;
-  const cacheWrite = parseFloat(document.getElementById('pricingCacheWrite').value) || 0;
-
-  if (input === 0 && output === 0) {
-    toast('Please set at least input or output pricing', 'error');
+  
+  if (DANGEROUS_KEYS.includes(modelId)) {
+    toast('Invalid model ID', 'error');
+    return;
+  }
+  
+  if (modelId.length > 256) {
+    toast('Model ID too long (max 256 characters)', 'error');
     return;
   }
 
-  const modelPricingConfig = getModelPricingConfig();
-  modelPricingConfig[modelId] = {
-    input: input,
-    output: output,
-    cached_input: cached || undefined,
-    cache_write: cacheWrite || undefined
+  const input = parseFloat(document.getElementById('pricingInput').value);
+  const output = parseFloat(document.getElementById('pricingOutput').value);
+  const cached = parseFloat(document.getElementById('pricingCached').value);
+  const cacheWrite = parseFloat(document.getElementById('pricingCacheWrite').value);
+
+  if (!isValidPricingValue(input) && !isValidPricingValue(output)) {
+    toast('Please set at least valid input or output pricing', 'error');
+    return;
+  }
+
+  const newPricing = {
+    input: isValidPricingValue(input) ? input : 0,
+    output: isValidPricingValue(output) ? output : 0,
+    cached_input: isValidPricingValue(cached) && cached > 0 ? cached : undefined,
+    cache_write: isValidPricingValue(cacheWrite) && cacheWrite > 0 ? cacheWrite : undefined
   };
-  setModelPricingConfig(modelPricingConfig);
+  
+  setModelPricingConfig({
+    ...getModelPricingConfig(),
+    [modelId]: newPricing
+  });
 
   await savePricingConfig();
   closeModal();
@@ -827,31 +1019,50 @@ export function exportPricing() {
   a.href = url;
   a.download = 'model-pricing-config.json';
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+    a.remove();
+  }, 1000);
   toast('Pricing configuration exported', 'success');
 }
 
 /**
  * Prompt to import pricing configuration from a JSON file
+ * Uses sanitization to prevent prototype pollution and validate data
  */
 export function importPricingPrompt() {
+  const MAX_FILE_SIZE = 1024 * 1024;
+  
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = '.json';
   input.onchange = async (e) => {
     const file = e.target.files[0];
     if (file) {
+      if (file.size > MAX_FILE_SIZE) {
+        toast('File too large. Maximum size is 1MB.', 'error');
+        return;
+      }
+      
       try {
         const text = await file.text();
-        const imported = JSON.parse(text);
-        const modelPricingConfig = getModelPricingConfig();
-        const merged = { ...modelPricingConfig, ...imported };
+        const parsed = JSON.parse(text);
+        const imported = sanitizeImportedPricing(parsed);
+        
+        const importedCount = Object.keys(imported).length;
+        if (importedCount === 0) {
+          toast('No valid pricing entries found in file', 'error');
+          return;
+        }
+        
+        const merged = { ...getModelPricingConfig(), ...imported };
         setModelPricingConfig(merged);
         await savePricingConfig();
         renderPricingModels();
-        toast(`Imported pricing for ${Object.keys(imported).length} models`, 'success');
+        toast(`Imported pricing for ${importedCount} models`, 'success');
       } catch (err) {
-        toast('Failed to import: Invalid JSON file', 'error');
+        console.error('Failed to import pricing:', err);
+        toast(`Failed to import: ${err.message || 'Invalid JSON file'}`, 'error');
       }
     }
   };
@@ -872,6 +1083,8 @@ window.modelsModule = {
   savePricingConfig,
   renderPricingModels,
   filterPricingModels,
+  debouncedFilterModels,
+  debouncedFilterPricingModels,
   openPricingModal,
   applyPresetPricing,
   savePricingForModel,
@@ -887,11 +1100,14 @@ window.modelsModule = {
 // Also expose directly for simpler onclick handlers
 window.loadModels = loadModels;
 window.filterModels = filterModels;
+window.debouncedFilterModels = debouncedFilterModels;
+window.debouncedFilterPricingModels = debouncedFilterPricingModels;
 window.filterModelsByProvider = filterModelsByProvider;
 window.toggleProviderCard = toggleProviderCard;
 window.copyModelId = copyModelId;
 window.clearModelSearch = clearModelSearch;
 window.switchModelsTab = switchModelsTab;
+window.filterPricingModels = filterPricingModels;
 window.openPricingModal = openPricingModal;
 window.applyPresetPricing = applyPresetPricing;
 window.savePricingForModel = savePricingForModel;
