@@ -104,6 +104,7 @@ func (r *RequestAccumulator) Delete(apiKey string) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	delete(r.counts, apiKey)
+	delete(r.inflight, apiKey)
 }
 
 // GetAll returns a copy of all request counts.

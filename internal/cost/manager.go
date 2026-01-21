@@ -180,43 +180,47 @@ func (m *Manager) SetRequestLimit(apiKey string, maxRequests int64) {
 // RemoveLimit removes a key's limit configuration and clears its accumulated data.
 // It removes the key from the config's AccessKeyLimits.Keys slice and deletes
 // accumulated cost/request data from the accumulators.
-// For multi-tier quotas, removes all tier data as well.
+// For multi-tier quotas, removes all tier data using prefix scan (robust even if config already removed).
 func (m *Manager) RemoveLimit(apiKey string) {
 	if m == nil || m.cfg == nil {
 		return
 	}
 	m.mu.Lock()
 
-	// Find the key config before removing to clean up tier data
-	var keyLimit *config.AccessKeyLimit
+	// Remove from config keys
 	keys := m.cfg.AccessKeyLimits.Keys
 	for i := range keys {
 		if keys[i].APIKey == apiKey {
-			keyLimit = &keys[i]
-			// Remove from config keys
 			m.cfg.AccessKeyLimits.Keys = append(keys[:i], keys[i+1:]...)
 			break
 		}
 	}
 	m.mu.Unlock()
 
-	// Delete accumulated data - legacy key
+	// Delete accumulated data - legacy/base key
 	m.accumulator.Delete(apiKey)
 	m.requestAccumulator.Delete(apiKey)
 
-	// Delete tier data if multi-tier was configured
-	if keyLimit != nil && len(keyLimit.QuotaRules) > 0 {
-		for _, rule := range keyLimit.QuotaRules {
-			tk := tierKey(apiKey, rule.ID)
-			m.accumulator.Delete(tk)
-			m.requestAccumulator.Delete(tk)
+	// Delete tier data by prefix scan (works even if config entry was already removed)
+	prefix := apiKey + TierKeyDelimiter
+	for k := range m.accumulator.GetAll() {
+		if len(k) > len(prefix) && k[:len(prefix)] == prefix {
+			m.accumulator.Delete(k)
 			if m.autoResetScheduler != nil {
-				m.autoResetScheduler.Cancel(tk)
+				m.autoResetScheduler.Cancel(k)
+			}
+		}
+	}
+	for k := range m.requestAccumulator.GetAll() {
+		if len(k) > len(prefix) && k[:len(prefix)] == prefix {
+			m.requestAccumulator.Delete(k)
+			if m.autoResetScheduler != nil {
+				m.autoResetScheduler.Cancel(k)
 			}
 		}
 	}
 
-	// Remove from auto-reset scheduler
+	// Remove base key from auto-reset scheduler
 	if m.autoResetScheduler != nil {
 		m.autoResetScheduler.Cancel(apiKey)
 	}
@@ -351,11 +355,26 @@ func (m *Manager) CheckAndRecordRequest(apiKey string) (allowed bool, current in
 		return true, 0, 0
 	}
 
-	// For multi-tier, use per-key lock to ensure atomic check+increment across all tiers
-	if len(rules) > 1 {
-		globalKeyLocks.lock(apiKey)
-		defer globalKeyLocks.unlock(apiKey)
+	// Single rule: use atomic accumulator method (no lock needed)
+	if len(rules) == 1 {
+		rule := rules[0]
+		if rule.maxReq == 0 {
+			// Unlimited - still increment for tracking
+			m.requestAccumulator.Add(rule.key, 1)
+			current = m.requestAccumulator.Get(rule.key)
+			_ = m.saveRequests()
+			return true, current, 0
+		}
+		ok, newCount := m.requestAccumulator.CheckAndAdd(rule.key, rule.maxReq)
+		if ok {
+			_ = m.saveRequests()
+		}
+		return ok, newCount, rule.maxReq
 	}
+
+	// Multi-rule: use per-key lock to ensure atomic check+increment across all tiers
+	globalKeyLocks.lock(apiKey)
+	defer globalKeyLocks.unlock(apiKey)
 
 	// First pass: check all tiers
 	for _, rule := range rules {
