@@ -20,6 +20,10 @@ let quotaSearchQuery = '';
 let lastFetchStatus = { start: null, end: null, success: null, count: 0 };
 const AUTO_REFRESH_DELAY = 5 * 60 * 1000; // 5 minutes
 
+// Favorites feature
+const FAVORITES_STORAGE_KEY = 'quota_favorites';
+let showFavoritesOnly = false;
+
 // Request tracking for race condition prevention
 const pendingRequests = new Map(); // auth_index -> { requestId, abortController }
 let currentRequestId = 0;
@@ -144,6 +148,267 @@ function safeJsonParse(body, context = 'JSON parse') {
 }
 
 // ============================================================================
+// Favorites Management
+// ============================================================================
+
+/**
+ * Load favorites from localStorage
+ * @returns {Object} Favorites map { authIndex: { label: string, addedAt: string } }
+ */
+function loadFavorites() {
+  try {
+    const stored = localStorage.getItem(FAVORITES_STORAGE_KEY);
+    return stored ? JSON.parse(stored) : {};
+  } catch (e) {
+    console.warn('Failed to load favorites:', e);
+    return {};
+  }
+}
+
+/**
+ * Save favorites to localStorage
+ * @param {Object} favorites - Favorites map
+ */
+function saveFavorites(favorites) {
+  try {
+    localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favorites));
+  } catch (e) {
+    console.warn('Failed to save favorites:', e);
+  }
+}
+
+/**
+ * Check if an auth file is favorited
+ * @param {string} authIndex - Auth index
+ * @returns {boolean} True if favorited
+ */
+function isFavorite(authIndex) {
+  const favorites = loadFavorites();
+  return !!favorites[authIndex];
+}
+
+/**
+ * Get favorite label for an auth file
+ * @param {string} authIndex - Auth index
+ * @returns {string|null} Custom label or null
+ */
+function getFavoriteLabel(authIndex) {
+  const favorites = loadFavorites();
+  return favorites[authIndex]?.label || null;
+}
+
+/**
+ * Toggle favorite status for an auth file
+ * @param {string} authIndex - Auth index
+ * @param {string} defaultLabel - Default label if adding
+ */
+export function toggleFavorite(authIndex, defaultLabel = '') {
+  const favorites = loadFavorites();
+  if (favorites[authIndex]) {
+    delete favorites[authIndex];
+    toast('Removed from favorites', 'info');
+  } else {
+    favorites[authIndex] = {
+      label: defaultLabel,
+      addedAt: new Date().toISOString()
+    };
+    toast('Added to favorites', 'success');
+  }
+  saveFavorites(favorites);
+  renderQuotaPage();
+  renderFavoritesFilterButton();
+}
+
+/**
+ * Update favorite label
+ * @param {string} authIndex - Auth index
+ * @param {string} label - New label
+ */
+export function updateFavoriteLabel(authIndex, label) {
+  const favorites = loadFavorites();
+  if (favorites[authIndex]) {
+    favorites[authIndex].label = label;
+    saveFavorites(favorites);
+  }
+}
+
+/**
+ * Remove from favorites
+ * @param {string} authIndex - Auth index
+ */
+export function removeFavorite(authIndex) {
+  const favorites = loadFavorites();
+  delete favorites[authIndex];
+  saveFavorites(favorites);
+  renderQuotaPage();
+  renderFavoritesFilterButton();
+  renderManageFavoritesModal();
+}
+
+/**
+ * Toggle favorites-only filter
+ */
+export function toggleFavoritesFilter() {
+  showFavoritesOnly = !showFavoritesOnly;
+  applyFilter();
+  renderQuotaPage();
+  renderFavoritesFilterButton();
+}
+
+/**
+ * Render favorites filter button state
+ */
+function renderFavoritesFilterButton() {
+  const btn = document.getElementById('quotaFavoritesFilter');
+  if (!btn) return;
+  
+  const favorites = loadFavorites();
+  const count = Object.keys(favorites).length;
+  
+  btn.classList.toggle('active', showFavoritesOnly);
+  btn.setAttribute('aria-pressed', showFavoritesOnly.toString());
+  
+  const countSpan = btn.querySelector('.favorites-count');
+  if (countSpan) {
+    countSpan.textContent = count > 0 ? `(${count})` : '';
+  }
+}
+
+/**
+ * Open manage favorites modal
+ */
+export function openManageFavoritesModal() {
+  const modal = document.getElementById('manageFavoritesModal');
+  if (modal) {
+    modal.classList.add('active');
+    renderManageFavoritesModal();
+  }
+}
+
+/**
+ * Close manage favorites modal
+ */
+export function closeManageFavoritesModal() {
+  const modal = document.getElementById('manageFavoritesModal');
+  if (modal) {
+    modal.classList.remove('active');
+  }
+}
+
+/**
+ * Render manage favorites modal content
+ */
+function renderManageFavoritesModal() {
+  const container = document.getElementById('manageFavoritesContent');
+  if (!container) return;
+  
+  const favorites = loadFavorites();
+  const entries = Object.entries(favorites);
+  
+  if (entries.length === 0) {
+    container.innerHTML = `
+      <div class="favorites-empty">
+        <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+        </svg>
+        <p>No favorites yet</p>
+        <span>Click the star icon on any auth file to add it to favorites</span>
+      </div>
+    `;
+    return;
+  }
+  
+  const itemsHtml = entries.map(([authIndex, data]) => {
+    const authFile = authFiles.find(f => f.auth_index === authIndex);
+    const displayName = authFile?.file_name || authFile?.name || authIndex;
+    const provider = authFile?.provider || 'Unknown';
+    
+    return `
+      <div class="favorites-item" data-auth-index="${escapeAttr(authIndex)}">
+        <div class="favorites-item-info">
+          <div class="favorites-item-name">${escapeHtml(displayName)}</div>
+          <span class="favorites-item-provider ${escapeAttr(provider.toLowerCase())}">${escapeHtml(provider)}</span>
+        </div>
+        <div class="favorites-item-label">
+          <input type="text" 
+                 class="favorites-label-input" 
+                 placeholder="Custom label (optional)"
+                 value="${escapeAttr(data.label || '')}"
+                 onchange="updateFavoriteLabelFromInput('${escapeAttr(authIndex)}', this.value)">
+        </div>
+        <div class="favorites-item-actions">
+          <button class="favorites-remove-btn" onclick="removeFavorite('${escapeAttr(authIndex)}')" title="Remove from favorites">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+      </div>
+    `;
+  }).join('');
+  
+  container.innerHTML = `
+    <div class="favorites-list">
+      ${itemsHtml}
+    </div>
+  `;
+}
+
+/**
+ * Update favorite label from input field
+ * @param {string} authIndex - Auth index
+ * @param {string} value - New label value
+ */
+export function updateFavoriteLabelFromInput(authIndex, value) {
+  updateFavoriteLabel(authIndex, value);
+  toast('Label updated', 'success');
+}
+
+/**
+ * Get count of favorites
+ * @returns {number} Number of favorites
+ */
+function getFavoritesCount() {
+  return Object.keys(loadFavorites()).length;
+}
+
+/**
+ * Render favorite star button for a card
+ * @param {string} authIndex - Auth index
+ * @param {string} defaultLabel - Default label for new favorite
+ * @returns {string} HTML string for star button
+ */
+function renderFavoriteButton(authIndex, defaultLabel = '') {
+  const favorited = isFavorite(authIndex);
+  const safeIndex = escapeAttr(authIndex);
+  const safeLabel = escapeAttr(defaultLabel);
+  
+  return `
+    <button class="quota-favorite-btn ${favorited ? 'active' : ''}" 
+            onclick="event.stopPropagation(); toggleFavorite('${safeIndex}', '${safeLabel}')" 
+            title="${favorited ? 'Remove from favorites' : 'Add to favorites'}"
+            aria-pressed="${favorited}">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" 
+           fill="${favorited ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+      </svg>
+    </button>
+  `;
+}
+
+/**
+ * Render favorite label badge if exists
+ * @param {string} authIndex - Auth index
+ * @returns {string} HTML string for label badge or empty
+ */
+function renderFavoriteLabel(authIndex) {
+  const label = getFavoriteLabel(authIndex);
+  if (!label) return '';
+  return `<span class="quota-favorite-label">${escapeHtml(label)}</span>`;
+}
+
+// ============================================================================
 // Request Management - Race condition prevention
 // ============================================================================
 
@@ -260,7 +525,7 @@ export function unloadQuotaPage() {
 }
 
 /**
- * Apply current filter to auth files (provider + status)
+ * Apply current filter to auth files (provider + status + favorites)
  */
 function applyFilter() {
   if (currentFilter === 'all') {
@@ -271,9 +536,17 @@ function applyFilter() {
     );
   }
 
+  // Apply favorites filter
+  if (showFavoritesOnly) {
+    const favorites = loadFavorites();
+    filteredAuthFiles = filteredAuthFiles.filter(f => !!favorites[f.auth_index]);
+  }
+
   const query = quotaSearchQuery.trim().toLowerCase();
   if (query) {
     filteredAuthFiles = filteredAuthFiles.filter(f => {
+      // Also search in favorite labels
+      const favoriteLabel = getFavoriteLabel(f.auth_index);
       const fields = [
         f.file_name,
         f.name,
@@ -281,7 +554,8 @@ function applyFilter() {
         f.account,
         f.project,
         f.project_id,
-        f.provider
+        f.provider,
+        favoriteLabel
       ];
       return fields.some(value => (value || '').toString().toLowerCase().includes(query));
     });
@@ -397,15 +671,20 @@ function renderQuotaPage() {
  */
 function renderIdleCard(authFile) {
   const authIndex = escapeAttr(authFile.auth_index);
+  const displayName = authFile.file_name || authFile.name;
   
   return `
     <div class="quota-card idle" data-auth-index="${authIndex}">
       <div class="quota-card-header">
         <div class="quota-card-info">
-          <div class="quota-card-name">${escapeHtml(authFile.file_name || authFile.name)}</div>
+          <div class="quota-card-name-row">
+            <div class="quota-card-name">${escapeHtml(displayName)}</div>
+            ${renderFavoriteLabel(authFile.auth_index)}
+          </div>
           <span class="quota-card-provider ${escapeAttr(authFile.provider?.toLowerCase() || '')}">${escapeHtml(authFile.provider || 'Unknown')}</span>
         </div>
         <div class="quota-card-actions">
+          ${renderFavoriteButton(authFile.auth_index, displayName)}
           <button class="quota-refresh-btn" onclick="refreshQuota('${authIndex}')" title="Fetch Quota">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M23 4v6h-6"></path>
@@ -433,12 +712,16 @@ function renderIdleCard(authFile) {
  */
 function renderLoadingCard(authFile) {
   const authIndex = escapeAttr(authFile.auth_index);
+  const displayName = authFile.file_name || authFile.name;
   
   return `
     <div class="quota-card loading" data-auth-index="${authIndex}">
       <div class="quota-card-header">
         <div class="quota-card-info">
-          <div class="quota-card-name">${escapeHtml(authFile.file_name || authFile.name)}</div>
+          <div class="quota-card-name-row">
+            <div class="quota-card-name">${escapeHtml(displayName)}</div>
+            ${renderFavoriteLabel(authFile.auth_index)}
+          </div>
           <span class="quota-card-provider ${escapeAttr(authFile.provider?.toLowerCase() || '')}">${escapeHtml(authFile.provider || 'Unknown')}</span>
         </div>
       </div>
@@ -1549,15 +1832,20 @@ export function renderQuotaErrorCard(authFile, error) {
   const statusCode = statusMatch ? escapeHtml(statusMatch[1]) : 'Error';
   const errorMessage = error.message || 'Unknown error occurred';
   const authIndex = escapeAttr(authFile.auth_index);
+  const displayName = authFile.file_name || authFile.name;
 
   return `
     <div class="quota-card error" data-auth-index="${authIndex}">
       <div class="quota-card-header">
         <div class="quota-card-info">
-          <div class="quota-card-name">${escapeHtml(authFile.file_name || authFile.name)}</div>
+          <div class="quota-card-name-row">
+            <div class="quota-card-name">${escapeHtml(displayName)}</div>
+            ${renderFavoriteLabel(authFile.auth_index)}
+          </div>
           <span class="quota-card-provider ${escapeAttr(authFile.provider?.toLowerCase() || '')}">${escapeHtml(authFile.provider || 'Unknown')}</span>
         </div>
         <div class="quota-card-actions">
+          ${renderFavoriteButton(authFile.auth_index, displayName)}
           <button class="quota-refresh-btn" onclick="refreshQuota('${authIndex}')" title="Retry">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M23 4v6h-6"></path>
@@ -1588,13 +1876,20 @@ export function renderQuotaErrorCard(authFile, error) {
  */
 export function renderQuotaUnavailableCard(authFile) {
   const authIndex = escapeAttr(authFile.auth_index);
+  const displayName = authFile.file_name || authFile.name;
   
   return `
     <div class="quota-card unavailable" data-auth-index="${authIndex}">
       <div class="quota-card-header">
         <div class="quota-card-info">
-          <div class="quota-card-name">${escapeHtml(authFile.file_name || authFile.name)}</div>
+          <div class="quota-card-name-row">
+            <div class="quota-card-name">${escapeHtml(displayName)}</div>
+            ${renderFavoriteLabel(authFile.auth_index)}
+          </div>
           <span class="quota-card-provider">${escapeHtml(authFile.provider || 'Unknown')}</span>
+        </div>
+        <div class="quota-card-actions">
+          ${renderFavoriteButton(authFile.auth_index, displayName)}
         </div>
       </div>
       <div class="quota-unavailable-content">
@@ -1621,15 +1916,20 @@ function renderQuotaCardWrapper(authFile, providerClass, contentHtml, fetchedAt,
   const statusClass = status ? `status-${status}` : '';
   const circularHtml = worstPercentage !== null ? renderCircularProgress(worstPercentage, status) : '';
   const authIndex = escapeAttr(authFile.auth_index);
+  const displayName = authFile.file_name || authFile.name;
 
   return `
     <div class="quota-card ${statusClass}" data-auth-index="${authIndex}">
       <div class="quota-card-header">
         <div class="quota-card-info">
-          <div class="quota-card-name">${escapeHtml(authFile.file_name || authFile.name)}</div>
+          <div class="quota-card-name-row">
+            <div class="quota-card-name">${escapeHtml(displayName)}</div>
+            ${renderFavoriteLabel(authFile.auth_index)}
+          </div>
           <span class="quota-card-provider ${escapeAttr(providerClass)}">${escapeHtml(authFile.provider || 'Unknown')}</span>
         </div>
         <div class="quota-card-actions">
+          ${renderFavoriteButton(authFile.auth_index, displayName)}
           ${circularHtml}
           <button class="quota-refresh-btn" onclick="refreshQuota('${authIndex}')" title="Refresh">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1881,13 +2181,30 @@ function updateSyncStatus() {
 }
 
 /**
- * Render active filter chips (provider, status, search)
+ * Render active filter chips (provider, status, search, favorites)
  */
 function renderActiveFilters() {
   const container = document.getElementById('quotaActiveFilters');
   if (!container) return;
   
   const chips = [];
+  
+  if (showFavoritesOnly) {
+    chips.push(`
+      <div class="quota-filter-chip favorites">
+        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+        </svg>
+        Favorites only
+        <button class="quota-filter-chip-remove" onclick="toggleFavoritesFilter()" aria-label="Remove favorites filter">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    `);
+  }
   
   if (currentFilter !== 'all') {
     chips.push(`
@@ -2287,11 +2604,13 @@ export function clearQuotaSearch() {
 export function resetQuotaFilters() {
   currentFilter = 'all';
   currentStatusFilter = null;
+  showFavoritesOnly = false;
   clearQuotaSearch();
   document.querySelectorAll('.quota-provider-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.filter === 'all');
     btn.setAttribute('aria-pressed', btn.dataset.filter === 'all');
   });
+  renderFavoritesFilterButton();
   applyFilter();
   renderQuotaPage();
   renderSummaryBar();
@@ -2438,3 +2757,12 @@ window.toggleQuotaMoreMenu = toggleQuotaMoreMenu;
 window.closeQuotaMoreMenu = closeQuotaMoreMenu;
 window.openQuotaFilterDrawer = openQuotaFilterDrawer;
 window.closeQuotaFilterDrawer = closeQuotaFilterDrawer;
+
+// Favorites functions
+window.toggleFavorite = toggleFavorite;
+window.updateFavoriteLabel = updateFavoriteLabel;
+window.updateFavoriteLabelFromInput = updateFavoriteLabelFromInput;
+window.removeFavorite = removeFavorite;
+window.toggleFavoritesFilter = toggleFavoritesFilter;
+window.openManageFavoritesModal = openManageFavoritesModal;
+window.closeManageFavoritesModal = closeManageFavoritesModal;

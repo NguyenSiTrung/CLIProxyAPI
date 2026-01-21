@@ -580,6 +580,17 @@
   height: 12px;
 }
 
+.quota-filter-chip.favorites {
+  background: rgba(251, 191, 36, 0.1);
+  border-color: rgba(251, 191, 36, 0.3);
+  color: #fbbf24;
+}
+
+.quota-filter-chip.favorites svg {
+  width: 12px;
+  height: 12px;
+}
+
 /* ==========================================================================
    Quota Cards Grid
    ========================================================================== */
@@ -1514,5 +1525,348 @@
   .quota-refresh-btn {
     width: 40px;
     height: 40px;
+  }
+}
+
+/* ==========================================================================
+   Favorites Feature Styles
+   ========================================================================== */
+
+/* Favorites Filter Button */
+.quota-favorites-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quota-favorites-btn svg {
+  color: #fbbf24;
+  flex-shrink: 0;
+}
+
+.quota-favorites-btn.active {
+  background: rgba(251, 191, 36, 0.15);
+  border-color: rgba(251, 191, 36, 0.5);
+}
+
+.quota-favorites-btn.active svg {
+  fill: #fbbf24;
+}
+
+.favorites-count {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+/* Favorite Button on Cards */
+.quota-favorite-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.2s ease;
+}
+
+.quota-favorite-btn:hover {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+}
+
+.quota-favorite-btn.active {
+  color: #fbbf24;
+}
+
+.quota-favorite-btn.active svg {
+  fill: #fbbf24;
+}
+
+/* Favorite Label Badge */
+.quota-favorite-label {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: rgba(251, 191, 36, 0.15);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: 4px;
+  font-size: 11px;
+  color: #fbbf24;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Card Name Row with Label */
+.quota-card-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Favorites Modal */
+.favorites-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
+.favorites-modal-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.favorites-modal {
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  transform: scale(0.95);
+  transition: transform 0.2s ease;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+.favorites-modal-overlay.active .favorites-modal {
+  transform: scale(1);
+}
+
+.favorites-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.favorites-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.favorites-modal-title svg {
+  color: #fbbf24;
+}
+
+.favorites-modal-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.favorites-modal-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.favorites-modal-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+}
+
+.favorites-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-color);
+}
+
+/* Favorites List */
+.favorites-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.favorites-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  transition: all 0.2s ease;
+}
+
+.favorites-item:hover {
+  border-color: var(--border-glow);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.favorites-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.favorites-item-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.favorites-item-provider {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  width: fit-content;
+}
+
+.favorites-item-provider.antigravity {
+  background: rgba(0, 191, 166, 0.15);
+  color: #00bfa6;
+}
+
+.favorites-item-provider.codex {
+  background: rgba(16, 163, 127, 0.15);
+  color: #10a37f;
+}
+
+.favorites-item-provider.gemini-cli {
+  background: rgba(66, 133, 244, 0.15);
+  color: #4285f4;
+}
+
+.favorites-item-label {
+  min-width: 150px;
+}
+
+.favorites-label-input {
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 13px;
+  transition: all 0.2s ease;
+}
+
+.favorites-label-input:focus {
+  outline: none;
+  border-color: var(--accent-cyan);
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.favorites-label-input::placeholder {
+  color: var(--text-muted);
+}
+
+.favorites-item-actions {
+  display: flex;
+  align-items: center;
+}
+
+.favorites-remove-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.favorites-remove-btn:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* Empty Favorites State */
+.favorites-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.favorites-empty svg {
+  color: #fbbf24;
+  opacity: 0.4;
+  margin-bottom: 16px;
+}
+
+.favorites-empty p {
+  margin: 0 0 8px;
+  font-size: 16px;
+  color: var(--text-secondary);
+}
+
+.favorites-empty span {
+  font-size: 13px;
+}
+
+/* Mobile adjustments for favorites */
+@media (max-width: 640px) {
+  .favorites-item {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .favorites-item-label {
+    min-width: 0;
+  }
+  
+  .favorites-item-actions {
+    justify-content: flex-end;
+  }
+  
+  .favorites-modal {
+    width: 95%;
+    max-height: 90vh;
+  }
+  
+  .favorites-modal-header,
+  .favorites-modal-content,
+  .favorites-modal-footer {
+    padding: 16px;
   }
 }
