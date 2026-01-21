@@ -8,6 +8,10 @@ import { toast } from '../core/toast.js';
 import { closeModal } from '../core/modal.js';
 import { getLogState, updateLogState, resetLogState } from '../core/state.js';
 
+let currentDetailLog = null;
+let scrollThrottleFrame = null;
+let loadRequestId = 0;
+
 /**
  * Escape HTML to prevent XSS
  */
@@ -132,70 +136,80 @@ function updateLogStatusUI() {
 
 /**
  * Get filtered logs based on current filter state
+ * Returns { logs: LogEntry[], regexError: boolean, errorMessage: string }
  */
 function getFilteredLogs() {
   const logState = getLogState();
   const filter = logState.filter;
-  const search = logState.search.toLowerCase();
+  const searchRaw = logState.search || '';
+  const searchLower = searchRaw.toLowerCase();
+  const useRegex = logState.useRegex !== false;
   let searchRegex = null;
+  let regexError = false;
+  let errorMessage = '';
   
-  try {
-    if (search) searchRegex = new RegExp(search, 'i');
-  } catch (e) { }
+  if (searchRaw && useRegex) {
+    try {
+      if (searchRaw.length > 200) {
+        regexError = true;
+        errorMessage = 'Pattern too long (max 200 chars)';
+      } else {
+        searchRegex = new RegExp(searchRaw, 'i');
+      }
+    } catch (e) {
+      regexError = true;
+      errorMessage = e.message;
+    }
+  }
   
-  return logState.allLogs.filter(l => {
+  const logs = logState.allLogs.filter(l => {
     if (filter !== 'ALL' && l.level !== filter) return false;
-    if (search) {
+    if (searchRaw) {
       if (searchRegex) return searchRegex.test(l.raw);
-      return l.raw.toLowerCase().includes(search);
+      return l.raw.toLowerCase().includes(searchLower);
     }
     return true;
   });
+  
+  return { logs, regexError, errorMessage };
 }
 
 /**
  * Render logs to the viewer
+ * Uses getFilteredLogs() to avoid duplicated filtering logic
  */
 function renderLogs() {
-  const logState = getLogState();
   const v = document.getElementById('logViewer');
-  const filter = logState.filter;
-  const search = logState.search.toLowerCase();
-  let searchRegex = null;
+  if (!v) return;
   
   const searchInput = document.getElementById('logSearch');
   const searchContainer = document.getElementById('logSearchContainer');
-  const regexError = document.getElementById('logRegexError');
+  const regexErrorEl = document.getElementById('logRegexError');
+  const logCountEl = document.getElementById('logCount');
 
-  try {
-    if (search) {
-      searchRegex = new RegExp(search, 'i');
-      updateLogState({ regexError: false });
-      if (searchInput) searchInput.classList.remove('regex-error');
-      if (searchContainer) searchContainer.classList.remove('has-error');
-      if (regexError) regexError.classList.remove('visible');
-    }
-  } catch (e) {
+  const { logs: filtered, regexError, errorMessage } = getFilteredLogs();
+  
+  if (regexError) {
     updateLogState({ regexError: true });
     if (searchInput) searchInput.classList.add('regex-error');
     if (searchContainer) searchContainer.classList.add('has-error');
-    if (regexError) {
-      regexError.textContent = 'Invalid regex: ' + e.message;
-      regexError.classList.add('visible');
+    if (regexErrorEl) {
+      regexErrorEl.textContent = errorMessage ? 'Invalid regex: ' + errorMessage : 'Invalid pattern';
+      regexErrorEl.classList.add('visible');
     }
-    searchRegex = null;
+  } else {
+    updateLogState({ regexError: false });
+    if (searchInput) searchInput.classList.remove('regex-error');
+    if (searchContainer) searchContainer.classList.remove('has-error');
+    if (regexErrorEl) regexErrorEl.classList.remove('visible');
   }
 
-  const filtered = logState.allLogs.filter(l => {
-    if (filter !== 'ALL' && l.level !== filter) return false;
-    if (search) {
-      if (searchRegex) return searchRegex.test(l.raw);
-      return l.raw.toLowerCase().includes(search);
-    }
-    return true;
-  });
-
-  document.getElementById('logCount').innerText = `${filtered.length} lines`;
+  if (logCountEl) {
+    const displayCount = filtered.length > 500 
+      ? `Showing 500 of ${filtered.length}` 
+      : `${filtered.length} lines`;
+    logCountEl.innerText = displayCount;
+  }
 
   if (filtered.length === 0) {
     v.innerHTML = `<div class="empty-logs">
@@ -210,17 +224,26 @@ function renderLogs() {
   }
 
   const linesToRender = filtered.slice(-500);
+  updateLogState({ renderedLogs: linesToRender });
 
   const html = linesToRender.map((l, idx) => {
-    let lvlClass = l.level.toLowerCase();
-    let displayTime = l.time ? (l.time.length > 15 ? l.time.substring(11, 19) : l.time) : '--:--:--';
+    const lvlClass = l.level.toLowerCase();
+    const displayTime = l.time ? (l.time.length > 15 ? l.time.substring(11, 19) : l.time) : '--:--:--';
     const isLongMessage = l.message && l.message.length > 200;
 
     return `
-       <div class="log-entry ${lvlClass}" data-log-idx="${idx}" onclick="window.logsModule.copyLogEntry(this)" ondblclick="window.logsModule.showLogDetail(${idx})" title="Click to copy • Double-click for details">
+       <div class="log-entry ${lvlClass}${isLongMessage ? ' long-message' : ''}" data-log-idx="${idx}" tabindex="0" role="listitem" aria-label="${l.level} log at ${escapeHtml(l.time || 'unknown time')}">
          <div class="log-time" title="${escapeHtml(l.time)}">${escapeHtml(displayTime)}</div>
          <div class="log-lvl ${lvlClass}">${l.level}</div>
-         <div class="log-msg${isLongMessage ? '' : ''}">${escapeHtml(l.message)}</div>
+         <div class="log-msg">${escapeHtml(l.message)}</div>
+         <div class="log-actions">
+           <button class="log-action-btn copy-btn" title="Copy log" aria-label="Copy log entry">
+             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+           </button>
+           <button class="log-action-btn details-btn" title="View details" aria-label="View log details">
+             <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+           </button>
+         </div>
        </div>
      `;
   }).join('');
@@ -252,11 +275,14 @@ export function clearLogFilters() {
  * Show log detail in modal
  */
 export function showLogDetail(idx) {
-  const linesToRender = getFilteredLogs().slice(-500);
-  const log = linesToRender[idx];
+  const logState = getLogState();
+  const renderedLogs = logState.renderedLogs || [];
+  const log = renderedLogs[idx];
   if (!log) return;
   
   const lvlClass = log.level.toLowerCase();
+  
+  currentDetailLog = log;
   
   document.getElementById('modalTitle').textContent = 'Log Entry Details';
   document.getElementById('modalContent').innerHTML = `
@@ -268,11 +294,11 @@ export function showLogDetail(idx) {
       <div class="log-detail-body">
         <div class="log-detail-message">${escapeHtml(log.raw)}</div>
         <div class="log-detail-actions">
-          <button class="btn btn-secondary btn-sm" onclick="window.logsModule.copyLogToClipboard(\`${escapeHtml(log.raw).replace(/`/g, '\\`')}\`)">
+          <button class="btn btn-secondary btn-sm" data-action="copy-full">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             Copy Full Log
           </button>
-          <button class="btn btn-secondary btn-sm" onclick="window.logsModule.copyLogToClipboard(\`${escapeHtml(log.message).replace(/`/g, '\\`')}\`)">
+          <button class="btn btn-secondary btn-sm" data-action="copy-message">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
             Copy Message Only
           </button>
@@ -283,6 +309,15 @@ export function showLogDetail(idx) {
   document.getElementById('modalFooter').innerHTML = `
     <button class="btn btn-secondary" onclick="window.logsModule.closeModal()">Close</button>
   `;
+  
+  const modalContent = document.getElementById('modalContent');
+  modalContent.querySelector('[data-action="copy-full"]')?.addEventListener('click', () => {
+    copyLogToClipboard(log.raw);
+  });
+  modalContent.querySelector('[data-action="copy-message"]')?.addEventListener('click', () => {
+    copyLogToClipboard(log.message);
+  });
+  
   document.getElementById('modal').classList.add('active');
 }
 
@@ -399,29 +434,86 @@ export function scrollLogsToBottom() {
 }
 
 /**
- * Setup log scroll tracking
+ * Setup log scroll tracking with throttling via requestAnimationFrame
  */
 export function setupLogScrollTracking() {
   const v = document.getElementById('logViewer');
   if (v) {
     v.addEventListener('scroll', () => {
-      const logState = getLogState();
-      const isAtBottom = v.scrollTop + v.clientHeight >= v.scrollHeight - 50;
-      updateLogState({ isAtBottom });
+      if (scrollThrottleFrame) return;
       
-      const btn = document.getElementById('scrollBottomBtn');
-      if (btn) {
-        if (!isAtBottom && logState.allLogs.length > 10) {
-          btn.classList.add('visible');
-        } else {
-          btn.classList.remove('visible');
-          updateLogState({ newLogsWhileScrolled: 0 });
-          const badge = document.getElementById('newLogsBadge');
-          if (badge) badge.style.display = 'none';
+      scrollThrottleFrame = requestAnimationFrame(() => {
+        scrollThrottleFrame = null;
+        
+        const logState = getLogState();
+        const isAtBottom = v.scrollTop + v.clientHeight >= v.scrollHeight - 50;
+        
+        if (logState.isAtBottom !== isAtBottom) {
+          updateLogState({ isAtBottom });
         }
-      }
+        
+        const btn = document.getElementById('scrollBottomBtn');
+        if (btn) {
+          if (!isAtBottom && logState.allLogs.length > 10) {
+            btn.classList.add('visible');
+          } else {
+            btn.classList.remove('visible');
+            if (logState.newLogsWhileScrolled !== 0) {
+              updateLogState({ newLogsWhileScrolled: 0 });
+            }
+            const badge = document.getElementById('newLogsBadge');
+            if (badge) badge.style.display = 'none';
+          }
+        }
+      });
     });
   }
+}
+
+/**
+ * Setup event delegation for log entries
+ * Handles copy and details buttons without inline handlers
+ */
+export function setupLogEventDelegation() {
+  const v = document.getElementById('logViewer');
+  if (!v) return;
+  
+  v.addEventListener('click', (e) => {
+    const copyBtn = e.target.closest('.copy-btn');
+    const detailsBtn = e.target.closest('.details-btn');
+    const logEntry = e.target.closest('.log-entry');
+    
+    if (copyBtn && logEntry) {
+      e.stopPropagation();
+      copyLogEntry(logEntry);
+      return;
+    }
+    
+    if (detailsBtn && logEntry) {
+      e.stopPropagation();
+      const idx = parseInt(logEntry.dataset.logIdx, 10);
+      if (!isNaN(idx)) {
+        showLogDetail(idx);
+      }
+      return;
+    }
+  });
+  
+  v.addEventListener('keydown', (e) => {
+    const logEntry = e.target.closest('.log-entry');
+    if (!logEntry) return;
+    
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      const idx = parseInt(logEntry.dataset.logIdx, 10);
+      if (!isNaN(idx)) {
+        showLogDetail(idx);
+      }
+    } else if (e.key === 'c' && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      copyLogEntry(logEntry);
+    }
+  });
 }
 
 /**
@@ -448,17 +540,18 @@ export function exportLogs() {
 }
 
 /**
- * Jump to next error
+ * Show errors only and scroll to latest
+ * Note: Despite the name, this filters to show errors rather than navigating to individual errors
  */
 export function jumpToNextError() {
   const logState = getLogState();
-  const errorLogs = logState.allLogs.filter(l => l.level === 'ERROR');
-  if (errorLogs.length === 0) {
+  if (logState.errorCount === 0) {
     toast('No errors found', 'info');
     return;
   }
   setLogFilter('ERROR');
   scrollLogsToBottom();
+  toast(`Showing ${logState.errorCount} error${logState.errorCount > 1 ? 's' : ''}`, 'info');
 }
 
 /**
@@ -503,11 +596,15 @@ export function clearLogs(confirmed = false) {
 
 /**
  * Load logs from server
+ * Uses requestId to prevent race conditions from overlapping requests
  */
 export async function loadLogs(isAuto = false) {
+  const thisRequestId = ++loadRequestId;
   const logState = getLogState();
   const v = document.getElementById('logViewer');
   const btn = document.getElementById('btnRefreshLogs');
+  
+  if (!v) return;
   
   if (!isAuto && btn) {
     btn.classList.add('loading');
@@ -524,6 +621,11 @@ export async function loadLogs(isAuto = false) {
     }
 
     const d = await api('GET', url);
+    
+    if (thisRequestId !== loadRequestId) {
+      return;
+    }
+    
     const lines = d.lines || [];
     const newLogs = lines
       .filter(l => !l.includes('/v0/management/logs'))
@@ -546,19 +648,23 @@ export async function loadLogs(isAuto = false) {
     }
 
     const currentState = getLogState();
-    updateLogState({
-      errorCount: currentState.allLogs.filter(l => l.level === 'ERROR').length,
-      warnCount: currentState.allLogs.filter(l => l.level === 'WARN').length,
-      infoCount: currentState.allLogs.filter(l => l.level === 'INFO').length,
-      debugCount: currentState.allLogs.filter(l => l.level === 'DEBUG').length
-    });
+    let errorCount = 0, warnCount = 0, infoCount = 0, debugCount = 0;
+    for (const l of currentState.allLogs) {
+      if (l.level === 'ERROR') errorCount++;
+      else if (l.level === 'WARN') warnCount++;
+      else if (l.level === 'INFO') infoCount++;
+      else if (l.level === 'DEBUG') debugCount++;
+    }
+    updateLogState({ errorCount, warnCount, infoCount, debugCount });
 
     renderLogs();
     updateLogStatusUI();
     updateLogStats();
 
   } catch (e) {
-    if (!isAuto) toast('Failed to load logs: ' + e.message, 'error');
+    if (thisRequestId === loadRequestId && !isAuto) {
+      toast('Failed to load logs: ' + e.message, 'error');
+    }
   } finally {
     if (btn) btn.classList.remove('loading');
   }
@@ -602,7 +708,8 @@ window.logsModule = {
   showLogDetail,
   copyLogToClipboard,
   copyLogEntry,
-  closeModal
+  closeModal,
+  setupLogEventDelegation
 };
 
 // Also expose directly for HTML onclick handlers
@@ -616,3 +723,4 @@ window.stopLogAutoRefresh = stopLogAutoRefresh;
 window.scrollLogsToBottom = scrollLogsToBottom;
 window.jumpToNextError = jumpToNextError;
 window.exportLogs = exportLogs;
+window.setupLogEventDelegation = setupLogEventDelegation;

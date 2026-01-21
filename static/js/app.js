@@ -26,7 +26,7 @@ import { loadConfig, setupConfigKeyboardShortcuts } from './pages/config.js';
 import { loadUsageStats, initAutoBackup, destroyUsageCharts } from './pages/usage.js';
 import { loadAnalytics } from './pages/analytics.js';
 import { loadAmpSettings } from './pages/amp.js';
-import { loadLogs } from './pages/logs.js';
+import { loadLogs, setupLogScrollTracking, setupLogEventDelegation, initLogKeyboardShortcuts } from './pages/logs.js';
 import { stopLogAutoRefresh } from './pages/logs.js';
 import { loadQuotaPage, stopAutoRefresh as stopQuotaAutoRefresh } from './pages/quota.js';
 
@@ -83,6 +83,11 @@ function init() {
   
   // Setup config keyboard shortcuts (Ctrl+S to save)
   setupConfigKeyboardShortcuts();
+
+  // Setup log page features
+  setupLogScrollTracking();
+  setupLogEventDelegation();
+  initLogKeyboardShortcuts();
 
   // Initialize modal system
   initModal();

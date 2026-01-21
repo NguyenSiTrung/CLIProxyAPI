@@ -260,43 +260,29 @@
 /* Log Entry */
 .log-entry {
   display: grid;
-  grid-template-columns: 85px 60px 1fr;
+  grid-template-columns: 85px 60px 1fr auto;
   gap: 12px;
   padding: 6px 10px;
   border-radius: 6px;
   margin-bottom: 2px;
-  transition: all 0.15s ease;
+  transition: background 0.15s ease;
   align-items: start;
   border-left: 3px solid transparent;
-  cursor: pointer;
   position: relative;
+}
+
+.log-entry:focus {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: -2px;
+  background: rgba(255, 255, 255, 0.04);
 }
 
 .log-entry:hover {
   background: rgba(255, 255, 255, 0.04);
-  transform: translateX(2px);
-}
-
-.log-entry:hover::after {
-  content: 'Click to copy • Double-click for details';
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 10px;
-  color: var(--text-muted);
-  opacity: 0.7;
-  pointer-events: none;
 }
 
 .log-entry.copied {
   background: rgba(0, 229, 255, 0.15) !important;
-}
-
-.log-entry.copied::after {
-  content: '✓ Copied!' !important;
-  color: var(--accent-cyan);
-  opacity: 1;
 }
 
 .log-entry.error {
@@ -315,6 +301,57 @@
 
 .log-entry.debug {
   border-left-color: rgba(34, 211, 160, 0.3);
+}
+
+.log-entry.long-message .log-msg {
+  max-height: 80px;
+}
+
+/* Log Action Buttons */
+.log-actions {
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  align-items: center;
+}
+
+.log-entry:hover .log-actions,
+.log-entry:focus .log-actions,
+.log-entry:focus-within .log-actions {
+  opacity: 1;
+}
+
+.log-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.log-action-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: var(--text-primary);
+}
+
+.log-action-btn:focus {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: -2px;
+}
+
+.log-action-btn.copy-btn:hover {
+  color: var(--accent-cyan);
+}
+
+.log-action-btn.details-btn:hover {
+  color: var(--accent-blue);
 }
 
 .log-time {
@@ -603,8 +640,12 @@
     order: 3;
   }
   
-  .log-entry:hover::after {
-    display: none;
+  .log-actions {
+    order: 4;
+    opacity: 1;
+    width: 100%;
+    justify-content: flex-start;
+    margin-top: 4px;
   }
   
   .scroll-bottom-btn {
@@ -612,5 +653,22 @@
     bottom: 16px;
     width: 36px;
     height: 36px;
+  }
+}
+
+/* Reduced motion accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .log-viewer-content {
+    scroll-behavior: auto;
+  }
+  
+  .log-entry,
+  .log-action-btn,
+  .log-actions {
+    transition: none;
+  }
+  
+  .scroll-bottom-btn {
+    transition: none;
   }
 }

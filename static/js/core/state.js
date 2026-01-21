@@ -31,8 +31,10 @@ let usageState = {
 // Log state
 let logState = {
   allLogs: [],
+  renderedLogs: [],
   filter: 'ALL',
   search: '',
+  useRegex: true,
   autoRefreshInterval: null,
   latestTimestamp: 0,
   searchDebounceTimer: null,
@@ -157,8 +159,10 @@ export function updateConfigState(updates) {
 export function resetLogState() {
   logState = {
     allLogs: [],
+    renderedLogs: [],
     filter: 'ALL',
     search: '',
+    useRegex: true,
     autoRefreshInterval: null,
     latestTimestamp: 0,
     searchDebounceTimer: null,
