@@ -45,7 +45,32 @@ export async function api(method, endpoint, body = null) {
   const res = await fetch(`/v0/management${endpoint}`, opts);
   
   if (!res.ok) {
-    throw new Error(await res.text() || `HTTP ${res.status}`);
+    // Try to parse JSON error response
+    let errorMessage = `HTTP ${res.status}`;
+    try {
+      const errorData = await res.json();
+      if (errorData.error) {
+        errorMessage = String(errorData.error).slice(0, 300);
+      } else if (errorData.message) {
+        errorMessage = String(errorData.message).slice(0, 300);
+      }
+    } catch {
+      // Not JSON - use generic status-based message for security
+      const statusMessages = {
+        400: 'Bad request',
+        401: 'Unauthorized',
+        403: 'Access denied',
+        404: 'Not found',
+        409: 'Conflict',
+        422: 'Invalid data',
+        429: 'Too many requests',
+        500: 'Server error',
+        502: 'Service unavailable',
+        503: 'Service unavailable'
+      };
+      errorMessage = statusMessages[res.status] || `HTTP ${res.status}`;
+    }
+    throw new Error(errorMessage);
   }
   
   const ct = res.headers.get('content-type') || '';

@@ -33,7 +33,12 @@ export function toast(message, type = 'info', duration = TOAST_TIMEOUT) {
   
   const toastEl = document.createElement('div');
   toastEl.className = `toast ${type}`;
-  toastEl.innerHTML = `<span>${message}</span>`;
+  
+  const span = document.createElement('span');
+  // Truncate message to prevent UI overflow and cap potential attack surface
+  const safeMessage = typeof message === 'string' ? message.slice(0, 500) : String(message);
+  span.textContent = safeMessage;
+  toastEl.appendChild(span);
   
   container.appendChild(toastEl);
   

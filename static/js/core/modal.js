@@ -4,6 +4,18 @@
  */
 
 /**
+ * Escape HTML entities to prevent XSS
+ * @param {string} str - The string to escape
+ * @returns {string} The escaped string
+ */
+function escapeHtml(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+/**
  * Show a modal dialog
  * @param {string} title - Modal title
  * @param {string} content - Modal body content (HTML)
@@ -29,7 +41,10 @@ export function closeModal() {
   const modalInner = document.querySelector('#modal .modal');
   
   if (modal) modal.classList.remove('active');
-  if (modalInner) modalInner.classList.remove('provider-detail-modal');
+  if (modalInner) {
+    // Remove all provider detail modal classes
+    modalInner.classList.remove('provider-detail-modal', 'provider-detail-modal-v2');
+  }
 }
 
 /**
@@ -41,18 +56,20 @@ export function closeModal() {
  * @param {string} confirmClass - CSS class for confirm button (default: 'btn-primary')
  */
 export function showConfirmModal(title, message, onConfirm, confirmText = 'Confirm', confirmClass = 'btn-primary') {
-  const content = `
-    <div style="text-align:center; padding: 24px 0;">
-      <p style="color:var(--text-secondary); font-size:14px; max-width:300px; margin:0 auto;">${message}</p>
-    </div>
-  `;
+  const contentDiv = document.createElement('div');
+  contentDiv.style.cssText = 'text-align:center; padding: 24px 0;';
+  
+  const p = document.createElement('p');
+  p.style.cssText = 'color:var(--text-secondary); font-size:14px; max-width:300px; margin:0 auto;';
+  p.textContent = message;
+  contentDiv.appendChild(p);
   
   const footer = `
     <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-    <button class="btn ${confirmClass}" id="modalConfirmBtn">${confirmText}</button>
+    <button class="btn ${confirmClass}" id="modalConfirmBtn">${escapeHtml(confirmText)}</button>
   `;
   
-  showModal(title, content, footer);
+  showModal(title, contentDiv.outerHTML, footer);
   
   // Attach confirm handler
   const confirmBtn = document.getElementById('modalConfirmBtn');

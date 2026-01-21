@@ -23,7 +23,7 @@ import { loadModels, fetchModels } from './pages/models.js';
 import { loadAuthFiles } from './pages/auth-files.js';
 import { loadKeys, setupKeysTabHandlers } from './pages/keys.js';
 import { loadConfig, setupConfigKeyboardShortcuts } from './pages/config.js';
-import { loadUsageStats, initAutoBackup } from './pages/usage.js';
+import { loadUsageStats, initAutoBackup, destroyUsageCharts } from './pages/usage.js';
 import { loadAnalytics } from './pages/analytics.js';
 import { loadAmpSettings } from './pages/amp.js';
 import { loadLogs } from './pages/logs.js';
@@ -45,6 +45,10 @@ function onBeforeNavigate(page) {
   // Stop quota auto-refresh when leaving quota page
   if (page !== 'quota') {
     stopQuotaAutoRefresh();
+  }
+  // Clean up chart instances when leaving usage page
+  if (page !== 'usage') {
+    destroyUsageCharts();
   }
 }
 

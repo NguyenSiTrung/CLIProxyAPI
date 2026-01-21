@@ -5,7 +5,11 @@
 
 import { api } from '../core/api.js';
 import { toast } from '../core/toast.js';
-import { showModal } from '../core/modal.js';
+import { 
+  showModal, 
+  showConfirmModal,
+  closeModal 
+} from '../core/modal.js';
 import { 
   getUsageState, 
   updateUsageState,
@@ -28,6 +32,24 @@ const autoBackupState = {
   folder: '',
   intervalMinutes: null
 };
+
+// Track if Chart.js defaults have been initialized
+let chartDefaultsInitialized = false;
+
+/**
+ * Destroy chart instances to prevent memory leaks
+ * Call this when navigating away from the usage page
+ */
+export function destroyUsageCharts() {
+  if (requestsChartInstance) {
+    requestsChartInstance.destroy();
+    requestsChartInstance = null;
+  }
+  if (tokensChartInstance) {
+    tokensChartInstance.destroy();
+    tokensChartInstance = null;
+  }
+}
 
 // Default pricing for well-known models (prices per 1M tokens in USD)
 const DEFAULT_MODEL_PRICING = {
@@ -75,6 +97,8 @@ const DEFAULT_MODEL_PRICING = {
  * Get default pricing for a model
  */
 function getDefaultPricing(modelId) {
+  if (typeof modelId !== 'string') return null;
+  
   if (DEFAULT_MODEL_PRICING[modelId]) {
     return DEFAULT_MODEL_PRICING[modelId];
   }
@@ -87,6 +111,15 @@ function getDefaultPricing(modelId) {
   }
   
   return null;
+}
+
+// Valid backup types for security
+const VALID_BACKUP_TYPES = ['auto', 'manual', 'import', 'unknown'];
+
+function sanitizeBackupType(type) {
+  if (typeof type !== 'string') return 'unknown';
+  const normalized = type.toLowerCase().trim();
+  return VALID_BACKUP_TYPES.includes(normalized) ? normalized : 'unknown';
 }
 
 /**
@@ -522,7 +555,7 @@ function renderProviderStats(providerUsage) {
     }
     
     return `
-    <div class="config-setting-item provider-clickable${isLimitExceeded ? ' provider-limit-exceeded' : ''}" style="padding:12px 16px;transition:all 0.2s;cursor:pointer${isLimitExceeded ? ';background:rgba(248,113,113,0.08)' : ''}" data-provider-key="${escapeHtml(name)}" data-provider-idx="${idx}">
+    <div class="config-setting-item provider-clickable${isLimitExceeded ? ' provider-limit-exceeded' : ''}" role="button" tabindex="0" aria-label="View details for API key ${escapeHtml(name.slice(0, 25))}" style="padding:12px 16px;transition:all 0.2s;cursor:pointer${isLimitExceeded ? ';background:rgba(248,113,113,0.08)' : ''}" data-provider-key="${escapeHtml(name)}" data-provider-idx="${idx}">
       <div class="config-setting-info">
         <div class="config-setting-text">
           <h4 style="font-family:monospace;font-size:13px" title="${escapeHtml(name)}">${escapeHtml(name.length > 25 ? name.slice(0, 22) + '...' : name)}${limitBadgeHtml}</h4>
@@ -535,16 +568,24 @@ function renderProviderStats(providerUsage) {
         <span class="badge badge-green" title="Success">${stats.successCount.toLocaleString()}</span>
         <span class="badge badge-red" title="Failed">${stats.failureCount.toLocaleString()}</span>
         <span class="badge badge-purple" title="Total">${stats.requests.toLocaleString()}</span>
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.5" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
       </div>
     </div>
   `;
   }).join('') + '</div>';
 
   providerContainer.querySelectorAll('.provider-clickable').forEach(el => {
-    el.addEventListener('click', () => {
+    const handleActivation = () => {
       const providerKey = el.dataset.providerKey;
       showProviderDetail(providerKey);
+    };
+    
+    el.addEventListener('click', handleActivation);
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        handleActivation();
+      }
     });
   });
 }
@@ -904,9 +945,13 @@ function renderUsageChartsUnified(usageData) {
 
   if (typeof Chart === 'undefined') return;
 
-  Chart.defaults.color = '#8888aa';
-  Chart.defaults.font.family = "'Inter', sans-serif";
-  Chart.defaults.scale.grid.color = 'rgba(255, 255, 255, 0.05)';
+  // Set Chart.js defaults only once to avoid unnecessary reconfiguration
+  if (!chartDefaultsInitialized) {
+    Chart.defaults.color = '#8888aa';
+    Chart.defaults.font.family = "'Inter', sans-serif";
+    Chart.defaults.scale.grid.color = 'rgba(255, 255, 255, 0.05)';
+    chartDefaultsInitialized = true;
+  }
 
   const ctxReq = document.getElementById('requestsChart')?.getContext('2d');
   if (ctxReq) {
@@ -1101,6 +1146,14 @@ export function triggerUsageImport() {
 export async function importUsageData(event) {
   const file = event.target.files[0];
   if (!file) return;
+
+  // File size validation - reject files larger than 20MB
+  const MAX_FILE_SIZE = 20 * 1024 * 1024;
+  if (file.size > MAX_FILE_SIZE) {
+    toast(`File too large (${(file.size / (1024 * 1024)).toFixed(1)}MB). Maximum size is 20MB.`, 'error');
+    event.target.value = '';
+    return;
+  }
 
   try {
     const text = await file.text();
@@ -1340,25 +1393,57 @@ export async function loadBackupFiles() {
       const message = result.enabled 
         ? 'No backup files found' 
         : 'No backup files found (auto-backup is disabled)';
-      listEl.innerHTML = `<div class="auto-backup-files-empty">${message}</div>`;
+      listEl.innerHTML = `<div class="auto-backup-files-empty">${escapeHtml(message)}</div>`;
       return;
     }
     
-    listEl.innerHTML = files.map(file => `
-      <div class="auto-backup-file-item">
-        <div class="auto-backup-file-info">
-          <div class="auto-backup-file-name" title="${escapeHtmlAttr(file.filename)}">${escapeHtml(file.filename)}</div>
-          <div class="auto-backup-file-meta">
-            <span class="auto-backup-file-type ${file.backup_type}">${file.backup_type}</span>
-            <span>${formatFileSize(file.size)}</span>
-            <span>${formatBackupTime(file.mod_time)}</span>
-          </div>
-        </div>
-        <button class="auto-backup-file-import" onclick="importBackupFile('${escapeHtmlAttr(file.filename)}')">
-          Import
-        </button>
-      </div>
-    `).join('');
+    // Clear and build DOM safely
+    listEl.innerHTML = '';
+    
+    files.forEach(file => {
+      const itemDiv = document.createElement('div');
+      itemDiv.className = 'auto-backup-file-item';
+      
+      const infoDiv = document.createElement('div');
+      infoDiv.className = 'auto-backup-file-info';
+      
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'auto-backup-file-name';
+      nameDiv.title = file.filename || '';
+      nameDiv.textContent = file.filename || '';
+      
+      const metaDiv = document.createElement('div');
+      metaDiv.className = 'auto-backup-file-meta';
+      
+      const typeSpan = document.createElement('span');
+      typeSpan.className = `auto-backup-file-type ${sanitizeBackupType(file.backup_type)}`;
+      typeSpan.textContent = file.backup_type || 'unknown';
+      
+      const sizeSpan = document.createElement('span');
+      sizeSpan.textContent = formatFileSize(file.size);
+      
+      const timeSpan = document.createElement('span');
+      timeSpan.textContent = formatBackupTime(file.mod_time);
+      
+      metaDiv.appendChild(typeSpan);
+      metaDiv.appendChild(sizeSpan);
+      metaDiv.appendChild(timeSpan);
+      
+      infoDiv.appendChild(nameDiv);
+      infoDiv.appendChild(metaDiv);
+      
+      const importBtn = document.createElement('button');
+      importBtn.className = 'auto-backup-file-import';
+      importBtn.textContent = 'Import';
+      importBtn.dataset.filename = file.filename;
+      importBtn.addEventListener('click', () => {
+        importBackupFile(file.filename);
+      });
+      
+      itemDiv.appendChild(infoDiv);
+      itemDiv.appendChild(importBtn);
+      listEl.appendChild(itemDiv);
+    });
   } catch (err) {
     console.error('Failed to load backup files:', err);
     listEl.innerHTML = '<div class="auto-backup-files-empty">Failed to load backup files</div>';
@@ -1398,17 +1483,27 @@ export async function triggerManualBackup() {
  * Import a backup file from server
  */
 export async function importBackupFile(filename) {
-  if (!confirm(`Import usage data from "${filename}"?\n\nThis will merge the backup data with current statistics.`)) {
+  const safeFilename = typeof filename === 'string' ? filename.slice(0, 200) : '';
+  if (!safeFilename) {
+    toast('Invalid filename', 'error');
     return;
   }
   
-  try {
-    const result = await api('POST', `/usage/backups/import?filename=${encodeURIComponent(filename)}`);
-    toast(`Imported ${result.added} records (${result.skipped} skipped)`, 'success');
-    loadUsageStats();
-  } catch (err) {
-    toast('Import failed: ' + err.message, 'error');
-  }
+  showConfirmModal(
+    'Import Backup',
+    `Import usage data from "${safeFilename}"? This will merge the backup data with current statistics.`,
+    async () => {
+      try {
+        const result = await api('POST', `/usage/backups/import?filename=${encodeURIComponent(safeFilename)}`);
+        toast(`Imported ${result.added} records (${result.skipped} skipped)`, 'success');
+        loadUsageStats();
+      } catch (err) {
+        toast('Import failed: ' + err.message, 'error');
+      }
+    },
+    'Import',
+    'btn-primary'
+  );
 }
 
 function formatFileSize(bytes) {
@@ -1461,7 +1556,8 @@ export const usageModule = {
   loadBackupFiles,
   refreshBackupFiles,
   triggerManualBackup,
-  importBackupFile
+  importBackupFile,
+  destroyUsageCharts
 };
 
 // Expose functions to window for HTML onclick handlers
@@ -1479,3 +1575,4 @@ window.initAutoBackup = initAutoBackup;
 window.refreshBackupFiles = refreshBackupFiles;
 window.triggerManualBackup = triggerManualBackup;
 window.importBackupFile = importBackupFile;
+window.destroyUsageCharts = destroyUsageCharts;
