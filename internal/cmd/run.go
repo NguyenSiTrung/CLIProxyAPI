@@ -45,21 +45,26 @@ func StartService(cfg *config.Config, configPath string, localPassword string) {
 		}))
 	}
 
+	// Start Telegram bot if configured - use OnAfterStart hook because
+	// the cost manager is only available after the server starts
+	var telegramBot *telegram.Bot
+	if cfg.Telegram.Enabled && cfg.Telegram.Token != "" {
+		telegramBot = telegram.NewBot(cfg.Telegram)
+		builder = builder.WithHooks(cliproxy.Hooks{
+			OnAfterStart: func(s *cliproxy.Service) {
+				if cm := s.CostManager(); cm != nil {
+					telegramBot.SetCostManager(cm)
+				}
+				telegramBot.Start()
+			},
+		})
+		defer telegramBot.Stop()
+	}
+
 	service, err := builder.Build()
 	if err != nil {
 		log.Errorf("failed to build proxy service: %v", err)
 		return
-	}
-
-	// Start Telegram bot if configured
-	var telegramBot *telegram.Bot
-	if cfg.Telegram.Enabled && cfg.Telegram.Token != "" {
-		telegramBot = telegram.NewBot(cfg.Telegram)
-		if cm := service.CostManager(); cm != nil {
-			telegramBot.SetCostManager(cm)
-		}
-		telegramBot.Start()
-		defer telegramBot.Stop()
 	}
 
 	// Start usage auto-backup service if configured
