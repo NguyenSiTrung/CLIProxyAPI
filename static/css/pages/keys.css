@@ -833,6 +833,109 @@
   flex: 1;
 }
 
+/* Multi-tier Quota Styles */
+.multi-tier-quotas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.quota-tier {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  min-width: 180px;
+  flex: 1;
+  max-width: 280px;
+}
+
+.quota-tier.tier-blocked {
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.08);
+}
+
+.tier-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.tier-id {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-cyan);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.tier-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tier-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tier-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  min-width: 55px;
+}
+
+.tier-value {
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.tier-current {
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.tier-reset {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.tier-stat .usage-bar-mini {
+  flex: 1;
+  min-width: 40px;
+  max-width: 60px;
+}
+
+/* Badge variants */
+.badge-info {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-radius: 4px;
+  background: rgba(0, 229, 255, 0.15);
+  color: var(--accent-cyan);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+}
+
+.badge-sm {
+  padding: 2px 6px;
+  font-size: 9px;
+}
+
 /* Responsive Cost Limits Table */
 @media (max-width: 768px) {
   .cost-limits-table th,

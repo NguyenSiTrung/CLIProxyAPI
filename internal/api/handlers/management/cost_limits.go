@@ -24,14 +24,25 @@ func (h *Handler) GetAccessKeyLimits(c *gin.Context) {
 		return
 	}
 
-	type keyInfo struct {
-		APIKey            string  `json:"api_key"`
+	type quotaRuleInfo struct {
+		ID                string  `json:"id"`
 		MaxCost           float64 `json:"max_cost"`
 		CurrentCost       float64 `json:"current_cost"`
 		MaxRequests       int64   `json:"max_requests"`
 		CurrentRequests   int64   `json:"current_requests"`
 		AutoResetInterval string  `json:"auto_reset_interval,omitempty"`
 		NextResetTime     string  `json:"next_reset_time,omitempty"`
+	}
+
+	type keyInfo struct {
+		APIKey            string          `json:"api_key"`
+		MaxCost           float64         `json:"max_cost"`
+		CurrentCost       float64         `json:"current_cost"`
+		MaxRequests       int64           `json:"max_requests"`
+		CurrentRequests   int64           `json:"current_requests"`
+		AutoResetInterval string          `json:"auto_reset_interval,omitempty"`
+		NextResetTime     string          `json:"next_reset_time,omitempty"`
+		QuotaRules        []quotaRuleInfo `json:"quota_rules,omitempty"`
 	}
 
 	keys := costManager.GetAllLimits()
@@ -45,12 +56,31 @@ func (h *Handler) GetAccessKeyLimits(c *gin.Context) {
 			CurrentRequests:   k.CurrentRequests,
 			AutoResetInterval: k.AutoResetInterval,
 		}
-		if k.AutoResetInterval != "" && k.AutoResetInterval != "none" {
+
+		// For legacy single-tier keys, compute next reset time
+		if len(k.QuotaRules) == 0 && k.AutoResetInterval != "" && k.AutoResetInterval != "none" {
 			nextReset := costManager.GetNextResetTime(k.APIKey)
 			if !nextReset.IsZero() {
 				info.NextResetTime = nextReset.Format("2006-01-02T15:04:05Z07:00")
 			}
 		}
+
+		// For multi-tier keys, include quota rules with their next reset times
+		if len(k.QuotaRules) > 0 {
+			info.QuotaRules = make([]quotaRuleInfo, len(k.QuotaRules))
+			for j, rule := range k.QuotaRules {
+				info.QuotaRules[j] = quotaRuleInfo{
+					ID:                rule.ID,
+					MaxCost:           rule.MaxCost,
+					CurrentCost:       rule.CurrentCost,
+					MaxRequests:       rule.MaxRequests,
+					CurrentRequests:   rule.CurrentRequests,
+					AutoResetInterval: rule.AutoResetInterval,
+					NextResetTime:     rule.NextResetTime,
+				}
+			}
+		}
+
 		keyInfos[i] = info
 	}
 

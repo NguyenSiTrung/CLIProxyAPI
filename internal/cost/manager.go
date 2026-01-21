@@ -575,6 +575,17 @@ func (m *Manager) GetCurrentCost(apiKey string) float64 {
 	return m.accumulator.Get(apiKey)
 }
 
+// QuotaRuleInfo contains current status for a single quota tier.
+type QuotaRuleInfo struct {
+	ID                string  `json:"id"`
+	MaxCost           float64 `json:"max_cost"`
+	CurrentCost       float64 `json:"current_cost"`
+	MaxRequests       int64   `json:"max_requests"`
+	CurrentRequests   int64   `json:"current_requests"`
+	AutoResetInterval string  `json:"auto_reset_interval"`
+	NextResetTime     string  `json:"next_reset_time,omitempty"`
+}
+
 // KeyLimitInfo contains limit and cost information for an API key.
 type KeyLimitInfo struct {
 	APIKey            string  `json:"api_key"`
@@ -583,12 +594,16 @@ type KeyLimitInfo struct {
 	MaxRequests       int64   `json:"max_requests"`
 	CurrentRequests   int64   `json:"current_requests"`
 	AutoResetInterval string  `json:"auto_reset_interval"`
+	// QuotaRules contains per-tier status for multi-tier quotas.
+	// Empty for legacy single-tier keys.
+	QuotaRules []QuotaRuleInfo `json:"quota_rules,omitempty"`
 }
 
 // GetAllLimits returns limit and cost information for all keys that have
 // either a configured limit or accumulated cost/requests.
 // Keys that only have accumulated data but are not in the access-keys list
 // and don't have explicit limits configured are filtered out (orphaned keys).
+// For multi-tier quota keys, QuotaRules contains per-tier current status.
 func (m *Manager) GetAllLimits() []KeyLimitInfo {
 	if m == nil {
 		return nil
@@ -608,14 +623,57 @@ func (m *Manager) GetAllLimits() []KeyLimitInfo {
 
 	for _, keyLimit := range m.cfg.AccessKeyLimits.Keys {
 		keySet[keyLimit.APIKey] = struct{}{}
-		result = append(result, KeyLimitInfo{
+
+		info := KeyLimitInfo{
 			APIKey:            keyLimit.APIKey,
-			MaxCost:           keyLimit.MaxCost,
-			CurrentCost:       m.accumulator.Get(keyLimit.APIKey),
-			MaxRequests:       keyLimit.MaxRequests,
-			CurrentRequests:   m.requestAccumulator.Get(keyLimit.APIKey),
 			AutoResetInterval: keyLimit.AutoResetInterval,
-		})
+		}
+
+		// Check for multi-tier quotas
+		if len(keyLimit.QuotaRules) > 0 {
+			// Multi-tier mode: populate QuotaRules and aggregate totals from first tier for backward compatibility
+			quotaRules := make([]QuotaRuleInfo, 0, len(keyLimit.QuotaRules))
+			for _, rule := range keyLimit.QuotaRules {
+				tk := tierKey(keyLimit.APIKey, rule.ID)
+				ruleInfo := QuotaRuleInfo{
+					ID:                rule.ID,
+					MaxCost:           rule.MaxCost,
+					CurrentCost:       m.accumulator.Get(tk),
+					MaxRequests:       rule.MaxRequests,
+					CurrentRequests:   m.requestAccumulator.Get(tk),
+					AutoResetInterval: rule.AutoResetInterval,
+				}
+				// Calculate next reset time for this tier
+				if rule.AutoResetInterval != "" && rule.AutoResetInterval != "none" {
+					interval := ParseResetInterval(rule.AutoResetInterval)
+					if interval != ResetNone && m.autoResetScheduler != nil {
+						lastReset := m.autoResetScheduler.State().GetLastReset(tk)
+						if !lastReset.IsZero() {
+							nextReset := NextResetTime(lastReset, interval)
+							ruleInfo.NextResetTime = nextReset.Format("2006-01-02T15:04:05Z07:00")
+						}
+					}
+				}
+				quotaRules = append(quotaRules, ruleInfo)
+			}
+			info.QuotaRules = quotaRules
+
+			// For backward compatibility, use first tier's values as the "main" values
+			if len(quotaRules) > 0 {
+				info.MaxCost = quotaRules[0].MaxCost
+				info.CurrentCost = quotaRules[0].CurrentCost
+				info.MaxRequests = quotaRules[0].MaxRequests
+				info.CurrentRequests = quotaRules[0].CurrentRequests
+			}
+		} else {
+			// Legacy single-tier mode
+			info.MaxCost = keyLimit.MaxCost
+			info.CurrentCost = m.accumulator.Get(keyLimit.APIKey)
+			info.MaxRequests = keyLimit.MaxRequests
+			info.CurrentRequests = m.requestAccumulator.Get(keyLimit.APIKey)
+		}
+
+		result = append(result, info)
 	}
 
 	allCosts := m.accumulator.GetAll()

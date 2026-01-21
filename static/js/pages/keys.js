@@ -753,84 +753,189 @@ function renderCostLimitsList(data) {
 
   const tbody = document.getElementById('costLimitsTableBody');
   keys.forEach((keyInfo, idx) => {
-    const { api_key, max_cost, current_cost, max_requests, current_requests, auto_reset_interval, next_reset_time } = keyInfo;
+    const { api_key, max_cost, current_cost, max_requests, current_requests, auto_reset_interval, next_reset_time, quota_rules } = keyInfo;
     const maskedKey = maskApiKey(api_key);
-    const usageInfo = getUsageInfo(current_cost, max_cost);
-    const requestUsageInfo = getRequestUsageInfo(current_requests || 0, max_requests || 0);
-    const isCostBlocked = max_cost > 0 && current_cost >= max_cost;
-    const isRequestBlocked = max_requests > 0 && (current_requests || 0) >= max_requests;
-    const isBlocked = isCostBlocked || isRequestBlocked;
-    
-    // Format auto-reset display
-    let autoResetDisplay = formatAutoResetInterval(auto_reset_interval);
-    if (auto_reset_interval && auto_reset_interval !== 'none' && next_reset_time) {
-      try {
-        const nextReset = new Date(next_reset_time);
-        autoResetDisplay += `<br><span class="next-reset-time">${nextReset.toLocaleString()}</span>`;
-      } catch (e) { /* ignore */ }
+    const hasMultiTier = quota_rules && quota_rules.length > 0;
+
+    // For multi-tier keys, check if any tier is blocked
+    let isCostBlocked = false;
+    let isRequestBlocked = false;
+    let blockedTierName = '';
+
+    if (hasMultiTier) {
+      for (const rule of quota_rules) {
+        if (rule.max_cost > 0 && rule.current_cost >= rule.max_cost) {
+          isCostBlocked = true;
+          blockedTierName = rule.id;
+          break;
+        }
+        if (rule.max_requests > 0 && rule.current_requests >= rule.max_requests) {
+          isRequestBlocked = true;
+          blockedTierName = rule.id;
+          break;
+        }
+      }
+    } else {
+      isCostBlocked = max_cost > 0 && current_cost >= max_cost;
+      isRequestBlocked = max_requests > 0 && (current_requests || 0) >= max_requests;
     }
-    
+    const isBlocked = isCostBlocked || isRequestBlocked;
+
     const row = document.createElement('tr');
     row.className = isBlocked ? 'cost-limit-blocked' : '';
-    row.innerHTML = `
-      <td>
-        <div class="cost-limit-key">
-          <span class="key-masked">${escapeHtml(maskedKey)}</span>
-          ${isBlocked ? `<span class="badge badge-blocked">${isCostBlocked ? 'Cost' : 'Requests'}</span>` : ''}
-        </div>
-      </td>
-      <td>
-        <div class="limit-cell">
-          <span class="cost-value">${usageInfo.isUnlimited ? '∞' : '$' + max_cost.toFixed(2)}</span>
-          <span class="current-value">$${current_cost.toFixed(2)}</span>
-          ${usageInfo.isUnlimited ? '' : `
-          <div class="usage-bar-mini">
-            <div class="usage-bar ${usageInfo.colorClass}" style="width: ${usageInfo.percentage}%"></div>
+
+    if (hasMultiTier) {
+      // Multi-tier display: show each tier with its own limits and reset times
+      const tierRows = quota_rules.map(rule => {
+        const tierUsageInfo = getUsageInfo(rule.current_cost, rule.max_cost);
+        const tierRequestUsageInfo = getRequestUsageInfo(rule.current_requests || 0, rule.max_requests || 0);
+        const tierCostBlocked = rule.max_cost > 0 && rule.current_cost >= rule.max_cost;
+        const tierRequestBlocked = rule.max_requests > 0 && rule.current_requests >= rule.max_requests;
+        const tierBlocked = tierCostBlocked || tierRequestBlocked;
+
+        let tierResetDisplay = formatAutoResetInterval(rule.auto_reset_interval);
+        if (rule.auto_reset_interval && rule.auto_reset_interval !== 'none' && rule.next_reset_time) {
+          try {
+            const nextReset = new Date(rule.next_reset_time);
+            tierResetDisplay += `<br><span class="next-reset-time">${nextReset.toLocaleString()}</span>`;
+          } catch (e) { /* ignore */ }
+        }
+
+        return `
+          <div class="quota-tier ${tierBlocked ? 'tier-blocked' : ''}">
+            <div class="tier-header">
+              <span class="tier-id">${escapeHtml(rule.id)}</span>
+              ${tierBlocked ? `<span class="badge badge-blocked badge-sm">${tierCostBlocked ? 'Cost' : 'Requests'}</span>` : ''}
+            </div>
+            <div class="tier-stats">
+              <div class="tier-stat">
+                <span class="tier-label">Cost:</span>
+                <span class="tier-value">${tierUsageInfo.isUnlimited ? '∞' : '$' + rule.max_cost.toFixed(2)}</span>
+                <span class="tier-current">$${rule.current_cost.toFixed(2)}</span>
+                ${tierUsageInfo.isUnlimited ? '' : `<div class="usage-bar-mini"><div class="usage-bar ${tierUsageInfo.colorClass}" style="width: ${tierUsageInfo.percentage}%"></div></div>`}
+              </div>
+              <div class="tier-stat">
+                <span class="tier-label">Requests:</span>
+                <span class="tier-value">${tierRequestUsageInfo.isUnlimited ? '∞' : rule.max_requests.toLocaleString()}</span>
+                <span class="tier-current">${(rule.current_requests || 0).toLocaleString()}</span>
+                ${tierRequestUsageInfo.isUnlimited ? '' : `<div class="usage-bar-mini"><div class="usage-bar ${tierRequestUsageInfo.colorClass}" style="width: ${tierRequestUsageInfo.percentage}%"></div></div>`}
+              </div>
+              <div class="tier-stat">
+                <span class="tier-label">Reset:</span>
+                <span class="tier-reset">${tierResetDisplay}</span>
+              </div>
+            </div>
           </div>
-          `}
-        </div>
-      </td>
-      <td>
-        <div class="limit-cell">
-          <span class="cost-value">${requestUsageInfo.isUnlimited ? '∞' : max_requests.toLocaleString()}</span>
-          <span class="current-value">${(current_requests || 0).toLocaleString()}</span>
-          ${requestUsageInfo.isUnlimited ? '' : `
-          <div class="usage-bar-mini">
-            <div class="usage-bar ${requestUsageInfo.colorClass}" style="width: ${requestUsageInfo.percentage}%"></div>
+        `;
+      }).join('');
+
+      row.innerHTML = `
+        <td>
+          <div class="cost-limit-key">
+            <span class="key-masked">${escapeHtml(maskedKey)}</span>
+            <span class="badge badge-info badge-sm">Multi-tier</span>
+            ${isBlocked ? `<span class="badge badge-blocked">${blockedTierName}</span>` : ''}
           </div>
-          `}
-        </div>
-      </td>
-      <td>
-        <span class="auto-reset-cell">${autoResetDisplay}</span>
-      </td>
-      <td>
-        <div class="cost-limit-actions">
-          <button class="btn btn-xs btn-secondary" onclick="window.keysModule.openEditLimitModal('${escapeJsString(api_key)}', ${max_cost}, ${max_requests || 0}, '${escapeJsString(auto_reset_interval || '')}')" title="Edit limit">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-            </svg>
-            Edit
-          </button>
-          <button class="btn btn-xs btn-warning" onclick="window.keysModule.confirmResetCost('${escapeJsString(api_key)}', '${escapeJsString(maskedKey)}')" title="Reset">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="23 4 23 10 17 10"></polyline>
-              <polyline points="1 20 1 14 7 14"></polyline>
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-            </svg>
-            Reset
-          </button>
-          <button class="btn btn-xs btn-danger" onclick="window.keysModule.confirmDeleteLimit('${escapeJsString(api_key)}', '${escapeJsString(maskedKey)}')" title="Delete limit">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
-            Delete
-          </button>
-        </div>
-      </td>
-    `;
+        </td>
+        <td colspan="3">
+          <div class="multi-tier-quotas">
+            ${tierRows}
+          </div>
+        </td>
+        <td>
+          <div class="cost-limit-actions">
+            <button class="btn btn-xs btn-warning" onclick="window.keysModule.confirmResetCost('${escapeJsString(api_key)}', '${escapeJsString(maskedKey)}')" title="Reset all tiers">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+              Reset
+            </button>
+            <button class="btn btn-xs btn-danger" onclick="window.keysModule.confirmDeleteLimit('${escapeJsString(api_key)}', '${escapeJsString(maskedKey)}')" title="Delete limit">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              Delete
+            </button>
+          </div>
+        </td>
+      `;
+    } else {
+      // Legacy single-tier display
+      const usageInfo = getUsageInfo(current_cost, max_cost);
+      const requestUsageInfo = getRequestUsageInfo(current_requests || 0, max_requests || 0);
+
+      // Format auto-reset display
+      let autoResetDisplay = formatAutoResetInterval(auto_reset_interval);
+      if (auto_reset_interval && auto_reset_interval !== 'none' && next_reset_time) {
+        try {
+          const nextReset = new Date(next_reset_time);
+          autoResetDisplay += `<br><span class="next-reset-time">${nextReset.toLocaleString()}</span>`;
+        } catch (e) { /* ignore */ }
+      }
+
+      row.innerHTML = `
+        <td>
+          <div class="cost-limit-key">
+            <span class="key-masked">${escapeHtml(maskedKey)}</span>
+            ${isBlocked ? `<span class="badge badge-blocked">${isCostBlocked ? 'Cost' : 'Requests'}</span>` : ''}
+          </div>
+        </td>
+        <td>
+          <div class="limit-cell">
+            <span class="cost-value">${usageInfo.isUnlimited ? '∞' : '$' + max_cost.toFixed(2)}</span>
+            <span class="current-value">$${current_cost.toFixed(2)}</span>
+            ${usageInfo.isUnlimited ? '' : `
+            <div class="usage-bar-mini">
+              <div class="usage-bar ${usageInfo.colorClass}" style="width: ${usageInfo.percentage}%"></div>
+            </div>
+            `}
+          </div>
+        </td>
+        <td>
+          <div class="limit-cell">
+            <span class="cost-value">${requestUsageInfo.isUnlimited ? '∞' : max_requests.toLocaleString()}</span>
+            <span class="current-value">${(current_requests || 0).toLocaleString()}</span>
+            ${requestUsageInfo.isUnlimited ? '' : `
+            <div class="usage-bar-mini">
+              <div class="usage-bar ${requestUsageInfo.colorClass}" style="width: ${requestUsageInfo.percentage}%"></div>
+            </div>
+            `}
+          </div>
+        </td>
+        <td>
+          <span class="auto-reset-cell">${autoResetDisplay}</span>
+        </td>
+        <td>
+          <div class="cost-limit-actions">
+            <button class="btn btn-xs btn-secondary" onclick="window.keysModule.openEditLimitModal('${escapeJsString(api_key)}', ${max_cost}, ${max_requests || 0}, '${escapeJsString(auto_reset_interval || '')}')" title="Edit limit">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+              Edit
+            </button>
+            <button class="btn btn-xs btn-warning" onclick="window.keysModule.confirmResetCost('${escapeJsString(api_key)}', '${escapeJsString(maskedKey)}')" title="Reset">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="23 4 23 10 17 10"></polyline>
+                <polyline points="1 20 1 14 7 14"></polyline>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+              Reset
+            </button>
+            <button class="btn btn-xs btn-danger" onclick="window.keysModule.confirmDeleteLimit('${escapeJsString(api_key)}', '${escapeJsString(maskedKey)}')" title="Delete limit">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              Delete
+            </button>
+          </div>
+        </td>
+      `;
+    }
     tbody.appendChild(row);
   });
 }
