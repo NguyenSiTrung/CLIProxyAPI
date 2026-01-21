@@ -846,3 +846,10 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Modal responsive grid for failure details */
+@media (max-width: 600px) {
+  .analytics-modal-grid {
+    grid-template-columns: 1fr !important;
+  }
+}

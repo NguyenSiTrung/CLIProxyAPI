@@ -16,12 +16,48 @@ let analyticsData = {
   sortBy: 'timestamp',
   sortDir: 'desc',
   currentPage: 1,
-  pageSize: 10,
+  pageSize: 50, // Match HTML default (50 selected)
   providerFailures: {},
   dailyFailures: []
 };
 
 let analyticsFilterTimeout = null;
+let analyticsLoadId = 0; // Guard against stale responses
+
+/**
+ * Escape HTML special characters to prevent XSS
+ */
+function escapeHtml(str) {
+  if (str == null) return '';
+  const s = String(str);
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Escape for use in HTML attributes
+ */
+function escapeAttr(str) {
+  return escapeHtml(str);
+}
+
+/**
+ * Safely convert value to lowercase string
+ */
+function safeString(val) {
+  return String(val ?? '');
+}
+
+/**
+ * Safely convert to lowercase for comparison
+ */
+function safeLower(val) {
+  return safeString(val).toLowerCase();
+}
 
 /**
  * Debounced filter for search input
@@ -202,11 +238,12 @@ function renderFailureBreakdown(containerId, data, emptyMessage) {
   const maxVal = entries[0][1];
   container.innerHTML = entries.slice(0, 6).map(([name, count], idx) => {
     const pct = maxVal > 0 ? (count / maxVal * 100) : 0;
-    const displayName = name.length > 20 ? name.slice(0, 17) + '...' : name;
+    const safeName = escapeHtml(name);
+    const displayName = name.length > 20 ? escapeHtml(name.slice(0, 17) + '...') : safeName;
     return `
       <div class="analytics-breakdown-item">
         <span class="analytics-breakdown-rank">${idx + 1}</span>
-        <span class="analytics-breakdown-name" title="${name}">${displayName}</span>
+        <span class="analytics-breakdown-name" title="${escapeAttr(name)}">${displayName}</span>
         <div class="analytics-breakdown-bar-wrapper">
           <div class="analytics-breakdown-bar" style="width:${pct}%"></div>
         </div>
@@ -263,16 +300,16 @@ function renderAnalyticsTable(failures) {
         bVal = severityOrder[b.severity?.level] || 4;
         break;
       case 'provider':
-        aVal = a.provider.toLowerCase();
-        bVal = b.provider.toLowerCase();
+        aVal = safeLower(a.provider);
+        bVal = safeLower(b.provider);
         break;
       case 'model':
-        aVal = a.model.toLowerCase();
-        bVal = b.model.toLowerCase();
+        aVal = safeLower(a.model);
+        bVal = safeLower(b.model);
         break;
       case 'source':
-        aVal = a.source.toLowerCase();
-        bVal = b.source.toLowerCase();
+        aVal = safeLower(a.source);
+        bVal = safeLower(b.source);
         break;
       case 'status':
         aVal = a.httpStatus || 0;
@@ -296,25 +333,25 @@ function renderAnalyticsTable(failures) {
 
   tbody.innerHTML = pageData.map(f => {
     const ts = new Date(f.timestamp);
-    const timeStr = isNaN(ts) ? f.timestamp : ts.toLocaleString();
-    const shortSource = f.source.length > 20 ? f.source.slice(0, 17) + '...' : f.source;
-    const shortProvider = f.provider.length > 15 ? f.provider.slice(0, 12) + '...' : f.provider;
+    const timeStr = isNaN(ts) ? escapeHtml(f.timestamp) : escapeHtml(ts.toLocaleString());
+    const shortSource = safeString(f.source).length > 20 ? safeString(f.source).slice(0, 17) + '...' : safeString(f.source);
+    const shortProvider = safeString(f.provider).length > 15 ? safeString(f.provider).slice(0, 12) + '...' : safeString(f.provider);
 
     const severity = f.severity || getSeverity(f.httpStatus);
     const severityHtml = `
       <span class="severity-indicator">
-        <span class="severity-dot ${severity.class}"></span>
-        ${severity.label}
+        <span class="severity-dot ${escapeAttr(severity.class)}"></span>
+        ${escapeHtml(severity.label)}
       </span>
     `;
 
     let statusBadge = '<span class="badge badge-red">Error</span>';
     if (f.httpStatus) {
       const badgeClass = f.httpStatus >= 500 ? 'badge-red' : f.httpStatus >= 400 ? 'badge-yellow' : 'badge-cyan';
-      statusBadge = `<span class="badge ${badgeClass}">${f.httpStatus}</span>`;
+      statusBadge = `<span class="badge ${badgeClass}">${escapeHtml(f.httpStatus)}</span>`;
     } else if (f.errorCode) {
-      const shortCode = f.errorCode.length > 12 ? f.errorCode.slice(0, 10) + '..' : f.errorCode;
-      statusBadge = `<span class="badge badge-red" title="${f.errorCode}">${shortCode}</span>`;
+      const shortCode = safeString(f.errorCode).length > 12 ? safeString(f.errorCode).slice(0, 10) + '..' : safeString(f.errorCode);
+      statusBadge = `<span class="badge badge-red" title="${escapeAttr(f.errorCode)}">${escapeHtml(shortCode)}</span>`;
     }
 
     const escapedF = JSON.stringify(f).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -322,9 +359,9 @@ function renderAnalyticsTable(failures) {
     return `<tr>
       <td style="font-size:12px;color:var(--text-secondary)">${timeStr}</td>
       <td>${severityHtml}</td>
-      <td><span class="badge badge-purple">${shortProvider}</span></td>
-      <td><span style="color:var(--accent-cyan);font-weight:500;font-size:13px">${f.model}</span></td>
-      <td title="${f.source}" style="font-size:12px">${shortSource}</td>
+      <td><span class="badge badge-purple">${escapeHtml(shortProvider)}</span></td>
+      <td><span style="color:var(--accent-cyan);font-weight:500;font-size:13px">${escapeHtml(f.model)}</span></td>
+      <td title="${escapeAttr(f.source)}" style="font-size:12px">${escapeHtml(shortSource)}</td>
       <td>${statusBadge}</td>
       <td>
         <button class="analytics-detail-btn" onclick='window.analyticsModule.showFailureDetails(${escapedF})'>
@@ -388,18 +425,20 @@ function updatePagination(totalItems) {
 }
 
 /**
- * Go to specific analytics page
+ * Go to specific analytics page with bounds clamping
  */
 export function goToAnalyticsPage(page) {
-  analyticsData.currentPage = page;
+  const totalPages = Math.max(1, Math.ceil(analyticsData.failures.length / analyticsData.pageSize));
+  analyticsData.currentPage = Math.max(1, Math.min(page, totalPages));
   renderAnalyticsTable(analyticsData.failures);
 }
 
 /**
- * Change analytics page by delta
+ * Change analytics page by delta with bounds clamping
  */
 export function changeAnalyticsPage(delta) {
-  analyticsData.currentPage += delta;
+  const totalPages = Math.max(1, Math.ceil(analyticsData.failures.length / analyticsData.pageSize));
+  analyticsData.currentPage = Math.max(1, Math.min(analyticsData.currentPage + delta, totalPages));
   renderAnalyticsTable(analyticsData.failures);
 }
 
@@ -486,11 +525,11 @@ export function filterAnalytics() {
 
   if (search) {
     filtered = filtered.filter(f =>
-      f.provider.toLowerCase().includes(search) ||
-      f.model.toLowerCase().includes(search) ||
-      f.source.toLowerCase().includes(search) ||
-      (f.errorCode || '').toLowerCase().includes(search) ||
-      (f.errorMessage || '').toLowerCase().includes(search)
+      safeLower(f.provider).includes(search) ||
+      safeLower(f.model).includes(search) ||
+      safeLower(f.source).includes(search) ||
+      safeLower(f.errorCode).includes(search) ||
+      safeLower(f.errorMessage).includes(search)
     );
   }
 
@@ -515,6 +554,11 @@ export function showFailureDetails(failure) {
   };
   const colors = severityColors[severity.level] || severityColors.low;
 
+  const safeModel = escapeHtml(failure.model);
+  const safeTimestamp = escapeHtml(new Date(failure.timestamp).toLocaleString());
+  const safeSeverityLabel = escapeHtml(severity.label);
+  const safeSeverityClass = escapeAttr(severity.class);
+
   const headerHtml = `
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid var(--border-color)">
       <div style="display:flex;align-items:center;gap:12px">
@@ -526,22 +570,24 @@ export function showFailureDetails(failure) {
           </svg>
         </div>
         <div>
-          <div style="font-weight:600;font-size:16px;margin-bottom:4px">${failure.model}</div>
-          <div style="font-size:12px;color:var(--text-secondary)">${new Date(failure.timestamp).toLocaleString()}</div>
+          <div style="font-weight:600;font-size:16px;margin-bottom:4px">${safeModel}</div>
+          <div style="font-size:12px;color:var(--text-secondary)">${safeTimestamp}</div>
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:8px">
         <span class="severity-indicator">
-          <span class="severity-dot ${severity.class}"></span>
-          ${severity.label}
+          <span class="severity-dot ${safeSeverityClass}"></span>
+          ${safeSeverityLabel}
         </span>
-        ${failure.httpStatus ? `<span class="badge ${failure.httpStatus >= 500 ? 'badge-red' : failure.httpStatus >= 400 ? 'badge-yellow' : 'badge-cyan'}">${failure.httpStatus}</span>` : ''}
+        ${failure.httpStatus ? `<span class="badge ${failure.httpStatus >= 500 ? 'badge-red' : failure.httpStatus >= 400 ? 'badge-yellow' : 'badge-cyan'}">${escapeHtml(failure.httpStatus)}</span>` : ''}
       </div>
     </div>
   `;
 
   let errorSection = '';
   if (failure.httpStatus || failure.errorCode || failure.errorMessage) {
+    const safeErrorCode = escapeHtml(failure.errorCode);
+    const safeErrorMessage = escapeHtml(failure.errorMessage);
     errorSection = `
       <div style="background:${colors.bg};border:1px solid ${colors.border};border-radius:12px;padding:16px;margin-bottom:20px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
@@ -556,13 +602,13 @@ export function showFailureDetails(failure) {
           ${failure.errorCode ? `
             <div style="display:flex;align-items:center;gap:12px">
               <span style="color:var(--text-secondary);font-size:12px;min-width:90px">Error Code</span>
-              <code style="background:rgba(0,0,0,0.3);padding:6px 12px;border-radius:6px;font-size:12px;font-family:monospace">${failure.errorCode}</code>
+              <code style="background:rgba(0,0,0,0.3);padding:6px 12px;border-radius:6px;font-size:12px;font-family:monospace">${safeErrorCode}</code>
             </div>
           ` : ''}
           ${failure.errorMessage ? `
             <div>
               <span style="color:var(--text-secondary);font-size:12px;display:block;margin-bottom:8px">Message</span>
-              <pre style="background:rgba(0,0,0,0.4);padding:14px;border-radius:8px;overflow-x:auto;font-size:12px;white-space:pre-wrap;word-break:break-word;max-height:160px;overflow-y:auto;margin:0;color:var(--text-primary);border:1px solid rgba(255,255,255,0.05)">${failure.errorMessage}</pre>
+              <pre style="background:rgba(0,0,0,0.4);padding:14px;border-radius:8px;overflow-x:auto;font-size:12px;white-space:pre-wrap;word-break:break-word;max-height:160px;overflow-y:auto;margin:0;color:var(--text-primary);border:1px solid rgba(255,255,255,0.05)">${safeErrorMessage}</pre>
             </div>
           ` : ''}
         </div>
@@ -581,27 +627,32 @@ export function showFailureDetails(failure) {
     `;
   }
 
+  const safeProvider = escapeHtml(failure.provider);
+  const safeSource = escapeHtml(failure.source);
+  const safeAuthIndex = failure.authIndex !== undefined ? escapeHtml(failure.authIndex) : 'N/A';
+
   const infoGridHtml = `
-    <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:16px;margin-bottom:20px">
+    <div style="display:grid;grid-template-columns:repeat(2, 1fr);gap:16px;margin-bottom:20px" class="analytics-modal-grid">
       <div style="background:rgba(167, 139, 250, 0.08);border:1px solid rgba(167, 139, 250, 0.2);border-radius:10px;padding:14px">
         <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Provider</div>
-        <div style="font-weight:500;color:var(--accent-purple)">${failure.provider}</div>
+        <div style="font-weight:500;color:var(--accent-purple)">${safeProvider}</div>
       </div>
       <div style="background:rgba(0, 229, 255, 0.08);border:1px solid rgba(0, 229, 255, 0.2);border-radius:10px;padding:14px">
         <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Model</div>
-        <div style="font-weight:500;color:var(--accent-cyan)">${failure.model}</div>
+        <div style="font-weight:500;color:var(--accent-cyan)">${safeModel}</div>
       </div>
       <div style="background:rgba(255,255,255,0.03);border:1px solid var(--border-color);border-radius:10px;padding:14px">
         <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Source</div>
-        <div style="font-size:13px;word-break:break-all;color:var(--text-primary)">${failure.source}</div>
+        <div style="font-size:13px;word-break:break-all;color:var(--text-primary)">${safeSource}</div>
       </div>
       <div style="background:rgba(251, 191, 36, 0.08);border:1px solid rgba(251, 191, 36, 0.2);border-radius:10px;padding:14px">
         <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Auth Index</div>
-        <div style="font-weight:500;color:var(--accent-yellow)">${failure.authIndex !== undefined ? failure.authIndex : 'N/A'}</div>
+        <div style="font-weight:500;color:var(--accent-yellow)">${safeAuthIndex}</div>
       </div>
     </div>
   `;
 
+  const safeTokensJson = escapeHtml(JSON.stringify(failure.tokens, null, 2));
   const tokensHtml = (failure.tokens && Object.keys(failure.tokens).length > 0) ? `
     <div style="background:rgba(255,255,255,0.02);border:1px solid var(--border-color);border-radius:10px;padding:14px">
       <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;display:flex;align-items:center;gap:6px">
@@ -611,7 +662,7 @@ export function showFailureDetails(failure) {
         </svg>
         Token Usage
       </div>
-      <pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;font-size:12px;margin:0;overflow-x:auto;color:var(--text-secondary)">${JSON.stringify(failure.tokens, null, 2)}</pre>
+      <pre style="background:rgba(0,0,0,0.3);padding:12px;border-radius:8px;font-size:12px;margin:0;overflow-x:auto;color:var(--text-secondary)">${safeTokensJson}</pre>
     </div>
   ` : '';
 
@@ -667,6 +718,19 @@ Tokens: ${JSON.stringify(f.tokens, null, 2)}`;
 }
 
 /**
+ * Sanitize CSV cell to prevent formula injection
+ * Prefixes dangerous characters with a single quote
+ */
+function sanitizeCsvCell(val) {
+  const str = String(val ?? '');
+  // If starts with formula-triggering characters, prefix with single quote
+  if (/^[=+\-@\t\r]/.test(str)) {
+    return "'" + str;
+  }
+  return str;
+}
+
+/**
  * Export analytics data to CSV
  */
 export function exportAnalytics() {
@@ -677,18 +741,29 @@ export function exportAnalytics() {
   }
 
   const headers = ['Timestamp', 'Provider', 'Model', 'Source', 'Auth Index', 'HTTP Status', 'Error Code', 'Error Message', 'Input Tokens', 'Output Tokens'];
-  const rows = failures.map(f => [
-    new Date(f.timestamp).toISOString(),
-    f.provider,
-    f.model,
-    f.source,
-    f.authIndex !== undefined ? f.authIndex : '',
-    f.httpStatus || '',
-    f.errorCode || '',
-    f.errorMessage || '',
-    f.tokens?.input_tokens || 0,
-    f.tokens?.output_tokens || 0
-  ]);
+  const rows = failures.map(f => {
+    // Safely parse timestamp
+    let timestamp;
+    try {
+      const d = new Date(f.timestamp);
+      timestamp = isNaN(d.getTime()) ? safeString(f.timestamp) : d.toISOString();
+    } catch {
+      timestamp = safeString(f.timestamp);
+    }
+    
+    return [
+      timestamp,
+      sanitizeCsvCell(f.provider),
+      sanitizeCsvCell(f.model),
+      sanitizeCsvCell(f.source),
+      f.authIndex !== undefined ? f.authIndex : '',
+      f.httpStatus || '',
+      sanitizeCsvCell(f.errorCode),
+      sanitizeCsvCell(f.errorMessage),
+      f.tokens?.input_tokens || 0,
+      f.tokens?.output_tokens || 0
+    ];
+  });
 
   const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(','))].join('\n');
 
@@ -709,6 +784,7 @@ export function exportAnalytics() {
  * Load analytics data from the server
  */
 export async function loadAnalytics() {
+  const currentLoadId = ++analyticsLoadId;
   const refreshBtn = document.getElementById('analyticsRefreshBtn');
   if (refreshBtn) {
     refreshBtn.classList.add('loading');
@@ -717,8 +793,18 @@ export async function loadAnalytics() {
   
   hideAnalyticsError();
   
+  // Store current filter values to restore after rebuilding dropdowns
+  const currentProviderFilter = document.getElementById('analyticsProviderFilter')?.value || '';
+  const currentModelFilter = document.getElementById('analyticsModelFilter')?.value || '';
+  
   try {
     const d = await api('GET', '/usage');
+    
+    // Guard against stale responses
+    if (currentLoadId !== analyticsLoadId) {
+      return; // A newer request was started, discard this response
+    }
+    
     const u = d.usage || {};
     const apis = u.apis || {};
 
@@ -807,6 +893,23 @@ export async function loadAnalytics() {
     }
 
     updateTrendIndicator('analyticsFailedTrend', failedToday, failedYesterday, true);
+    // Update today trend indicator - show "Today" label
+    const todayTrendEl = document.getElementById('analyticsTodayTrend');
+    if (todayTrendEl) {
+      todayTrendEl.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+          <line x1="16" y1="2" x2="16" y2="6"></line>
+          <line x1="8" y1="2" x2="8" y2="6"></line>
+          <line x1="3" y1="10" x2="21" y2="10"></line>
+        </svg>
+        <span>Today</span>
+      `;
+    }
+    // Update success rate trend
+    const previousSuccessRate = analyticsData.previousSuccessRate || parseFloat(successRate);
+    updateTrendIndicator('analyticsRateTrend', parseFloat(successRate), previousSuccessRate, false);
+    analyticsData.previousSuccessRate = parseFloat(successRate);
     
     const sparklineData = generateSparklineData(failures, 7);
     renderSparkline('sparklineTotal', sparklineData);
@@ -821,13 +924,21 @@ export async function loadAnalytics() {
     const providerSelect = document.getElementById('analyticsProviderFilter');
     if (providerSelect) {
       providerSelect.innerHTML = '<option value="">All Providers</option>' +
-        [...providers].sort().map(p => `<option value="${p}">${p.length > 30 ? p.slice(0, 27) + '...' : p}</option>`).join('');
+        [...providers].sort().map(p => `<option value="${escapeAttr(p)}">${escapeHtml(p.length > 30 ? p.slice(0, 27) + '...' : p)}</option>`).join('');
+      // Restore selected value if still valid
+      if (currentProviderFilter && providers.has(currentProviderFilter)) {
+        providerSelect.value = currentProviderFilter;
+      }
     }
 
     const modelSelect = document.getElementById('analyticsModelFilter');
     if (modelSelect) {
       modelSelect.innerHTML = '<option value="">All Models</option>' +
-        [...models].sort().map(m => `<option value="${m}">${m}</option>`).join('');
+        [...models].sort().map(m => `<option value="${escapeAttr(m)}">${escapeHtml(m)}</option>`).join('');
+      // Restore selected value if still valid
+      if (currentModelFilter && models.has(currentModelFilter)) {
+        modelSelect.value = currentModelFilter;
+      }
     }
 
     renderFailureBreakdown('failuresByProvider', providerFailures, 'No provider failures');
