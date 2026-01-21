@@ -451,7 +451,7 @@ func (b *Bot) handleUserStats(apiKey string) string {
 						}
 						if rule.NextResetTime != "" {
 							if t, err := time.Parse("2006-01-02T15:04:05Z07:00", rule.NextResetTime); err == nil {
-								sb.WriteString(fmt.Sprintf("     • Resets: %s\n", formatRelativeTime(t)))
+								sb.WriteString(fmt.Sprintf("     • Resets: %s\n", formatTimeUntil(t)))
 							}
 						} else if rule.AutoResetInterval != "" && rule.AutoResetInterval != "none" {
 							sb.WriteString(fmt.Sprintf("     • Interval: %s\n", rule.AutoResetInterval))
@@ -469,7 +469,7 @@ func (b *Bot) handleUserStats(apiKey string) string {
 					if limit.AutoResetInterval != "" && limit.AutoResetInterval != "none" {
 						nextReset := cm.GetNextResetTime(apiKey)
 						if !nextReset.IsZero() {
-							sb.WriteString(fmt.Sprintf("   • Resets: %s\n", formatRelativeTime(nextReset)))
+							sb.WriteString(fmt.Sprintf("   • Resets: %s\n", formatTimeUntil(nextReset)))
 						} else {
 							sb.WriteString(fmt.Sprintf("   • Interval: %s\n", limit.AutoResetInterval))
 						}
@@ -590,6 +590,34 @@ func formatRelativeTime(t time.Time) string {
 		return fmt.Sprintf("%dm ago", minutes)
 	}
 	return "Just now"
+}
+
+func formatTimeUntil(t time.Time) string {
+	diff := time.Until(t)
+	if diff <= 0 {
+		return "any moment"
+	}
+	seconds := int(diff.Seconds())
+	minutes := seconds / 60
+	hours := minutes / 60
+	days := hours / 24
+
+	if days > 0 {
+		if hours%24 > 0 {
+			return fmt.Sprintf("in %dd %dh", days, hours%24)
+		}
+		return fmt.Sprintf("in %dd", days)
+	}
+	if hours > 0 {
+		if minutes%60 > 0 {
+			return fmt.Sprintf("in %dh %dm", hours, minutes%60)
+		}
+		return fmt.Sprintf("in %dh", hours)
+	}
+	if minutes > 0 {
+		return fmt.Sprintf("in %dm", minutes)
+	}
+	return "in <1m"
 }
 
 func (b *Bot) handleModels() string {
