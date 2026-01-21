@@ -76,10 +76,10 @@ func NewCalculator() *Calculator {
 	return c
 }
 
-// LoadPricing fetches pricing data from the /model-pricing endpoint.
+// LoadPricing fetches pricing data from the /v0/management/model-pricing endpoint.
 // If the endpoint is unavailable, default pricing is used.
 func (c *Calculator) LoadPricing(baseURL string) error {
-	url := strings.TrimRight(baseURL, "/") + "/model-pricing"
+	url := strings.TrimRight(baseURL, "/") + "/v0/management/model-pricing"
 
 	resp, err := http.Get(url)
 	if err != nil {

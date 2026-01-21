@@ -282,9 +282,14 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 	cost.DefaultCostLimitPlugin().SetManager(s.costManager)
 	// Set cost manager for management API endpoints
 	s.mgmt.SetCostManager(s.costManager)
-	// Load pricing data from /model-pricing endpoint (use defaults if unavailable)
+	// Load pricing data from /v0/management/model-pricing endpoint (use defaults if unavailable)
 	if s.costManager.Calculator() != nil {
-		if err := s.costManager.Calculator().LoadPricing(fmt.Sprintf("http://%s:%d", cfg.Host, cfg.Port)); err != nil {
+		// Use localhost when host is empty (binds to all interfaces)
+		host := cfg.Host
+		if host == "" {
+			host = "127.0.0.1"
+		}
+		if err := s.costManager.Calculator().LoadPricing(fmt.Sprintf("http://%s:%d", host, cfg.Port)); err != nil {
 			log.Debugf("cost calculator: using default pricing (unable to load from endpoint: %v)", err)
 		}
 	}

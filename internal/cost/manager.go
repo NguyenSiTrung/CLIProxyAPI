@@ -677,13 +677,25 @@ func (m *Manager) GetAllLimits() []KeyLimitInfo {
 			}
 			info.QuotaRules = quotaRules
 
-			// For backward compatibility, use first tier's values as the "main" values
-			if len(quotaRules) > 0 {
-				info.MaxCost = quotaRules[0].MaxCost
-				info.CurrentCost = quotaRules[0].CurrentCost
-				info.MaxRequests = quotaRules[0].MaxRequests
-				info.CurrentRequests = quotaRules[0].CurrentRequests
+			// For backward compatibility, aggregate totals from all tiers
+			// Use the first tier with a non-zero value for MaxCost/MaxRequests
+			var aggregatedCost, aggregatedRequests int64
+			var maxCost float64
+			var maxRequests int64
+			for _, rule := range quotaRules {
+				aggregatedCost += int64(rule.CurrentCost * 100) // cents for precision
+				aggregatedRequests += rule.CurrentRequests
+				if maxCost == 0 && rule.MaxCost > 0 {
+					maxCost = rule.MaxCost
+				}
+				if maxRequests == 0 && rule.MaxRequests > 0 {
+					maxRequests = rule.MaxRequests
+				}
 			}
+			info.MaxCost = maxCost
+			info.CurrentCost = float64(aggregatedCost) / 100.0
+			info.MaxRequests = maxRequests
+			info.CurrentRequests = aggregatedRequests
 		} else {
 			// Legacy single-tier mode
 			info.MaxCost = keyLimit.MaxCost
