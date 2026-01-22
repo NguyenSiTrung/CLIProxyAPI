@@ -156,6 +156,15 @@
   margin-top: 24px;
 }
 
+/* Modal size variants */
+.modal.modal-lg {
+  max-width: 700px;
+}
+
+.modal.modal-xl {
+  max-width: 900px;
+}
+
 /* ========== Toggle Switch ========== */
 .toggle {
   position: relative;

@@ -855,6 +855,9 @@ function renderCostLimitsList(data) {
         `;
       }).join('');
 
+      // Prepare quota_rules data as JSON for the onclick handler
+      const quotaRulesJson = JSON.stringify(quota_rules).replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
       row.innerHTML = `
         <td>
           <div class="cost-limit-key">
@@ -870,6 +873,13 @@ function renderCostLimitsList(data) {
         </td>
         <td>
           <div class="cost-limit-actions">
+            <button class="btn btn-xs btn-secondary" onclick="window.keysModule.openMultiTierModalFromData('${escapeJsString(api_key)}', '${quotaRulesJson}')" title="Edit tiers">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+              Edit
+            </button>
             <button class="btn btn-xs btn-warning" onclick="window.keysModule.confirmResetCost('${escapeJsString(api_key)}', '${escapeJsString(maskedKey)}')" title="Reset all tiers">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
                 <polyline points="23 4 23 10 17 10"></polyline>
@@ -1036,6 +1046,346 @@ export async function saveEditLimit(apiKey) {
     });
     closeModal();
     toast('Limit updated successfully', 'success');
+    refreshAllCostData();
+  } catch (e) {
+    toast('Failed: ' + e.message, 'error');
+  }
+}
+
+// Track multi-tier quota rules being edited
+let editingQuotaRules = [];
+let editingApiKey = '';
+
+/**
+ * Open multi-tier modal from serialized JSON data (used in onclick handlers)
+ */
+export function openMultiTierModalFromData(apiKey, quotaRulesJson) {
+  try {
+    const quotaRules = JSON.parse(quotaRulesJson.replace(/&quot;/g, '"'));
+    openMultiTierModal(apiKey, quotaRules);
+  } catch (e) {
+    console.error('Failed to parse quota rules:', e);
+    openMultiTierModal(apiKey, []);
+  }
+}
+
+/**
+ * Open multi-tier quota editor modal
+ */
+export function openMultiTierModal(apiKey, quotaRules = []) {
+  editingApiKey = apiKey;
+  editingQuotaRules = quotaRules.map(rule => ({ ...rule }));
+  
+  const maskedKey = maskApiKey(apiKey);
+  const isNew = quotaRules.length === 0;
+  
+  const content = `
+    <div class="form-group">
+      <label>API Key</label>
+      <div class="key-display">${maskedKey}</div>
+    </div>
+    <div class="quota-mode-selector">
+      <div class="mode-tabs">
+        <button type="button" class="mode-tab ${!isNew && quotaRules.length === 0 ? 'active' : ''}" id="modeSingleTier" onclick="window.keysModule.switchQuotaMode('single')">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+          </svg>
+          Single-tier
+        </button>
+        <button type="button" class="mode-tab ${quotaRules.length > 0 ? 'active' : ''}" id="modeMultiTier" onclick="window.keysModule.switchQuotaMode('multi')">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <line x1="3" y1="9" x2="21" y2="9"/>
+            <line x1="3" y1="15" x2="21" y2="15"/>
+          </svg>
+          Multi-tier
+        </button>
+      </div>
+    </div>
+    
+    <div id="singleTierSection" class="quota-section" style="${quotaRules.length > 0 ? 'display:none;' : ''}">
+      <div class="form-row">
+        <div class="form-group form-group-half">
+          <label>Maximum Cost (USD)</label>
+          <input type="number" id="singleMaxCost" class="form-input" step="0.01" min="0" value="" placeholder="0 = unlimited">
+        </div>
+        <div class="form-group form-group-half">
+          <label>Maximum Requests</label>
+          <input type="number" id="singleMaxRequests" class="form-input" step="1" min="0" value="" placeholder="0 = unlimited">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Auto-Reset Interval</label>
+        <select id="singleAutoReset" class="form-input">
+          <option value="none" selected>None</option>
+          <option value="hourly">Hourly</option>
+          <option value="daily">Daily</option>
+          <option value="weekly">Weekly</option>
+          <option value="monthly">Monthly</option>
+          <option value="1h">Every Hour</option>
+          <option value="5h">Every 5 Hours</option>
+          <option value="12h">Every 12 Hours</option>
+        </select>
+      </div>
+    </div>
+    
+    <div id="multiTierSection" class="quota-section" style="${quotaRules.length === 0 ? 'display:none;' : ''}">
+      <div class="multi-tier-header">
+        <span class="multi-tier-info">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="M12 16v-4"/>
+            <path d="M12 8h.01"/>
+          </svg>
+          Each tier is enforced independently. Request is blocked if ANY tier limit is exceeded.
+        </span>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="window.keysModule.addQuotaTier()">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+          </svg>
+          Add Tier
+        </button>
+      </div>
+      <div id="quotaTiersList" class="quota-tiers-list"></div>
+    </div>`;
+
+  const footer = `
+    <button class="btn btn-secondary" onclick="window.closeModal()">Cancel</button>
+    <button class="btn btn-primary" id="saveQuotaBtn" onclick="window.keysModule.saveQuotaRules()">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+        <polyline points="17 21 17 13 7 13 7 21"/>
+        <polyline points="7 3 7 8 15 8"/>
+      </svg>
+      Save
+    </button>`;
+
+  showModal('Edit Cost Limits', content, footer, 'modal-lg');
+  
+  // Render existing tiers
+  renderQuotaTiers();
+  
+  // If it's a new key with no quota rules, start in single-tier mode
+  if (quotaRules.length === 0) {
+    document.getElementById('modeSingleTier')?.classList.add('active');
+    document.getElementById('modeMultiTier')?.classList.remove('active');
+  }
+}
+
+/**
+ * Switch between single-tier and multi-tier modes
+ */
+export function switchQuotaMode(mode) {
+  const singleSection = document.getElementById('singleTierSection');
+  const multiSection = document.getElementById('multiTierSection');
+  const singleTab = document.getElementById('modeSingleTier');
+  const multiTab = document.getElementById('modeMultiTier');
+  
+  if (mode === 'single') {
+    singleSection.style.display = '';
+    multiSection.style.display = 'none';
+    singleTab?.classList.add('active');
+    multiTab?.classList.remove('active');
+  } else {
+    singleSection.style.display = 'none';
+    multiSection.style.display = '';
+    singleTab?.classList.remove('active');
+    multiTab?.classList.add('active');
+    
+    // If no tiers exist, add a default one
+    if (editingQuotaRules.length === 0) {
+      editingQuotaRules.push({
+        id: 'daily',
+        max_cost: 0,
+        max_requests: 1000,
+        auto_reset_interval: 'daily'
+      });
+      renderQuotaTiers();
+    }
+  }
+}
+
+/**
+ * Render quota tier rows in the editor
+ */
+function renderQuotaTiers() {
+  const container = document.getElementById('quotaTiersList');
+  if (!container) return;
+  
+  if (editingQuotaRules.length === 0) {
+    container.innerHTML = `
+      <div class="quota-tiers-empty">
+        <p>No quota tiers configured. Click "Add Tier" to create one.</p>
+      </div>`;
+    return;
+  }
+  
+  container.innerHTML = editingQuotaRules.map((rule, idx) => `
+    <div class="quota-tier-row" data-index="${idx}">
+      <div class="tier-row-header">
+        <div class="form-group tier-id-group">
+          <label>Tier ID</label>
+          <input type="text" class="form-input tier-id-input" value="${escapeHtml(rule.id || '')}" 
+            placeholder="e.g., daily, burst" onchange="window.keysModule.updateTierId(${idx}, this.value)"
+            ${rule.id && editingQuotaRules.length > 0 ? '' : ''}>
+        </div>
+        <button type="button" class="btn btn-xs btn-danger tier-remove-btn" onclick="window.keysModule.removeQuotaTier(${idx})" title="Remove tier">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="tier-row-content">
+        <div class="form-group">
+          <label>Max Cost ($)</label>
+          <input type="number" class="form-input" step="0.01" min="0" value="${rule.max_cost || ''}" 
+            placeholder="0 = no limit" onchange="window.keysModule.updateTierField(${idx}, 'max_cost', this.value)">
+        </div>
+        <div class="form-group">
+          <label>Max Requests</label>
+          <input type="number" class="form-input" step="1" min="0" value="${rule.max_requests || ''}" 
+            placeholder="0 = no limit" onchange="window.keysModule.updateTierField(${idx}, 'max_requests', this.value)">
+        </div>
+        <div class="form-group">
+          <label>Auto-Reset</label>
+          <select class="form-input" onchange="window.keysModule.updateTierField(${idx}, 'auto_reset_interval', this.value)">
+            <option value="none" ${!rule.auto_reset_interval || rule.auto_reset_interval === 'none' ? 'selected' : ''}>None</option>
+            <option value="hourly" ${rule.auto_reset_interval === 'hourly' ? 'selected' : ''}>Hourly</option>
+            <option value="daily" ${rule.auto_reset_interval === 'daily' ? 'selected' : ''}>Daily</option>
+            <option value="weekly" ${rule.auto_reset_interval === 'weekly' ? 'selected' : ''}>Weekly</option>
+            <option value="monthly" ${rule.auto_reset_interval === 'monthly' ? 'selected' : ''}>Monthly</option>
+            <option value="1h" ${rule.auto_reset_interval === '1h' ? 'selected' : ''}>Every Hour</option>
+            <option value="5h" ${rule.auto_reset_interval === '5h' ? 'selected' : ''}>Every 5 Hours</option>
+            <option value="12h" ${rule.auto_reset_interval === '12h' ? 'selected' : ''}>Every 12 Hours</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+/**
+ * Add a new quota tier
+ */
+export function addQuotaTier() {
+  const existingIds = new Set(editingQuotaRules.map(r => r.id));
+  let newId = 'tier-1';
+  const suggestions = ['burst', 'hourly', 'daily', 'weekly', 'monthly', 'tier-1', 'tier-2', 'tier-3'];
+  for (const suggestion of suggestions) {
+    if (!existingIds.has(suggestion)) {
+      newId = suggestion;
+      break;
+    }
+  }
+  
+  editingQuotaRules.push({
+    id: newId,
+    max_cost: 0,
+    max_requests: 0,
+    auto_reset_interval: 'none'
+  });
+  renderQuotaTiers();
+}
+
+/**
+ * Remove a quota tier
+ */
+export function removeQuotaTier(index) {
+  editingQuotaRules.splice(index, 1);
+  renderQuotaTiers();
+}
+
+/**
+ * Update tier ID
+ */
+export function updateTierId(index, value) {
+  editingQuotaRules[index].id = value.trim();
+}
+
+/**
+ * Update tier field value
+ */
+export function updateTierField(index, field, value) {
+  if (field === 'max_cost') {
+    editingQuotaRules[index].max_cost = parseFloat(value) || 0;
+  } else if (field === 'max_requests') {
+    editingQuotaRules[index].max_requests = parseInt(value, 10) || 0;
+  } else if (field === 'auto_reset_interval') {
+    editingQuotaRules[index].auto_reset_interval = value;
+  }
+}
+
+/**
+ * Save quota rules (single-tier or multi-tier)
+ */
+export async function saveQuotaRules() {
+  const singleSection = document.getElementById('singleTierSection');
+  const isMultiTier = singleSection?.style.display === 'none';
+  
+  try {
+    if (isMultiTier) {
+      // Multi-tier mode: validate and save quota_rules
+      if (editingQuotaRules.length === 0) {
+        toast('Multi-tier mode requires at least one tier. Add a tier or switch to Single-tier mode.', 'error');
+        return;
+      }
+      
+      const rules = editingQuotaRules.map(r => ({
+        id: r.id?.trim() || '',
+        max_cost: r.max_cost || 0,
+        max_requests: r.max_requests || 0,
+        auto_reset_interval: r.auto_reset_interval || 'none'
+      }));
+      
+      // Client-side validation
+      const seenIds = new Set();
+      for (let i = 0; i < rules.length; i++) {
+        const rule = rules[i];
+        if (!rule.id) {
+          toast(`Tier ${i + 1}: ID is required`, 'error');
+          return;
+        }
+        // Reject IDs containing # (used as internal delimiter)
+        if (rule.id.includes('#')) {
+          toast(`Tier "${rule.id}": ID cannot contain '#' character`, 'error');
+          return;
+        }
+        if (seenIds.has(rule.id)) {
+          toast(`Duplicate tier ID: ${rule.id}`, 'error');
+          return;
+        }
+        seenIds.add(rule.id);
+        
+        if (rule.max_cost === 0 && rule.max_requests === 0) {
+          toast(`Tier "${rule.id}": At least one limit must be set`, 'error');
+          return;
+        }
+      }
+      
+      await api('PUT', `/access-key-limits/keys/${encodeURIComponent(editingApiKey)}`, {
+        quota_rules: rules
+      });
+    } else {
+      // Single-tier mode: send quota_rules: [] to explicitly clear any multi-tier config
+      const maxCost = parseFloat(document.getElementById('singleMaxCost')?.value || '0') || 0;
+      const maxRequests = parseInt(document.getElementById('singleMaxRequests')?.value || '0', 10) || 0;
+      const autoResetInterval = normalizeAutoResetInterval(document.getElementById('singleAutoReset')?.value);
+      
+      if (maxCost === 0 && maxRequests === 0 && autoResetInterval === 'none') {
+        toast('Please set at least one limit or auto-reset interval', 'error');
+        return;
+      }
+      
+      await api('PUT', `/access-key-limits/keys/${encodeURIComponent(editingApiKey)}`, {
+        max_cost: maxCost,
+        max_requests: maxRequests,
+        auto_reset_interval: autoResetInterval,
+        quota_rules: [] // Explicitly clear multi-tier rules when switching to single-tier
+      });
+    }
+    
+    closeModal();
+    toast('Quota limits saved successfully', 'success');
     refreshAllCostData();
   } catch (e) {
     toast('Failed: ' + e.message, 'error');
@@ -1271,11 +1621,16 @@ export async function proceedWithLimitSelection() {
 
     const existingLimit = limitsMap[selectedKey];
     if (existingLimit) {
-      // Open edit modal with existing values
-      openEditLimitModal(selectedKey, existingLimit.max_cost);
+      // Check if it's a multi-tier key
+      if (existingLimit.quota_rules && existingLimit.quota_rules.length > 0) {
+        openMultiTierModal(selectedKey, existingLimit.quota_rules);
+      } else {
+        // Open edit modal with existing values (legacy single-tier)
+        openEditLimitModal(selectedKey, existingLimit.max_cost, existingLimit.max_requests || 0, existingLimit.auto_reset_interval || '');
+      }
     } else {
-      // Open add modal for new limit
-      openAddLimitForKeyModal(selectedKey);
+      // Open multi-tier modal for new limit (allows choosing single or multi-tier)
+      openMultiTierModal(selectedKey, []);
     }
   } catch (e) {
     toast('Failed: ' + e.message, 'error');
@@ -1378,6 +1733,14 @@ export const keysModule = {
   hasExistingLimit,
   openEditLimitModal,
   saveEditLimit,
+  openMultiTierModal,
+  openMultiTierModalFromData,
+  switchQuotaMode,
+  addQuotaTier,
+  removeQuotaTier,
+  updateTierId,
+  updateTierField,
+  saveQuotaRules,
   confirmResetCost,
   resetCost,
   confirmDeleteLimit,

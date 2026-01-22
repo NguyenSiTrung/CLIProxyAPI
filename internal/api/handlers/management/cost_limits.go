@@ -1,7 +1,9 @@
 package management
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
@@ -139,7 +141,16 @@ func (h *Handler) PutAccessKeyLimitsCountOnlySuccess(c *gin.Context) {
 	h.persist(c)
 }
 
+// QuotaRuleInput is the input format for quota rules in PUT requests
+type QuotaRuleInput struct {
+	ID                string  `json:"id"`
+	MaxCost           float64 `json:"max_cost"`
+	MaxRequests       int64   `json:"max_requests"`
+	AutoResetInterval string  `json:"auto_reset_interval"`
+}
+
 // PutAccessKeyLimit updates the cost/request limit for a specific API key.
+// Supports both single-tier (legacy) and multi-tier (quota_rules) modes.
 // PUT /v0/management/access-key-limits/keys/:key
 func (h *Handler) PutAccessKeyLimit(c *gin.Context) {
 	if costManager == nil {
@@ -154,17 +165,59 @@ func (h *Handler) PutAccessKeyLimit(c *gin.Context) {
 	}
 
 	var body struct {
-		MaxCost           *float64 `json:"max_cost"`
-		MaxRequests       *int64   `json:"max_requests"`
-		AutoResetInterval *string  `json:"auto_reset_interval"`
+		MaxCost           *float64          `json:"max_cost"`
+		MaxRequests       *int64            `json:"max_requests"`
+		AutoResetInterval *string           `json:"auto_reset_interval"`
+		QuotaRules        *[]QuotaRuleInput `json:"quota_rules"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON body"})
 		return
 	}
 
+	// Check if this is a multi-tier update (quota_rules is present)
+	if body.QuotaRules != nil {
+		rules := *body.QuotaRules
+
+		// If quota_rules is empty AND legacy fields are provided, switch to legacy mode
+		if len(rules) == 0 && (body.MaxCost != nil || body.MaxRequests != nil || body.AutoResetInterval != nil) {
+			// Clear quota_rules and apply legacy fields
+			h.mu.Lock()
+			h.updateAccessKeyQuotaRulesLocked(apiKey, nil) // Clear multi-tier rules
+			h.updateAccessKeyLimitLocked(apiKey, body.MaxCost, body.MaxRequests, body.AutoResetInterval)
+			h.mu.Unlock()
+			h.persist(c)
+			return
+		}
+
+		// Multi-tier mode: validate and apply quota rules
+		if err := validateQuotaRules(rules); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+
+		// Convert to config.QuotaRule format (trim IDs for consistency)
+		configRules := make([]config.QuotaRule, len(rules))
+		for i, r := range rules {
+			configRules[i] = config.QuotaRule{
+				ID:                strings.TrimSpace(r.ID),
+				MaxCost:           r.MaxCost,
+				MaxRequests:       r.MaxRequests,
+				AutoResetInterval: r.AutoResetInterval,
+			}
+		}
+
+		// Lock and update
+		h.mu.Lock()
+		h.updateAccessKeyQuotaRulesLocked(apiKey, configRules)
+		h.mu.Unlock()
+		h.persist(c)
+		return
+	}
+
+	// Legacy single-tier mode
 	if body.MaxCost == nil && body.MaxRequests == nil && body.AutoResetInterval == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "at least one of max_cost, max_requests, or auto_reset_interval is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "at least one of max_cost, max_requests, auto_reset_interval, or quota_rules is required"})
 		return
 	}
 
@@ -183,6 +236,71 @@ func (h *Handler) PutAccessKeyLimit(c *gin.Context) {
 	h.updateAccessKeyLimitLocked(apiKey, body.MaxCost, body.MaxRequests, body.AutoResetInterval)
 	h.mu.Unlock()
 	h.persist(c)
+}
+
+// validateQuotaRules validates the input quota rules
+func validateQuotaRules(rules []QuotaRuleInput) error {
+	if len(rules) == 0 {
+		return nil // Empty rules = switch to legacy mode (clear quota_rules)
+	}
+
+	seenIDs := make(map[string]bool)
+	for i, rule := range rules {
+		// ID is required and must be unique
+		id := strings.TrimSpace(rule.ID)
+		if id == "" {
+			return fmt.Errorf("quota rule %d: id is required", i+1)
+		}
+		// Reject IDs containing the tier key delimiter (#) to avoid accumulator key collisions
+		if strings.Contains(id, "#") {
+			return fmt.Errorf("quota rule '%s': id cannot contain '#' character", id)
+		}
+		if seenIDs[id] {
+			return fmt.Errorf("quota rule %d: duplicate id '%s'", i+1, id)
+		}
+		seenIDs[id] = true
+
+		// Non-negative values
+		if rule.MaxCost < 0 {
+			return fmt.Errorf("quota rule '%s': max_cost cannot be negative", id)
+		}
+		if rule.MaxRequests < 0 {
+			return fmt.Errorf("quota rule '%s': max_requests cannot be negative", id)
+		}
+
+		// At least one limit should be set
+		if rule.MaxCost == 0 && rule.MaxRequests == 0 {
+			return fmt.Errorf("quota rule '%s': at least one of max_cost or max_requests must be set", id)
+		}
+	}
+	return nil
+}
+
+// updateAccessKeyQuotaRulesLocked updates the quota rules for an API key.
+// This replaces all existing rules with the new set.
+// IMPORTANT: Caller must hold h.mu lock.
+func (h *Handler) updateAccessKeyQuotaRulesLocked(apiKey string, rules []config.QuotaRule) {
+	// Find existing key entry
+	for i, keyLimit := range h.cfg.AccessKeyLimits.Keys {
+		if keyLimit.APIKey == apiKey {
+			// Update existing entry: replace quota rules
+			h.cfg.AccessKeyLimits.Keys[i].QuotaRules = rules
+			// When switching to multi-tier, clear legacy fields to avoid confusion
+			if len(rules) > 0 {
+				h.cfg.AccessKeyLimits.Keys[i].MaxCost = 0
+				h.cfg.AccessKeyLimits.Keys[i].MaxRequests = 0
+				h.cfg.AccessKeyLimits.Keys[i].AutoResetInterval = ""
+			}
+			return
+		}
+	}
+
+	// Key not found, create new entry
+	newEntry := config.AccessKeyLimit{
+		APIKey:     apiKey,
+		QuotaRules: rules,
+	}
+	h.cfg.AccessKeyLimits.Keys = append(h.cfg.AccessKeyLimits.Keys, newEntry)
 }
 
 // updateAccessKeyLimitLocked updates the limit configuration in h.cfg for a specific API key.

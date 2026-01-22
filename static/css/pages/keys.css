@@ -968,3 +968,192 @@
     display: none;
   }
 }
+
+/* ================================
+   Multi-tier Quota Editor Styles
+   ================================ */
+
+/* Mode tabs for switching between single-tier and multi-tier */
+.quota-mode-selector {
+  margin-bottom: 20px;
+}
+
+.mode-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 4px;
+  background: rgba(20, 20, 45, 0.6);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  width: fit-content;
+}
+
+.mode-tab {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.mode-tab:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.mode-tab.active {
+  background: rgba(0, 229, 255, 0.1);
+  border-color: rgba(0, 229, 255, 0.3);
+  color: var(--accent-cyan);
+}
+
+.mode-tab svg {
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
+}
+
+.mode-tab.active svg {
+  opacity: 1;
+}
+
+/* Quota section */
+.quota-section {
+  margin-top: 16px;
+}
+
+/* Multi-tier header with info and add button */
+.multi-tier-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  background: rgba(0, 229, 255, 0.05);
+  border: 1px solid rgba(0, 229, 255, 0.15);
+  border-radius: var(--radius-md);
+}
+
+.multi-tier-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.multi-tier-info svg {
+  width: 16px;
+  height: 16px;
+  color: var(--accent-cyan);
+  flex-shrink: 0;
+}
+
+/* Quota tiers list */
+.quota-tiers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.quota-tiers-empty {
+  text-align: center;
+  padding: 32px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  border: 1px dashed var(--border-color);
+  border-radius: var(--radius-md);
+  background: rgba(0, 0, 0, 0.1);
+}
+
+/* Individual tier row */
+.quota-tier-row {
+  background: rgba(20, 20, 45, 0.4);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  transition: all 0.2s ease;
+}
+
+.quota-tier-row:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.tier-row-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.tier-id-group {
+  flex: 1;
+  max-width: 200px;
+  margin-bottom: 0;
+}
+
+.tier-id-input {
+  font-weight: 600;
+  color: var(--accent-cyan);
+}
+
+.tier-remove-btn {
+  flex-shrink: 0;
+  margin-bottom: 4px;
+}
+
+.tier-row-content {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.tier-row-content .form-group {
+  margin-bottom: 0;
+}
+
+.tier-row-content .form-group label {
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.tier-row-content .form-input {
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+/* Responsive adjustments for tier editor */
+@media (max-width: 600px) {
+  .mode-tabs {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .multi-tier-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .tier-row-content {
+    grid-template-columns: 1fr;
+  }
+  
+  .tier-row-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .tier-id-group {
+    max-width: 100%;
+  }
+}

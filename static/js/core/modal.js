@@ -20,17 +20,27 @@ function escapeHtml(str) {
  * @param {string} title - Modal title
  * @param {string} content - Modal body content (HTML)
  * @param {string} footer - Modal footer content (HTML), optional
+ * @param {string} sizeClass - Optional size class (e.g., 'modal-lg', 'modal-xl')
  */
-export function showModal(title, content, footer = '') {
+export function showModal(title, content, footer = '', sizeClass = '') {
   const titleEl = document.getElementById('modalTitle');
   const contentEl = document.getElementById('modalContent');
   const footerEl = document.getElementById('modalFooter');
   const modal = document.getElementById('modal');
+  const modalInner = document.querySelector('#modal .modal');
   
   if (titleEl) titleEl.textContent = title;
   if (contentEl) contentEl.innerHTML = content;
   if (footerEl) footerEl.innerHTML = footer;
   if (modal) modal.classList.add('active');
+  
+  // Handle size classes
+  if (modalInner) {
+    modalInner.classList.remove('modal-lg', 'modal-xl');
+    if (sizeClass) {
+      modalInner.classList.add(sizeClass);
+    }
+  }
 }
 
 /**
@@ -42,8 +52,8 @@ export function closeModal() {
   
   if (modal) modal.classList.remove('active');
   if (modalInner) {
-    // Remove all provider detail modal classes
-    modalInner.classList.remove('provider-detail-modal', 'provider-detail-modal-v2');
+    // Remove all custom modal classes
+    modalInner.classList.remove('provider-detail-modal', 'provider-detail-modal-v2', 'modal-lg', 'modal-xl');
   }
 }
 
