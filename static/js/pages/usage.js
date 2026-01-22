@@ -114,7 +114,7 @@ function getDefaultPricing(modelId) {
 }
 
 // Valid backup types for security
-const VALID_BACKUP_TYPES = ['auto', 'manual', 'import', 'unknown'];
+const VALID_BACKUP_TYPES = ['auto', 'manual', 'import', 'scheduled', 'shutdown', 'unknown'];
 
 function sanitizeBackupType(type) {
   if (typeof type !== 'string') return 'unknown';

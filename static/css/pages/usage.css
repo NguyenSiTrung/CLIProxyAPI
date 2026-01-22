@@ -1353,11 +1353,19 @@
   font-size: 9px;
   font-weight: 500;
   text-transform: uppercase;
+  /* Default style for unknown types */
+  background: rgba(148, 163, 184, 0.15);
+  color: var(--text-secondary);
 }
 
 .auto-backup-file-type.scheduled {
   background: rgba(0, 229, 255, 0.15);
   color: var(--accent-cyan);
+}
+
+.auto-backup-file-type.auto {
+  background: rgba(34, 211, 160, 0.15);
+  color: var(--accent-green);
 }
 
 .auto-backup-file-type.shutdown {
@@ -1368,6 +1376,11 @@
 .auto-backup-file-type.manual {
   background: rgba(168, 85, 247, 0.15);
   color: var(--accent-purple);
+}
+
+.auto-backup-file-type.import {
+  background: rgba(59, 130, 246, 0.15);
+  color: var(--accent-blue);
 }
 
 .auto-backup-file-import {
