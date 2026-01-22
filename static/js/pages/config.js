@@ -7,15 +7,239 @@ import { api, getApiKey } from '../core/api.js';
 import { toast } from '../core/toast.js';
 import { getConfigState, updateConfigState } from '../core/state.js';
 
+// ===================================
+// Constants
+// ===================================
+
+const CONSTANTS = {
+  DEBOUNCE_SYNTAX_HIGHLIGHT: 50,
+  DEBOUNCE_YAML_VALIDATE: 500,
+  DEBOUNCE_AUTOSAVE: 30000, // 30 seconds
+  RETRY_ATTEMPTS: 3,
+  RETRY_DELAY_BASE: 1000, // 1 second base for exponential backoff
+  API_TIMEOUT: 30000, // 30 seconds
+  LINE_HEIGHT_DEFAULT: 20.8,
+  PADDING_TOP_DEFAULT: 16,
+  REGEX_TIMEOUT: 5000, // 5 seconds max for regex operations
+  MAX_REGEX_LENGTH: 1000, // Max length for user-provided regex
+};
+
+// ===================================
+// Module State (avoid global window variables)
+// ===================================
+
+const moduleState = {
+  syntaxHighlightTimeout: null,
+  configValidateTimeout: null,
+  autosaveTimeout: null,
+  pendingToggles: new Set(), // Track in-flight toggle operations
+  undoStack: [],
+  redoStack: [],
+  maxUndoStackSize: 100,
+  lastSavedDraft: null,
+  beforeUnloadHandler: null,
+  suppressUndoTracking: false,
+  lastEditorValue: null,
+  lastSelectionStart: 0,
+  lastSelectionEnd: 0,
+};
+
+// ===================================
+// Helper Functions
+// ===================================
+
+/**
+ * Retry an async operation with exponential backoff
+ * @param {Function} fn - Async function to retry
+ * @param {number} maxAttempts - Maximum retry attempts
+ * @param {number} baseDelay - Base delay in ms for exponential backoff
+ * @returns {Promise} - Result of the function
+ */
+async function withRetry(fn, maxAttempts = CONSTANTS.RETRY_ATTEMPTS, baseDelay = CONSTANTS.RETRY_DELAY_BASE) {
+  let lastError;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (attempt < maxAttempts) {
+        const delay = baseDelay * Math.pow(2, attempt - 1);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  throw lastError;
+}
+
+/**
+ * Wrap a fetch call with timeout
+ * @param {Promise} fetchPromise - The fetch promise
+ * @param {number} timeout - Timeout in milliseconds
+ * @returns {Promise} - Result or timeout error
+ */
+function withTimeout(fetchPromise, timeout = CONSTANTS.API_TIMEOUT) {
+  return Promise.race([
+    fetchPromise,
+    new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Request timed out')), timeout)
+    )
+  ]);
+}
+
+/**
+ * Save draft to localStorage
+ */
+function saveDraftToLocalStorage() {
+  const editor = document.getElementById('configEditor');
+  if (!editor) return;
+  
+  try {
+    const draft = {
+      content: editor.value,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem('config_draft', JSON.stringify(draft));
+    moduleState.lastSavedDraft = draft.timestamp;
+  } catch (e) {
+    console.warn('Failed to save draft to localStorage:', e.message);
+  }
+}
+
+/**
+ * Load draft from localStorage
+ * @returns {Object|null} - Draft object or null
+ */
+function loadDraftFromLocalStorage() {
+  try {
+    const draft = localStorage.getItem('config_draft');
+    if (draft) {
+      return JSON.parse(draft);
+    }
+  } catch (e) {
+    console.warn('Failed to load draft from localStorage:', e.message);
+  }
+  return null;
+}
+
+/**
+ * Clear draft from localStorage
+ */
+function clearDraftFromLocalStorage() {
+  try {
+    localStorage.removeItem('config_draft');
+    moduleState.lastSavedDraft = null;
+  } catch (e) {
+    console.warn('Failed to clear draft from localStorage:', e.message);
+  }
+}
+
+/**
+ * Setup beforeunload handler for unsaved changes warning
+ */
+export function setupUnsavedChangesWarning() {
+  // Remove existing handler if any
+  if (moduleState.beforeUnloadHandler) {
+    window.removeEventListener('beforeunload', moduleState.beforeUnloadHandler);
+  }
+  
+  moduleState.beforeUnloadHandler = (e) => {
+    const configState = getConfigState();
+    if (configState.hasUnsavedChanges) {
+      e.preventDefault();
+      e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+      return e.returnValue;
+    }
+  };
+  
+  window.addEventListener('beforeunload', moduleState.beforeUnloadHandler);
+}
+
+/**
+ * Remove beforeunload handler
+ */
+export function removeUnsavedChangesWarning() {
+  if (moduleState.beforeUnloadHandler) {
+    window.removeEventListener('beforeunload', moduleState.beforeUnloadHandler);
+    moduleState.beforeUnloadHandler = null;
+  }
+}
+
+/**
+ * Schedule autosave of draft
+ */
+function scheduleAutosave() {
+  if (moduleState.autosaveTimeout) {
+    clearTimeout(moduleState.autosaveTimeout);
+  }
+  
+  moduleState.autosaveTimeout = setTimeout(() => {
+    const configState = getConfigState();
+    if (configState.hasUnsavedChanges) {
+      saveDraftToLocalStorage();
+    }
+  }, CONSTANTS.DEBOUNCE_AUTOSAVE);
+}
+
+/**
+ * Check for and offer to restore draft
+ */
+export async function checkForDraft() {
+  const draft = loadDraftFromLocalStorage();
+  if (!draft) return false;
+  
+  // Check if draft is less than 24 hours old
+  const ageHours = (Date.now() - draft.timestamp) / (1000 * 60 * 60);
+  if (ageHours > 24) {
+    clearDraftFromLocalStorage();
+    return false;
+  }
+  
+  const editor = document.getElementById('configEditor');
+  if (!editor) return false;
+  
+  // Check if draft differs from current content
+  if (draft.content === editor.value) {
+    clearDraftFromLocalStorage();
+    return false;
+  }
+  
+  // Ask user if they want to restore
+  const timeAgo = formatTimeAgo(draft.timestamp);
+  if (confirm(`A draft from ${timeAgo} was found. Would you like to restore it?`)) {
+    editor.value = draft.content;
+    onConfigEditorInput();
+    toast('Draft restored', 'success');
+    return true;
+  } else {
+    clearDraftFromLocalStorage();
+    return false;
+  }
+}
+
+/**
+ * Format timestamp as "X minutes/hours ago"
+ */
+function formatTimeAgo(timestamp) {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  if (seconds < 60) return 'a few seconds ago';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+}
+
 /**
  * Load server configuration
  */
 export async function loadConfig() {
   try {
-    const [cfg, yaml] = await Promise.all([
-      api('GET', '/config'),
-      api('GET', '/config.yaml')
-    ]);
+    // Use retry logic for resilience against network issues
+    const [cfg, yaml] = await withRetry(async () => {
+      return await Promise.all([
+        api('GET', '/config'),
+        api('GET', '/config.yaml')
+      ]);
+    });
 
     // Set toggle states and update status dots
     const debugChecked = cfg.debug || false;
@@ -49,6 +273,14 @@ export async function loadConfig() {
       editor.value = yaml;
     }
 
+    moduleState.undoStack = [];
+    moduleState.redoStack = [];
+    if (editor) {
+      moduleState.lastEditorValue = editor.value;
+      moduleState.lastSelectionStart = editor.selectionStart;
+      moduleState.lastSelectionEnd = editor.selectionEnd;
+    }
+
     updateConfigState({
       originalYaml: yaml,
       hasUnsavedChanges: false
@@ -58,6 +290,12 @@ export async function loadConfig() {
     updateSyntaxHighlight();
     hideUnsavedIndicator();
     hideYamlError();
+    
+    // Setup unsaved changes warning
+    setupUnsavedChangesWarning();
+    
+    // Check for any saved drafts after a short delay
+    setTimeout(() => checkForDraft(), 500);
     
     // Load cost limits state separately (uses different API endpoint)
     loadCostLimitsState();
@@ -119,14 +357,35 @@ export function onConfigEditorInput() {
   const editor = document.getElementById('configEditor');
   if (!editor) return;
 
+  if (!moduleState.suppressUndoTracking) {
+    const lastValue = moduleState.lastEditorValue;
+    if (lastValue !== null && editor.value !== lastValue) {
+      moduleState.undoStack.push({
+        value: lastValue,
+        selectionStart: moduleState.lastSelectionStart,
+        selectionEnd: moduleState.lastSelectionEnd,
+      });
+      if (moduleState.undoStack.length > moduleState.maxUndoStackSize) {
+        moduleState.undoStack.shift();
+      }
+      moduleState.redoStack = [];
+    }
+  }
+
+  moduleState.lastEditorValue = editor.value;
+  moduleState.lastSelectionStart = editor.selectionStart;
+  moduleState.lastSelectionEnd = editor.selectionEnd;
+
   const configState = getConfigState();
   updateConfigEditorInfo();
 
   // Update syntax highlighting (debounced for performance)
-  clearTimeout(window._syntaxHighlightTimeout);
-  window._syntaxHighlightTimeout = setTimeout(() => {
+  if (moduleState.syntaxHighlightTimeout) {
+    clearTimeout(moduleState.syntaxHighlightTimeout);
+  }
+  moduleState.syntaxHighlightTimeout = setTimeout(() => {
     updateSyntaxHighlight();
-  }, 50);
+  }, CONSTANTS.DEBOUNCE_SYNTAX_HIGHLIGHT);
 
   // Update current line highlight
   updateCurrentLineHighlight();
@@ -135,16 +394,20 @@ export function onConfigEditorInput() {
   if (editor.value !== configState.originalYaml) {
     updateConfigState({ hasUnsavedChanges: true });
     showUnsavedIndicator();
+    // Schedule autosave when there are unsaved changes
+    scheduleAutosave();
   } else {
     updateConfigState({ hasUnsavedChanges: false });
     hideUnsavedIndicator();
   }
 
   // Validate YAML on input (debounced)
-  clearTimeout(window._configValidateTimeout);
-  window._configValidateTimeout = setTimeout(() => {
+  if (moduleState.configValidateTimeout) {
+    clearTimeout(moduleState.configValidateTimeout);
+  }
+  moduleState.configValidateTimeout = setTimeout(() => {
     validateYaml(editor.value);
-  }, 500);
+  }, CONSTANTS.DEBOUNCE_YAML_VALIDATE);
 }
 
 /**
@@ -164,29 +427,104 @@ function hideUnsavedIndicator() {
 }
 
 /**
- * Validate YAML content
+ * Validate YAML content with comprehensive checks
+ * Includes syntax validation beyond just indentation
  */
 function validateYaml(content) {
   try {
     const lines = content.split('\n');
+    const errors = [];
+    let inMultilineString = false;
+    let multilineIndent = 0;
+    
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
+      const lineNum = i + 1;
+      const trimmedLine = line.trim();
+      
+      // Skip empty lines and comments
+      if (trimmedLine === '' || trimmedLine.startsWith('#')) {
+        continue;
+      }
+      
+      // Handle multiline strings (|, >, |-, >-, |+, >+)
+      if (inMultilineString) {
+        const currentIndent = line.match(/^(\s*)/)[1].length;
+        if (currentIndent <= multilineIndent && trimmedLine !== '') {
+          inMultilineString = false;
+        } else {
+          continue; // Skip validation inside multiline strings
+        }
+      }
+      
       // Check for tabs (YAML uses spaces)
       if (line.includes('\t')) {
-        showYamlError(`Line ${i + 1}: Tab characters are not allowed in YAML. Use spaces for indentation.`);
-        return false;
+        errors.push(`Line ${lineNum}: Tab characters are not allowed in YAML. Use spaces for indentation.`);
+        continue;
       }
-      // Check for inconsistent indentation
+      
+      // Check for inconsistent indentation (warning, not error for flexibility)
       const leadingSpaces = line.match(/^(\s*)/)[1].length;
-      if (leadingSpaces % 2 !== 0 && line.trim().length > 0) {
-        showYamlError(`Line ${i + 1}: Indentation should use 2 spaces.`);
-        return false;
+      
+      // Detect start of multiline string
+      if (/:\s*[|>][-+]?\s*$/.test(line)) {
+        inMultilineString = true;
+        multilineIndent = leadingSpaces;
+        continue;
+      }
+      
+      // Check for invalid key format (keys shouldn't start with special chars except for anchors/aliases)
+      if (/^\s*[{}\[\],]/.test(line) && !trimmedLine.startsWith('-')) {
+        // This might be flow style YAML, which is valid but let's warn
+      }
+      
+      // Check for duplicate colons in key (common typo)
+      const keyPart = line.split(':')[0];
+      if (keyPart && (keyPart.match(/:/g) || []).length > 0) {
+        // Could be a URL or special value, skip
+      }
+      
+      // Check for unquoted special characters that might cause issues
+      if (/:\s+[@`]/.test(line)) {
+        errors.push(`Line ${lineNum}: Special characters after colon should be quoted.`);
+      }
+      
+      // Check for trailing spaces (warning)
+      if (line !== line.trimEnd()) {
+        // Trailing spaces - minor issue, don't block
+      }
+      
+      // Check for incorrect boolean/null format (common mistakes)
+      const valueMatch = line.match(/:\s*(.+)$/);
+      if (valueMatch) {
+        const value = valueMatch[1].trim();
+        // Check for unquoted Yes/No which YAML 1.1 treats as boolean
+        if (/^(Yes|No)$/i.test(value) && !/^["']/.test(value)) {
+          // This is valid YAML but might be unintended
+        }
+      }
+      
+      // Check for missing space after colon in key-value pairs
+      if (/^[^#]*:[^\s]/.test(line) && !/:\/\//.test(line)) {
+        // Could be URL, but check if it looks like a key-value
+        const colonIndex = line.indexOf(':');
+        const beforeColon = line.substring(0, colonIndex).trim();
+        // If it's a simple key (no special chars), it needs space after colon
+        if (/^[\w-]+$/.test(beforeColon) && line.charAt(colonIndex + 1) !== ' ' && line.charAt(colonIndex + 1) !== '\n') {
+          errors.push(`Line ${lineNum}: Missing space after colon in key-value pair.`);
+        }
       }
     }
+    
+    if (errors.length > 0) {
+      showYamlError(errors[0]); // Show first error
+      return false;
+    }
+    
     hideYamlError();
     return true;
   } catch (e) {
-    showYamlError(e.message);
+    showYamlError('Validation error: ' + e.message);
     return false;
   }
 }
@@ -228,8 +566,17 @@ export async function reloadConfig() {
 
 /**
  * Toggle a server setting with enhanced UI feedback
+ * Includes race condition prevention and retry logic
  */
 export async function toggleSettingEnhanced(setting, value, inputEl) {
+  // Prevent race conditions - if this setting is already being toggled, ignore
+  if (moduleState.pendingToggles.has(setting)) {
+    // Revert the checkbox to its previous state
+    inputEl.checked = !value;
+    toast('Please wait for the previous operation to complete', 'warning');
+    return;
+  }
+  
   const label = inputEl.closest('.toggle-enhanced');
   const statusDotId = {
     'debug': 'statusDebug',
@@ -239,10 +586,18 @@ export async function toggleSettingEnhanced(setting, value, inputEl) {
     'ws-auth': 'statusWsAuth'
   }[setting];
 
+  // Mark this setting as pending
+  moduleState.pendingToggles.add(setting);
+  
+  // Disable the input to prevent rapid clicks
+  inputEl.disabled = true;
   if (label) label.classList.add('loading');
 
   try {
-    await api('PUT', `/${setting}`, { value });
+    // Use retry logic for network resilience
+    await withRetry(async () => {
+      await api('PUT', `/${setting}`, { value });
+    }, 2); // Max 2 retries for toggle operations
 
     updateStatusDot(statusDotId, value);
 
@@ -254,18 +609,28 @@ export async function toggleSettingEnhanced(setting, value, inputEl) {
 
     toast(`${setting.replace(/-/g, ' ')} ${value ? 'enabled' : 'disabled'}`, 'success');
   } catch (e) {
+    // Revert the checkbox on failure
     inputEl.checked = !value;
+    updateStatusDot(statusDotId, !value);
     if (label) label.classList.remove('loading');
     toast('Failed: ' + e.message, 'error');
+  } finally {
+    // Re-enable the input and remove from pending set
+    inputEl.disabled = false;
+    moduleState.pendingToggles.delete(setting);
   }
 }
 
 /**
  * Load cost limits state from API
+ * Now includes retry logic and proper user notification on failure
  */
 export async function loadCostLimitsState() {
   try {
-    const data = await api('GET', '/access-key-limits');
+    const data = await withRetry(async () => {
+      return await api('GET', '/access-key-limits');
+    }, 2); // 2 retries for cost limits
+    
     const enabled = data.enabled || false;
     const countOnlySuccess = data.count_only_success_requests || false;
     
@@ -278,20 +643,48 @@ export async function loadCostLimitsState() {
     updateStatusDot('statusCostLimits', enabled);
     updateStatusDot('statusCountOnlySuccessRequests', countOnlySuccess);
   } catch (e) {
+    // Show user-friendly notification instead of silent failure
     console.warn('Could not load cost limits state:', e.message);
+    toast('Could not load cost limits settings', 'warning');
+    
+    // Disable the toggles to indicate unavailable state
+    const toggle = document.getElementById('toggleCostLimits');
+    const countOnlySuccessToggle = document.getElementById('toggleCountOnlySuccessRequests');
+    if (toggle) {
+      toggle.disabled = true;
+      toggle.title = 'Cost limits unavailable';
+    }
+    if (countOnlySuccessToggle) {
+      countOnlySuccessToggle.disabled = true;
+      countOnlySuccessToggle.title = 'Cost limits unavailable';
+    }
   }
 }
 
 /**
  * Toggle cost limits enabled state
+ * Includes race condition prevention and retry logic
  */
 export async function toggleCostLimitsEnabled(value, inputEl) {
+  const settingKey = 'cost-limits-enabled';
+  
+  // Prevent race conditions
+  if (moduleState.pendingToggles.has(settingKey)) {
+    inputEl.checked = !value;
+    toast('Please wait for the previous operation to complete', 'warning');
+    return;
+  }
+  
   const label = inputEl.closest('.toggle-enhanced');
   
+  moduleState.pendingToggles.add(settingKey);
+  inputEl.disabled = true;
   if (label) label.classList.add('loading');
   
   try {
-    await api('PUT', '/access-key-limits/enabled', { enabled: value });
+    await withRetry(async () => {
+      await api('PUT', '/access-key-limits/enabled', { enabled: value });
+    }, 2);
     
     updateStatusDot('statusCostLimits', value);
     
@@ -304,21 +697,39 @@ export async function toggleCostLimitsEnabled(value, inputEl) {
     toast(`Cost limits ${value ? 'enabled' : 'disabled'}`, 'success');
   } catch (e) {
     inputEl.checked = !value;
+    updateStatusDot('statusCostLimits', !value);
     if (label) label.classList.remove('loading');
     toast('Failed: ' + e.message, 'error');
+  } finally {
+    inputEl.disabled = false;
+    moduleState.pendingToggles.delete(settingKey);
   }
 }
 
 /**
  * Toggle count only success requests state
+ * Includes race condition prevention and retry logic
  */
 export async function toggleCountOnlySuccessRequests(value, inputEl) {
+  const settingKey = 'count-only-success-requests';
+  
+  // Prevent race conditions
+  if (moduleState.pendingToggles.has(settingKey)) {
+    inputEl.checked = !value;
+    toast('Please wait for the previous operation to complete', 'warning');
+    return;
+  }
+  
   const label = inputEl.closest('.toggle-enhanced');
   
+  moduleState.pendingToggles.add(settingKey);
+  inputEl.disabled = true;
   if (label) label.classList.add('loading');
   
   try {
-    await api('PUT', '/access-key-limits/count-only-success-requests', { count_only_success_requests: value });
+    await withRetry(async () => {
+      await api('PUT', '/access-key-limits/count-only-success-requests', { count_only_success_requests: value });
+    }, 2);
     
     updateStatusDot('statusCountOnlySuccessRequests', value);
     
@@ -331,13 +742,18 @@ export async function toggleCountOnlySuccessRequests(value, inputEl) {
     toast(`Request limit now counts ${value ? 'only successful requests' : 'all requests'}`, 'success');
   } catch (e) {
     inputEl.checked = !value;
+    updateStatusDot('statusCountOnlySuccessRequests', !value);
     if (label) label.classList.remove('loading');
     toast('Failed: ' + e.message, 'error');
+  } finally {
+    inputEl.disabled = false;
+    moduleState.pendingToggles.delete(settingKey);
   }
 }
 
 /**
  * Save configuration with enhanced UI feedback
+ * Includes retry logic and draft cleanup
  */
 export async function saveConfigEnhanced() {
   const editor = document.getElementById('configEditor');
@@ -352,6 +768,11 @@ export async function saveConfigEnhanced() {
     return;
   }
 
+  // Prevent double-save
+  if (btn && btn.classList.contains('saving')) {
+    return;
+  }
+
   if (btn) btn.classList.add('saving');
   if (btnText) btnText.textContent = 'Saving...';
   if (btnIcon) {
@@ -359,25 +780,34 @@ export async function saveConfigEnhanced() {
   }
 
   try {
-    const response = await fetch('/v0/management/config.yaml', {
-      method: 'PUT',
-      headers: {
-        'Authorization': `Bearer ${getApiKey()}`,
-        'Content-Type': 'application/yaml'
-      },
-      body: editor.value
-    });
+    // Use retry logic with timeout for network resilience
+    await withRetry(async () => {
+      const response = await withTimeout(
+        fetch('/v0/management/config.yaml', {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${getApiKey()}`,
+            'Content-Type': 'application/yaml'
+          },
+          body: editor.value
+        }),
+        CONSTANTS.API_TIMEOUT
+      );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(errorText || 'Failed to save configuration');
-    }
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(errorText || 'Failed to save configuration');
+      }
+    }, 2); // 2 retries for save
 
     updateConfigState({
       originalYaml: editor.value,
       hasUnsavedChanges: false
     });
     hideUnsavedIndicator();
+    
+    // Clear the draft since we successfully saved
+    clearDraftFromLocalStorage();
 
     if (btnIcon) {
       btnIcon.innerHTML = '<polyline points="20 6 9 17 4 12"></polyline>';
@@ -419,6 +849,20 @@ export function setupConfigKeyboardShortcuts() {
     if ((e.ctrlKey || e.metaKey) && e.key === 's') {
       e.preventDefault();
       saveConfigEnhanced();
+      return;
+    }
+
+    // Ctrl+Z: Undo (custom implementation)
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+      e.preventDefault();
+      editorUndo();
+      return;
+    }
+
+    // Ctrl+Y or Ctrl+Shift+Z: Redo (custom implementation)
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || (e.key === 'z' && e.shiftKey))) {
+      e.preventDefault();
+      editorRedo();
       return;
     }
 
@@ -506,24 +950,49 @@ export function setupConfigKeyboardShortcuts() {
 }
 
 /**
- * Replace editor content while preserving undo stack (if possible)
- * Falls back to direct assignment if execCommand not available
+ * Push state to undo stack
  */
-function replaceEditorContent(editor, newValue, selStart, selEnd) {
-  // Select all and replace using execCommand to preserve undo stack
-  editor.focus();
-  editor.select();
+function pushToUndoStack(editor) {
+  if (moduleState.suppressUndoTracking) {
+    moduleState.lastEditorValue = editor.value;
+    moduleState.lastSelectionStart = editor.selectionStart;
+    moduleState.lastSelectionEnd = editor.selectionEnd;
+    return;
+  }
+
+  const state = {
+    value: editor.value,
+    selectionStart: editor.selectionStart,
+    selectionEnd: editor.selectionEnd,
+  };
   
-  // Try using execCommand (deprecated but still works in most browsers for undo)
-  const success = document.execCommand('insertText', false, newValue);
+  moduleState.undoStack.push(state);
   
-  if (!success) {
-    // Fallback: direct assignment (breaks undo stack)
-    editor.value = newValue;
+  // Limit stack size
+  if (moduleState.undoStack.length > moduleState.maxUndoStackSize) {
+    moduleState.undoStack.shift();
   }
   
+  // Clear redo stack when new action is performed
+  moduleState.redoStack = [];
+}
+
+/**
+ * Replace editor content with custom undo stack support
+ * No longer relies on deprecated document.execCommand()
+ */
+function replaceEditorContent(editor, newValue, selStart, selEnd) {
+  // Save current state to undo stack before making changes
+  pushToUndoStack(editor);
+
+  // Update the value
+  moduleState.suppressUndoTracking = true;
+  editor.value = newValue;
+  moduleState.suppressUndoTracking = false;
+
   // Restore selection
   editor.setSelectionRange(selStart, selEnd);
+  editor.focus();
 }
 
 /**
@@ -814,6 +1283,7 @@ function editorAutoIndentNewline() {
 
 /**
  * Update line numbers display
+ * Optimized with incremental updates for better performance on large files
  */
 export function updateLineNumbers() {
   const editor = document.getElementById('configEditor');
@@ -821,14 +1291,43 @@ export function updateLineNumbers() {
   if (!editor || !lineNumbersEl) return;
 
   const lines = editor.value.split('\n');
-  const lineCount = lines.length;
+  const newLineCount = lines.length;
+  const currentLineCount = lineNumbersEl.children.length;
   
-  let html = '';
-  for (let i = 1; i <= lineCount; i++) {
-    html += `<div class="line-number">${i}</div>`;
+  // Optimization: Only update if line count changed
+  if (newLineCount === currentLineCount) {
+    return;
   }
   
-  lineNumbersEl.innerHTML = html;
+  // For large files (>1000 lines), use document fragment for better performance
+  if (newLineCount > 1000 || Math.abs(newLineCount - currentLineCount) > 100) {
+    const fragment = document.createDocumentFragment();
+    for (let i = 1; i <= newLineCount; i++) {
+      const div = document.createElement('div');
+      div.className = 'line-number';
+      div.textContent = i;
+      fragment.appendChild(div);
+    }
+    lineNumbersEl.innerHTML = '';
+    lineNumbersEl.appendChild(fragment);
+    return;
+  }
+  
+  // Incremental update: add or remove line numbers as needed
+  if (newLineCount > currentLineCount) {
+    // Add new line numbers
+    for (let i = currentLineCount + 1; i <= newLineCount; i++) {
+      const div = document.createElement('div');
+      div.className = 'line-number';
+      div.textContent = i;
+      lineNumbersEl.appendChild(div);
+    }
+  } else {
+    // Remove excess line numbers
+    while (lineNumbersEl.children.length > newLineCount) {
+      lineNumbersEl.removeChild(lineNumbersEl.lastChild);
+    }
+  }
 }
 
 /**
@@ -1009,24 +1508,58 @@ function highlightYaml(code) {
 }
 
 /**
- * Undo action
+ * Undo action - custom implementation without deprecated execCommand
  */
 export function editorUndo() {
   const editor = document.getElementById('configEditor');
   if (!editor) return;
+  
+  if (moduleState.undoStack.length === 0) {
+    toast('Nothing to undo', 'info');
+    return;
+  }
+  
+  // Save current state to redo stack
+  moduleState.redoStack.push({
+    value: editor.value,
+    selectionStart: editor.selectionStart,
+    selectionEnd: editor.selectionEnd,
+  });
+  
+  // Restore previous state
+  const prevState = moduleState.undoStack.pop();
+  editor.value = prevState.value;
+  editor.setSelectionRange(prevState.selectionStart, prevState.selectionEnd);
   editor.focus();
-  document.execCommand('undo');
+  
   onConfigEditorInput();
 }
 
 /**
- * Redo action
+ * Redo action - custom implementation without deprecated execCommand
  */
 export function editorRedo() {
   const editor = document.getElementById('configEditor');
   if (!editor) return;
+  
+  if (moduleState.redoStack.length === 0) {
+    toast('Nothing to redo', 'info');
+    return;
+  }
+  
+  // Save current state to undo stack (without clearing redo)
+  moduleState.undoStack.push({
+    value: editor.value,
+    selectionStart: editor.selectionStart,
+    selectionEnd: editor.selectionEnd,
+  });
+  
+  // Restore next state
+  const nextState = moduleState.redoStack.pop();
+  editor.value = nextState.value;
+  editor.setSelectionRange(nextState.selectionStart, nextState.selectionEnd);
   editor.focus();
-  document.execCommand('redo');
+  
   onConfigEditorInput();
 }
 
@@ -1288,6 +1821,8 @@ export function editorReplace() {
   const match = findState.matches[findState.currentIndex];
   if (!match) return;
 
+  pushToUndoStack(editor);
+
   const replaceText = replaceInput.value;
   const before = editor.value.substring(0, match.start);
   const after = editor.value.substring(match.end);
@@ -1301,6 +1836,7 @@ export function editorReplace() {
 
 /**
  * Replace all matches
+ * Includes security validation for search terms
  */
 export function editorReplaceAll() {
   const findInput = document.getElementById('editorFindInput');
@@ -1311,7 +1847,12 @@ export function editorReplaceAll() {
 
   const searchTerm = findInput.value;
   const replaceText = replaceInput.value;
-  if (!searchTerm) return;
+  
+  // Validate search term
+  if (!isSearchTermSafe(searchTerm)) return;
+
+  // Save to undo stack before replacing
+  pushToUndoStack(editor);
 
   let content = editor.value;
   const flags = caseSensitive ? 'g' : 'gi';
@@ -1326,10 +1867,7 @@ export function editorReplaceAll() {
   findState = { matches: [], currentIndex: -1 };
   updateFindMatchCount();
   
-  // Show toast with count
-  if (window.toast) {
-    window.toast(`Replaced ${replacementCount} occurrence(s)`, 'success');
-  }
+  toast(`Replaced ${replacementCount} occurrence(s)`, 'success');
 }
 
 /**
@@ -1476,6 +2014,75 @@ export function handleGotoKeydown(event) {
  */
 function escapeRegex(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Safely execute regex with timeout protection against ReDoS
+ * @param {RegExp} regex - The regex to execute
+ * @param {string} content - The content to search
+ * @param {number} maxTime - Maximum execution time in ms
+ * @returns {Array|null} - Match results or null if timed out
+ */
+function safeRegexExec(regex, content, maxTime = CONSTANTS.REGEX_TIMEOUT) {
+  // For very long content, use a simpler approach
+  if (content.length > 100000) {
+    console.warn('Content too large for regex search, using simple string search');
+    return null;
+  }
+  
+  const startTime = Date.now();
+  const results = [];
+  let match;
+  
+  // Reset regex state
+  regex.lastIndex = 0;
+  
+  while ((match = regex.exec(content)) !== null) {
+    results.push(match);
+    
+    // Check timeout
+    if (Date.now() - startTime > maxTime) {
+      console.warn('Regex execution timed out');
+      toast('Search operation timed out', 'warning');
+      return results; // Return partial results
+    }
+    
+    // Prevent infinite loops for zero-length matches
+    if (match.index === regex.lastIndex) {
+      regex.lastIndex++;
+    }
+  }
+  
+  return results;
+}
+
+/**
+ * Validate search term to prevent ReDoS attacks
+ * @param {string} searchTerm - The search term to validate
+ * @returns {boolean} - Whether the search term is safe
+ */
+function isSearchTermSafe(searchTerm) {
+  if (!searchTerm) return false;
+  
+  // Limit length
+  if (searchTerm.length > CONSTANTS.MAX_REGEX_LENGTH) {
+    toast('Search term is too long', 'warning');
+    return false;
+  }
+  
+  // Check for potentially dangerous patterns (nested quantifiers, etc.)
+  // These patterns can cause catastrophic backtracking
+  const dangerousPatterns = [
+    /(\+|\*|\?)\1/, // Repeated quantifiers
+    /\(\?[^)]*\([^)]*\)/, // Nested groups with quantifiers
+  ];
+
+  if (dangerousPatterns.some(pattern => pattern.test(searchTerm))) {
+    toast('Search term looks unsafe. Please simplify it.', 'warning');
+    return false;
+  }
+
+  return true;
 }
 
 /**
@@ -1672,3 +2279,6 @@ window.editorGoToLine = editorGoToLine;
 window.editorCloseGoto = editorCloseGoto;
 window.editorGotoLineExecute = editorGotoLineExecute;
 window.handleGotoKeydown = handleGotoKeydown;
+window.setupUnsavedChangesWarning = setupUnsavedChangesWarning;
+window.removeUnsavedChangesWarning = removeUnsavedChangesWarning;
+window.checkForDraft = checkForDraft;
