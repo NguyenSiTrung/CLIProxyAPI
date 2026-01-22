@@ -97,8 +97,11 @@
       <div id="page-dashboard" class="page active">
         <div class="page-header">
           <div class="dashboard-welcome">
-            <h1 class="page-title">Dashboard</h1>
-            <p class="page-subtitle">Server overview and quick actions</p>
+            <h1 class="page-title">
+              <span id="dashboardGreeting">Welcome back</span>
+              <span class="greeting-emoji" id="greetingEmoji">👋</span>
+            </h1>
+            <p class="page-subtitle" id="dashboardSubtitle">Here's your server overview</p>
           </div>
           <div class="dashboard-header-controls">
             <div class="dashboard-last-updated" id="dashboardLastUpdated">
@@ -108,6 +111,31 @@
               </svg>
               <span id="dashboardUpdateTime">Not yet updated</span>
             </div>
+            <!-- Theme Toggle -->
+            <button class="theme-toggle-btn" id="themeToggleBtn" onclick="toggleTheme()" title="Toggle theme">
+              <svg class="theme-icon-light" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="5"></circle>
+                <line x1="12" y1="1" x2="12" y2="3"></line>
+                <line x1="12" y1="21" x2="12" y2="23"></line>
+                <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+                <line x1="1" y1="12" x2="3" y2="12"></line>
+                <line x1="21" y1="12" x2="23" y2="12"></line>
+                <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+              </svg>
+              <svg class="theme-icon-dark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+              </svg>
+            </button>
+            <!-- Notification Bell -->
+            <button class="notification-bell" id="notificationBell" onclick="toggleNotifications()" title="Notifications">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+              </svg>
+              <span class="notification-badge" id="notificationBadge">0</span>
+            </button>
             <div class="health-indicator" id="healthIndicator" role="status" aria-live="polite" aria-label="Server status: Online">
               <div class="health-pulse" aria-hidden="true"></div>
               <span class="health-text">Online</span>
@@ -124,9 +152,10 @@
               </svg>
             </div>
             <div class="stat-content">
-              <div class="stat-value" id="statModels" aria-live="polite">-</div>
+              <div class="stat-value" id="statModels" aria-live="polite" data-value="0">-</div>
               <div class="stat-label" id="statModelsLabel">Available Models</div>
             </div>
+            <div class="stat-sparkline" id="sparklineModels"></div>
           </div>
           <div class="stat-card purple" role="article" aria-labelledby="statAuthFilesLabel">
             <div class="stat-icon" aria-hidden="true">
@@ -136,9 +165,10 @@
               </svg>
             </div>
             <div class="stat-content">
-              <div class="stat-value" id="statAuthFiles" aria-live="polite">-</div>
+              <div class="stat-value" id="statAuthFiles" aria-live="polite" data-value="0">-</div>
               <div class="stat-label" id="statAuthFilesLabel">Auth Files</div>
             </div>
+            <div class="stat-sparkline" id="sparklineAuth"></div>
           </div>
           <div class="stat-card green" role="article" aria-labelledby="statRequestsLabel">
             <div class="stat-icon" aria-hidden="true">
@@ -147,9 +177,17 @@
               </svg>
             </div>
             <div class="stat-content">
-              <div class="stat-value" id="statRequests" aria-live="polite">-</div>
+              <div class="stat-value" id="statRequests" aria-live="polite" data-value="0">-</div>
               <div class="stat-label" id="statRequestsLabel">Total Requests</div>
+              <div class="stat-trend up" id="statRequestsTrend">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                  <polyline points="17 6 23 6 23 12"></polyline>
+                </svg>
+                <span id="statRequestsTrendValue">+0%</span>
+              </div>
             </div>
+            <div class="stat-sparkline" id="sparklineRequests"></div>
           </div>
           <div class="stat-card yellow" role="article" aria-labelledby="statSuccessLabel">
             <div class="stat-icon" aria-hidden="true">
@@ -159,66 +197,82 @@
               </svg>
             </div>
             <div class="stat-content">
-              <div class="stat-value" id="statSuccess" aria-live="polite">-</div>
+              <div class="stat-value" id="statSuccess" aria-live="polite" data-value="0">-</div>
               <div class="stat-label" id="statSuccessLabel">Success Rate</div>
+              <div class="stat-trend up" id="statSuccessTrend">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                  <polyline points="17 6 23 6 23 12"></polyline>
+                </svg>
+                <span id="statSuccessTrendValue">Stable</span>
+              </div>
             </div>
+            <div class="stat-sparkline" id="sparklineSuccess"></div>
           </div>
         </div>
-        <div class="card">
-          <div class="card-header">
-            <h3 class="card-title">Quick Actions</h3>
-          </div>
-          <div class="quick-actions-grid" role="group" aria-label="Quick actions">
-            <button class="quick-action-btn" onclick="navigateTo('models')" data-tooltip="Browse all available AI models">
-              <div class="quick-action-icon cyan" aria-hidden="true">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                  <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
-                  <line x1="12" y1="22.08" x2="12" y2="12"></line>
-                </svg>
-              </div>
-              <span>View Models</span>
-            </button>
-            <button class="quick-action-btn" onclick="navigateTo('auth')" data-tooltip="Manage OAuth and auth files">
-              <div class="quick-action-icon purple">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                </svg>
-              </div>
-              <span>Add Auth</span>
-            </button>
-            <button class="quick-action-btn" onclick="navigateTo('usage')" data-tooltip="View detailed usage statistics">
-              <div class="quick-action-icon green">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <line x1="18" y1="20" x2="18" y2="10"></line>
-                  <line x1="12" y1="20" x2="12" y2="4"></line>
-                  <line x1="6" y1="20" x2="6" y2="14"></line>
-                </svg>
-              </div>
-              <span>View Usage</span>
-            </button>
-            <button class="quick-action-btn" onclick="navigateTo('logs')" data-tooltip="Check recent request logs">
-              <div class="quick-action-icon yellow">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                  <polyline points="14 2 14 8 20 8"></polyline>
-                  <line x1="16" y1="13" x2="8" y2="13"></line>
-                  <line x1="16" y1="17" x2="8" y2="17"></line>
-                  <polyline points="10 9 9 9 8 9"></polyline>
-                </svg>
-              </div>
-              <span>View Logs</span>
-            </button>
-            <button class="quick-action-btn" onclick="navigateTo('keys')" data-tooltip="Manage API access keys">
-              <div class="quick-action-icon blue">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
-                </svg>
-              </div>
-              <span>API Keys</span>
-            </button>
-            <button class="quick-action-btn" onclick="navigateTo('config')" data-tooltip="Configure server settings">
+        <!-- Two Column Layout for Quick Actions and Recent Activity -->
+        <div class="dashboard-two-column">
+          <div class="card">
+            <div class="card-header">
+              <h3 class="card-title">Quick Actions</h3>
+              <span class="keyboard-hint">Press key to navigate</span>
+            </div>
+            <div class="quick-actions-grid" role="group" aria-label="Quick actions">
+              <button class="quick-action-btn" onclick="navigateTo('models')" data-tooltip="Browse all available AI models" data-shortcut="M">
+                <div class="quick-action-icon cyan" aria-hidden="true">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                    <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                  </svg>
+                </div>
+                <span>View Models</span>
+                <kbd class="shortcut-key">M</kbd>
+              </button>
+              <button class="quick-action-btn" onclick="navigateTo('auth')" data-tooltip="Manage OAuth and auth files" data-shortcut="A">
+                <div class="quick-action-icon purple">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                  </svg>
+                </div>
+                <span>Add Auth</span>
+                <kbd class="shortcut-key">A</kbd>
+              </button>
+              <button class="quick-action-btn" onclick="navigateTo('usage')" data-tooltip="View detailed usage statistics" data-shortcut="U">
+                <div class="quick-action-icon green">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="20" x2="18" y2="10"></line>
+                    <line x1="12" y1="20" x2="12" y2="4"></line>
+                    <line x1="6" y1="20" x2="6" y2="14"></line>
+                  </svg>
+                </div>
+                <span>View Usage</span>
+                <kbd class="shortcut-key">U</kbd>
+              </button>
+              <button class="quick-action-btn" onclick="navigateTo('logs')" data-tooltip="Check recent request logs" data-shortcut="L">
+                <div class="quick-action-icon yellow">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                    <polyline points="10 9 9 9 8 9"></polyline>
+                  </svg>
+                </div>
+                <span>View Logs</span>
+                <kbd class="shortcut-key">L</kbd>
+              </button>
+              <button class="quick-action-btn" onclick="navigateTo('keys')" data-tooltip="Manage API access keys" data-shortcut="K">
+                <div class="quick-action-icon blue">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+                  </svg>
+                </div>
+                <span>API Keys</span>
+                <kbd class="shortcut-key">K</kbd>
+              </button>
+              <button class="quick-action-btn" onclick="navigateTo('config')" data-tooltip="Configure server settings" data-shortcut="S">
               <div class="quick-action-icon red">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <circle cx="12" cy="12" r="3"></circle>
@@ -226,10 +280,156 @@
                 </svg>
               </div>
               <span>Settings</span>
-            </button>
+                <kbd class="shortcut-key">S</kbd>
+              </button>
+            </div>
+          </div>
+          <!-- Recent Activity Card -->
+          <div class="card recent-activity-card">
+            <div class="card-header">
+              <h3 class="card-title">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;margin-right:8px;">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                Recent Activity
+              </h3>
+            </div>
+            <div class="activity-timeline" id="activityTimeline">
+              <div class="activity-item">
+                <div class="activity-icon cyan">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                  </svg>
+                </div>
+                <div class="activity-content">
+                  <p class="activity-text">Loading activity...</p>
+                  <span class="activity-time">--</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
-        <div class="card server-status-card">
+        <!-- Getting Started Checklist -->
+        <div class="card getting-started-card" id="gettingStartedCard">
+          <div class="card-header">
+            <h3 class="card-title">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;margin-right:8px;">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+              Getting Started
+            </h3>
+            <button class="btn btn-ghost btn-sm" onclick="dismissGettingStarted()" title="Dismiss">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+              </svg>
+            </button>
+          </div>
+          <div class="checklist-progress">
+            <div class="progress-bar">
+              <div class="progress-fill" id="checklistProgress" style="width: 25%"></div>
+            </div>
+            <span class="progress-text" id="checklistProgressText">1 of 4 complete</span>
+          </div>
+          <div class="checklist-items" id="checklistItems">
+            <div class="checklist-item completed" data-step="server">
+              <div class="checklist-check">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
+              <div class="checklist-content">
+                <h4>Server Running</h4>
+                <p>Your CLI Proxy server is online</p>
+              </div>
+            </div>
+            <div class="checklist-item" data-step="auth" onclick="navigateTo('auth')">
+              <div class="checklist-check">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
+              <div class="checklist-content">
+                <h4>Add Authentication</h4>
+                <p>Connect OAuth or upload auth files</p>
+              </div>
+            </div>
+            <div class="checklist-item" data-step="model" onclick="navigateTo('models')">
+              <div class="checklist-check">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
+              <div class="checklist-content">
+                <h4>Configure Models</h4>
+                <p>Set up your first AI model</p>
+              </div>
+            </div>
+            <div class="checklist-item" data-step="request">
+              <div class="checklist-check">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
+              <div class="checklist-content">
+                <h4>Make First Request</h4>
+                <p>Send your first API request</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- System Health Panel -->
+        <div class="card system-health-card">
+          <div class="card-header">
+            <h3 class="card-title">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;margin-right:8px;">
+                <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+              </svg>
+              System Health
+            </h3>
+          </div>
+          <div class="health-metrics-grid">
+            <div class="health-metric">
+              <div class="metric-header">
+                <span class="metric-label">Response Time</span>
+                <span class="metric-value" id="metricResponseTime">-- ms</span>
+              </div>
+              <div class="metric-bar">
+                <div class="metric-fill green" id="metricResponseTimeFill" style="width: 0%"></div>
+              </div>
+            </div>
+            <div class="health-metric">
+              <div class="metric-header">
+                <span class="metric-label">Active Connections</span>
+                <span class="metric-value" id="metricConnections">0</span>
+              </div>
+              <div class="metric-bar">
+                <div class="metric-fill cyan" id="metricConnectionsFill" style="width: 0%"></div>
+              </div>
+            </div>
+            <div class="health-metric">
+              <div class="metric-header">
+                <span class="metric-label">Error Rate</span>
+                <span class="metric-value" id="metricErrorRate">0%</span>
+              </div>
+              <div class="metric-bar">
+                <div class="metric-fill yellow" id="metricErrorRateFill" style="width: 0%"></div>
+              </div>
+            </div>
+            <div class="health-metric">
+              <div class="metric-header">
+                <span class="metric-label">Cache Hit Rate</span>
+                <span class="metric-value" id="metricCacheHit">--%</span>
+              </div>
+              <div class="metric-bar">
+                <div class="metric-fill purple" id="metricCacheHitFill" style="width: 0%"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card server-status-card glassmorphism">
           <div class="card-header">
             <h3 class="card-title">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;margin-right:8px;">

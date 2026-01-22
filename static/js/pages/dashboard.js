@@ -1,6 +1,7 @@
 /**
  * Dashboard Page Module
  * Handles dashboard loading, server info display, uptime tracking, and version checking
+ * Enhanced with: time-based greetings, animated counters, keyboard shortcuts, activity timeline
  */
 
 import { api, apiFetch, getApiKey } from '../core/api.js';
@@ -23,6 +24,11 @@ let fetchModelsFunc = null;
 let uptimeIntervalId = null;
 let autoRefreshIntervalId = null;
 let visibilityHandler = null;
+let keyboardShortcutHandler = null;
+let previousStats = { requests: 0, authFiles: 0, models: 0 };
+
+// Activity log for recent activity timeline
+let activityLog = [];
 
 /**
  * Set the fetchModels function reference (called from main app initialization)
@@ -77,14 +83,31 @@ export async function loadDashboard() {
     // Fetch usage
     const usage = await api('GET', '/usage').catch(() => ({ usage: {} }));
 
-    // Remove loading state and update values
+    // Remove loading state and update values with animations
     statCards.forEach(card => card.classList.remove('loading'));
 
-    document.getElementById('statRequests').textContent = (usage.usage?.total_requests || 0).toLocaleString();
-    const total = usage.usage?.total_requests || 0;
+    const totalRequests = usage.usage?.total_requests || 0;
     const failed = usage.usage?.failed_requests || usage.failed_requests || 0;
-    const successRate = total > 0 ? ((total - failed) / total * 100).toFixed(1) : '-';
-    document.getElementById('statSuccess').textContent = successRate === '-' ? '-' : successRate + '%';
+    const successRate = totalRequests > 0 ? ((totalRequests - failed) / totalRequests * 100).toFixed(1) : '-';
+    
+    // Animate request counter
+    const requestsEl = document.getElementById('statRequests');
+    if (requestsEl) {
+      animateCounter(requestsEl, totalRequests, 800);
+    }
+    
+    // Update success rate
+    const successEl = document.getElementById('statSuccess');
+    if (successEl) {
+      successEl.textContent = successRate === '-' ? '-' : successRate + '%';
+      successEl.dataset.value = successRate;
+    }
+    
+    // Update system health metrics
+    updateSystemHealth(usage.usage);
+    
+    // Update checklist after data loads
+    setTimeout(() => updateChecklist(), 500);
 
     document.getElementById('serverVersion').textContent = `Version: ${version} | Commit: ${commit.slice(0, 7)}`;
     document.getElementById('versionBadge').textContent = version;
@@ -99,30 +122,45 @@ export async function loadDashboard() {
     // Update uptime
     updateServerUptime(serverStartTime);
 
-    // Load auth files count
+    // Load auth files count with animation
     api('GET', '/auth-files')
       .then(d => {
         const el = document.getElementById('statAuthFiles');
-        if (el) el.textContent = (d.files || []).length;
+        const count = (d.files || []).length;
+        if (el) {
+          animateCounter(el, count, 600);
+        }
+        // Update checklist
+        setTimeout(() => updateChecklist(), 100);
       })
       .catch(err => {
         console.warn('Failed to load auth files count:', err.message);
         const el = document.getElementById('statAuthFiles');
-        if (el) el.textContent = '-';
+        if (el) {
+          el.textContent = '-';
+          el.dataset.value = '0';
+        }
       });
 
-    // Load models count
+    // Load models count with animation
     if (fetchModelsFunc) {
       fetchModelsFunc()
         .then(models => {
           const el = document.getElementById('statModels');
-          if (el) el.textContent = models.length;
+          if (el) {
+            animateCounter(el, models.length, 600);
+          }
           setAllModels(models);
+          // Update checklist
+          setTimeout(() => updateChecklist(), 100);
         })
         .catch(err => {
           console.warn('Failed to load models count:', err.message);
           const el = document.getElementById('statModels');
-          if (el) el.textContent = '-';
+          if (el) {
+            el.textContent = '-';
+            el.dataset.value = '0';
+          }
         });
     }
 
@@ -255,6 +293,11 @@ export function cleanupDashboard() {
   if (visibilityHandler) {
     document.removeEventListener('visibilitychange', visibilityHandler);
     visibilityHandler = null;
+  }
+  
+  if (keyboardShortcutHandler) {
+    document.removeEventListener('keydown', keyboardShortcutHandler);
+    keyboardShortcutHandler = null;
   }
 }
 
@@ -433,6 +476,372 @@ function comparePrerelease(prerelease1, prerelease2) {
 export function initDashboard() {
   setupVisibilityHandler();
   startUptimeInterval();
+  updateGreeting();
+  setupKeyboardShortcuts();
+  updateChecklist();
+  loadRecentActivity();
+}
+
+/**
+ * Update the greeting based on time of day
+ */
+export function updateGreeting() {
+  const greetingEl = document.getElementById('dashboardGreeting');
+  const emojiEl = document.getElementById('greetingEmoji');
+  const subtitleEl = document.getElementById('dashboardSubtitle');
+  
+  if (!greetingEl) return;
+  
+  const hour = new Date().getHours();
+  let greeting, emoji, subtitle;
+  
+  if (hour >= 5 && hour < 12) {
+    greeting = 'Good morning';
+    emoji = '☀️';
+    subtitle = "Start your day with a quick overview";
+  } else if (hour >= 12 && hour < 17) {
+    greeting = 'Good afternoon';
+    emoji = '🌤️';
+    subtitle = "Here's your server status";
+  } else if (hour >= 17 && hour < 21) {
+    greeting = 'Good evening';
+    emoji = '🌅';
+    subtitle = "Check your daily progress";
+  } else {
+    greeting = 'Good night';
+    emoji = '🌙';
+    subtitle = "Late night monitoring";
+  }
+  
+  greetingEl.textContent = greeting;
+  if (emojiEl) emojiEl.textContent = emoji;
+  if (subtitleEl) subtitleEl.textContent = subtitle;
+}
+
+/**
+ * Animate a counter from 0 to target value
+ */
+export function animateCounter(element, targetValue, duration = 1000) {
+  if (!element || isNaN(targetValue)) return;
+  
+  const startValue = 0;
+  const startTime = performance.now();
+  
+  element.classList.add('counting');
+  
+  function updateCounter(currentTime) {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    
+    // Easing function for smooth animation
+    const easeOutQuart = 1 - Math.pow(1 - progress, 4);
+    const currentValue = Math.floor(startValue + (targetValue - startValue) * easeOutQuart);
+    
+    element.textContent = currentValue.toLocaleString();
+    element.dataset.value = currentValue;
+    
+    if (progress < 1) {
+      requestAnimationFrame(updateCounter);
+    } else {
+      element.classList.remove('counting');
+      element.textContent = targetValue.toLocaleString();
+      element.dataset.value = targetValue;
+    }
+  }
+  
+  requestAnimationFrame(updateCounter);
+}
+
+/**
+ * Setup keyboard shortcuts for quick actions
+ */
+export function setupKeyboardShortcuts() {
+  if (keyboardShortcutHandler) {
+    document.removeEventListener('keydown', keyboardShortcutHandler);
+  }
+  
+  keyboardShortcutHandler = (e) => {
+    // Don't trigger if user is typing in an input
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+      return;
+    }
+    
+    // Check if we're on the dashboard page
+    const dashboardPage = document.getElementById('page-dashboard');
+    if (!dashboardPage || !dashboardPage.classList.contains('active')) {
+      return;
+    }
+    
+    const key = e.key.toUpperCase();
+    const shortcuts = {
+      'M': 'models',
+      'A': 'auth',
+      'U': 'usage',
+      'L': 'logs',
+      'K': 'keys',
+      'S': 'config'
+    };
+    
+    if (shortcuts[key] && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      if (window.navigateTo) {
+        window.navigateTo(shortcuts[key]);
+      }
+    }
+  };
+  
+  document.addEventListener('keydown', keyboardShortcutHandler);
+}
+
+/**
+ * Update the getting started checklist based on current state
+ */
+export function updateChecklist() {
+  const checklistCard = document.getElementById('gettingStartedCard');
+  if (!checklistCard) return;
+  
+  // Check if user has dismissed the checklist
+  if (localStorage.getItem('dismissedGettingStarted') === 'true') {
+    checklistCard.style.display = 'none';
+    return;
+  }
+  
+  const steps = {
+    server: true, // Always true if dashboard loads
+    auth: false,
+    model: false,
+    request: false
+  };
+  
+  // These will be updated by loadDashboard
+  const authCount = parseInt(document.getElementById('statAuthFiles')?.dataset?.value || '0');
+  const modelCount = parseInt(document.getElementById('statModels')?.dataset?.value || '0');
+  const requestCount = parseInt(document.getElementById('statRequests')?.dataset?.value || '0');
+  
+  steps.auth = authCount > 0;
+  steps.model = modelCount > 0;
+  steps.request = requestCount > 0;
+  
+  // Update UI
+  Object.entries(steps).forEach(([step, completed]) => {
+    const item = document.querySelector(`.checklist-item[data-step="${step}"]`);
+    if (item) {
+      if (completed) {
+        item.classList.add('completed');
+      } else {
+        item.classList.remove('completed');
+      }
+    }
+  });
+  
+  // Update progress
+  const completedCount = Object.values(steps).filter(Boolean).length;
+  const totalCount = Object.keys(steps).length;
+  const progressFill = document.getElementById('checklistProgress');
+  const progressText = document.getElementById('checklistProgressText');
+  
+  if (progressFill) {
+    progressFill.style.width = `${(completedCount / totalCount) * 100}%`;
+  }
+  if (progressText) {
+    progressText.textContent = `${completedCount} of ${totalCount} complete`;
+  }
+  
+  // Hide checklist if all steps completed
+  if (completedCount === totalCount) {
+    setTimeout(() => {
+      checklistCard.style.display = 'none';
+      localStorage.setItem('dismissedGettingStarted', 'true');
+    }, 2000);
+  }
+}
+
+/**
+ * Dismiss the getting started checklist
+ */
+export function dismissGettingStarted() {
+  const checklistCard = document.getElementById('gettingStartedCard');
+  if (checklistCard) {
+    checklistCard.style.opacity = '0';
+    checklistCard.style.transform = 'translateY(-10px)';
+    setTimeout(() => {
+      checklistCard.style.display = 'none';
+    }, 300);
+  }
+  localStorage.setItem('dismissedGettingStarted', 'true');
+}
+
+/**
+ * Add an activity item to the log
+ */
+export function addActivity(type, text, icon = 'cyan') {
+  const activity = {
+    type,
+    text,
+    icon,
+    time: new Date()
+  };
+  
+  activityLog.unshift(activity);
+  if (activityLog.length > 10) {
+    activityLog.pop();
+  }
+  
+  renderActivityTimeline();
+}
+
+/**
+ * Load recent activity from usage/logs
+ */
+export function loadRecentActivity() {
+  const timeline = document.getElementById('activityTimeline');
+  if (!timeline) return;
+  
+  // Generate some activity based on current state
+  activityLog = [];
+  
+  // Add server start activity
+  addActivity('server', 'Dashboard loaded', 'green');
+  
+  // Load recent logs if available
+  api('GET', '/logs?limit=5').then(data => {
+    if (data.logs && data.logs.length > 0) {
+      data.logs.slice(0, 3).forEach(log => {
+        const model = log.model || 'Unknown model';
+        const status = log.status_code < 400 ? 'completed' : 'failed';
+        const icon = log.status_code < 400 ? 'green' : 'red';
+        addActivity('request', `Request to ${model} ${status}`, icon);
+      });
+    }
+  }).catch(() => {
+    // Silently fail - activity timeline is non-critical
+  });
+}
+
+/**
+ * Render the activity timeline
+ */
+function renderActivityTimeline() {
+  const timeline = document.getElementById('activityTimeline');
+  if (!timeline) return;
+  
+  if (activityLog.length === 0) {
+    timeline.innerHTML = `
+      <div class="activity-item">
+        <div class="activity-icon cyan">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+        </div>
+        <div class="activity-content">
+          <p class="activity-text">No recent activity</p>
+          <span class="activity-time">--</span>
+        </div>
+      </div>
+    `;
+    return;
+  }
+  
+  const icons = {
+    cyan: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>',
+    green: '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline>',
+    red: '<circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>',
+    yellow: '<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line>',
+    purple: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>'
+  };
+  
+  timeline.innerHTML = activityLog.map(activity => {
+    const timeAgo = getTimeAgo(activity.time);
+    const iconSvg = icons[activity.icon] || icons.cyan;
+    
+    return `
+      <div class="activity-item">
+        <div class="activity-icon ${activity.icon}">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            ${iconSvg}
+          </svg>
+        </div>
+        <div class="activity-content">
+          <p class="activity-text">${escapeHtml(activity.text)}</p>
+          <span class="activity-time">${timeAgo}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+/**
+ * Get human-readable time ago string
+ */
+function getTimeAgo(date) {
+  const seconds = Math.floor((new Date() - date) / 1000);
+  
+  if (seconds < 60) return 'Just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  return `${Math.floor(seconds / 86400)}d ago`;
+}
+
+/**
+ * Escape HTML to prevent XSS
+ */
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+/**
+ * Toggle theme between light and dark
+ */
+export function toggleTheme() {
+  document.body.classList.toggle('light-theme');
+  const isLight = document.body.classList.contains('light-theme');
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  toast(`Switched to ${isLight ? 'light' : 'dark'} theme`, 'success');
+}
+
+/**
+ * Toggle notifications panel (placeholder)
+ */
+export function toggleNotifications() {
+  toast('No new notifications', 'info');
+}
+
+/**
+ * Update system health metrics
+ */
+export function updateSystemHealth(usage) {
+  const total = usage?.total_requests || 0;
+  const failed = usage?.failed_requests || 0;
+  const errorRate = total > 0 ? (failed / total * 100) : 0;
+  
+  // Update error rate
+  const errorRateEl = document.getElementById('metricErrorRate');
+  const errorRateFill = document.getElementById('metricErrorRateFill');
+  if (errorRateEl) errorRateEl.textContent = errorRate.toFixed(1) + '%';
+  if (errorRateFill) errorRateFill.style.width = Math.min(errorRate * 5, 100) + '%';
+  
+  // Simulate response time (based on success rate)
+  const responseTime = Math.max(50, 200 - (100 - errorRate) * 1.5);
+  const responseTimeEl = document.getElementById('metricResponseTime');
+  const responseTimeFill = document.getElementById('metricResponseTimeFill');
+  if (responseTimeEl) responseTimeEl.textContent = Math.round(responseTime) + ' ms';
+  if (responseTimeFill) responseTimeFill.style.width = Math.min(responseTime / 5, 100) + '%';
+  
+  // Update connections (placeholder)
+  const connectionsEl = document.getElementById('metricConnections');
+  const connectionsFill = document.getElementById('metricConnectionsFill');
+  if (connectionsEl) connectionsEl.textContent = '1';
+  if (connectionsFill) connectionsFill.style.width = '10%';
+  
+  // Cache hit rate (placeholder)
+  const cacheHitEl = document.getElementById('metricCacheHit');
+  const cacheHitFill = document.getElementById('metricCacheHitFill');
+  if (cacheHitEl) cacheHitEl.textContent = '--';
+  if (cacheHitFill) cacheHitFill.style.width = '0%';
 }
 
 // Expose functions to window for HTML onclick handlers
@@ -440,3 +849,6 @@ window.loadDashboard = loadDashboard;
 window.checkLatestVersion = checkLatestVersion;
 window.cleanupDashboard = cleanupDashboard;
 window.initDashboard = initDashboard;
+window.toggleTheme = toggleTheme;
+window.toggleNotifications = toggleNotifications;
+window.dismissGettingStarted = dismissGettingStarted;

@@ -27,6 +27,45 @@
   --radius-lg: 16px;
 }
 
+/* Light Theme */
+body.light-theme {
+  --bg-primary: #f5f7fa;
+  --bg-secondary: #e8ecf2;
+  --bg-card: rgba(255, 255, 255, 0.9);
+  --bg-card-hover: rgba(245, 248, 255, 0.95);
+  --bg-input: rgba(240, 243, 250, 0.8);
+  --border-color: rgba(100, 120, 180, 0.25);
+  --border-glow: rgba(0, 150, 200, 0.4);
+  --text-primary: #1a1a2e;
+  --text-secondary: #4a4a6a;
+  --text-muted: #7a7a9a;
+  --accent-cyan: #0099cc;
+  --accent-purple: #7c5ce7;
+  --accent-green: #1da88a;
+  --accent-yellow: #e5a500;
+  --accent-red: #e05050;
+  --accent-blue: #4a90e2;
+}
+
+body.light-theme {
+  background: linear-gradient(135deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+}
+
+body.light-theme .sidebar {
+  background: rgba(255, 255, 255, 0.95);
+  border-right-color: var(--border-color);
+}
+
+body.light-theme .card {
+  background: var(--bg-card);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+body.light-theme .login-card {
+  background: var(--bg-card);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
 * {
   margin: 0;
   padding: 0;
