@@ -66,8 +66,7 @@
         </svg><span>API Keys</span></a><a class="nav-item" data-page="config"><svg xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="3" />
-          <path
-            d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
         </svg><span>Configuration</span></a><a class="nav-item" data-page="usage"><svg
           xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M18 20V10m-6 10V4M6 20v-6" />
@@ -109,15 +108,15 @@
               </svg>
               <span id="dashboardUpdateTime">Not yet updated</span>
             </div>
-            <div class="health-indicator" id="healthIndicator">
-              <div class="health-pulse"></div>
+            <div class="health-indicator" id="healthIndicator" role="status" aria-live="polite" aria-label="Server status: Online">
+              <div class="health-pulse" aria-hidden="true"></div>
               <span class="health-text">Online</span>
             </div>
           </div>
         </div>
-        <div class="stats-grid">
-          <div class="stat-card cyan">
-            <div class="stat-icon">
+        <div class="stats-grid" role="region" aria-label="Dashboard statistics">
+          <div class="stat-card cyan" role="article" aria-labelledby="statModelsLabel">
+            <div class="stat-icon" aria-hidden="true">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
                 <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
@@ -125,43 +124,43 @@
               </svg>
             </div>
             <div class="stat-content">
-              <div class="stat-value" id="statModels">-</div>
-              <div class="stat-label">Available Models</div>
+              <div class="stat-value" id="statModels" aria-live="polite">-</div>
+              <div class="stat-label" id="statModelsLabel">Available Models</div>
             </div>
           </div>
-          <div class="stat-card purple">
-            <div class="stat-icon">
+          <div class="stat-card purple" role="article" aria-labelledby="statAuthFilesLabel">
+            <div class="stat-icon" aria-hidden="true">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
                 <path d="M9 12l2 2 4-4"></path>
               </svg>
             </div>
             <div class="stat-content">
-              <div class="stat-value" id="statAuthFiles">-</div>
-              <div class="stat-label">Auth Files</div>
+              <div class="stat-value" id="statAuthFiles" aria-live="polite">-</div>
+              <div class="stat-label" id="statAuthFilesLabel">Auth Files</div>
             </div>
           </div>
-          <div class="stat-card green">
-            <div class="stat-icon">
+          <div class="stat-card green" role="article" aria-labelledby="statRequestsLabel">
+            <div class="stat-icon" aria-hidden="true">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
               </svg>
             </div>
             <div class="stat-content">
-              <div class="stat-value" id="statRequests">-</div>
-              <div class="stat-label">Total Requests</div>
+              <div class="stat-value" id="statRequests" aria-live="polite">-</div>
+              <div class="stat-label" id="statRequestsLabel">Total Requests</div>
             </div>
           </div>
-          <div class="stat-card yellow">
-            <div class="stat-icon">
+          <div class="stat-card yellow" role="article" aria-labelledby="statSuccessLabel">
+            <div class="stat-icon" aria-hidden="true">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
                 <polyline points="22 4 12 14.01 9 11.01"></polyline>
               </svg>
             </div>
             <div class="stat-content">
-              <div class="stat-value" id="statSuccess">-</div>
-              <div class="stat-label">Success Rate</div>
+              <div class="stat-value" id="statSuccess" aria-live="polite">-</div>
+              <div class="stat-label" id="statSuccessLabel">Success Rate</div>
             </div>
           </div>
         </div>
@@ -169,9 +168,9 @@
           <div class="card-header">
             <h3 class="card-title">Quick Actions</h3>
           </div>
-          <div class="quick-actions-grid">
+          <div class="quick-actions-grid" role="group" aria-label="Quick actions">
             <button class="quick-action-btn" onclick="navigateTo('models')" data-tooltip="Browse all available AI models">
-              <div class="quick-action-icon cyan">
+              <div class="quick-action-icon cyan" aria-hidden="true">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
                   <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>

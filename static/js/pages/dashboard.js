@@ -19,6 +19,11 @@ import {
 // Forward declaration for fetchModels from models.js (to avoid circular dependency)
 let fetchModelsFunc = null;
 
+// Dashboard-specific state
+let uptimeIntervalId = null;
+let autoRefreshIntervalId = null;
+let visibilityHandler = null;
+
 /**
  * Set the fetchModels function reference (called from main app initialization)
  * @param {Function} fn - The fetchModels function from models.js
@@ -31,6 +36,9 @@ export function setFetchModelsFunc(fn) {
  * Load the dashboard page data
  */
 export async function loadDashboard() {
+  // Initialize dashboard resources
+  initDashboard();
+  
   const refreshBtn = document.getElementById('dashboardRefreshBtn');
   const lastUpdatedEl = document.getElementById('dashboardLastUpdated');
   const statCards = document.querySelectorAll('.stats-grid .stat-card');
@@ -93,17 +101,29 @@ export async function loadDashboard() {
 
     // Load auth files count
     api('GET', '/auth-files')
-      .then(d => document.getElementById('statAuthFiles').textContent = (d.files || []).length)
-      .catch(() => {});
+      .then(d => {
+        const el = document.getElementById('statAuthFiles');
+        if (el) el.textContent = (d.files || []).length;
+      })
+      .catch(err => {
+        console.warn('Failed to load auth files count:', err.message);
+        const el = document.getElementById('statAuthFiles');
+        if (el) el.textContent = '-';
+      });
 
     // Load models count
     if (fetchModelsFunc) {
       fetchModelsFunc()
         .then(models => {
-          document.getElementById('statModels').textContent = models.length;
+          const el = document.getElementById('statModels');
+          if (el) el.textContent = models.length;
           setAllModels(models);
         })
-        .catch(() => document.getElementById('statModels').textContent = '-');
+        .catch(err => {
+          console.warn('Failed to load models count:', err.message);
+          const el = document.getElementById('statModels');
+          if (el) el.textContent = '-';
+        });
     }
 
     // Update health indicator
@@ -176,12 +196,66 @@ export function updateServerUptime(serverStartTimeStr) {
  * @returns {number} The interval ID
  */
 export function startUptimeInterval() {
-  return setInterval(() => {
+  // Clear any existing interval first
+  stopUptimeInterval();
+  
+  uptimeIntervalId = setInterval(() => {
     const uptimeEl = document.getElementById('serverUptime');
     if (uptimeEl && uptimeEl.textContent !== '-') {
       updateServerUptime();
     }
   }, 1000);
+  
+  return uptimeIntervalId;
+}
+
+/**
+ * Stop the uptime update interval
+ */
+export function stopUptimeInterval() {
+  if (uptimeIntervalId) {
+    clearInterval(uptimeIntervalId);
+    uptimeIntervalId = null;
+  }
+}
+
+/**
+ * Setup visibility change handler to pause/resume animations
+ */
+export function setupVisibilityHandler() {
+  if (visibilityHandler) {
+    document.removeEventListener('visibilitychange', visibilityHandler);
+  }
+  
+  visibilityHandler = () => {
+    const healthIndicator = document.getElementById('healthIndicator');
+    if (healthIndicator) {
+      if (document.hidden) {
+        healthIndicator.classList.add('paused');
+      } else {
+        healthIndicator.classList.remove('paused');
+      }
+    }
+  };
+  
+  document.addEventListener('visibilitychange', visibilityHandler);
+}
+
+/**
+ * Cleanup dashboard resources when leaving the page
+ */
+export function cleanupDashboard() {
+  stopUptimeInterval();
+  
+  if (autoRefreshIntervalId) {
+    clearInterval(autoRefreshIntervalId);
+    autoRefreshIntervalId = null;
+  }
+  
+  if (visibilityHandler) {
+    document.removeEventListener('visibilitychange', visibilityHandler);
+    visibilityHandler = null;
+  }
 }
 
 /**
@@ -270,27 +344,99 @@ export function updateVersionBadge(current, latest) {
 
 /**
  * Compare two semantic version strings
+ * Handles versions like: 1.0.0, v1.0.0, 1.0.0-beta, 1.0.0-rc.1, 1.0.0+build
  * @param {string} v1 - First version
  * @param {string} v2 - Second version
  * @returns {number} 1 if v1 > v2, -1 if v1 < v2, 0 if equal
  */
 export function compareVersions(v1, v2) {
+  if (!v1 || !v2) return 0;
+  
   // Remove 'v' prefix if present
   v1 = v1.replace(/^v/, '');
   v2 = v2.replace(/^v/, '');
 
-  const parts1 = v1.split('.').map(p => parseInt(p, 10) || 0);
-  const parts2 = v2.split('.').map(p => parseInt(p, 10) || 0);
+  // Split version and pre-release parts (e.g., "1.0.0-beta.1" -> ["1.0.0", "beta.1"])
+  const [version1, prerelease1] = v1.split('-');
+  const [version2, prerelease2] = v2.split('-');
 
+  // Remove build metadata (everything after +)
+  const cleanVersion1 = version1.split('+')[0];
+  const cleanVersion2 = version2.split('+')[0];
+
+  const parts1 = cleanVersion1.split('.').map(p => parseInt(p, 10) || 0);
+  const parts2 = cleanVersion2.split('.').map(p => parseInt(p, 10) || 0);
+
+  // Compare main version numbers
   for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
     const p1 = parts1[i] || 0;
     const p2 = parts2[i] || 0;
     if (p1 > p2) return 1;
     if (p1 < p2) return -1;
   }
+  
+  // If main versions are equal, compare pre-release
+  // A version without pre-release is greater than one with pre-release
+  // e.g., 1.0.0 > 1.0.0-beta
+  if (!prerelease1 && prerelease2) return 1;
+  if (prerelease1 && !prerelease2) return -1;
+  if (prerelease1 && prerelease2) {
+    const prereleaseComparison = comparePrerelease(prerelease1, prerelease2);
+    if (prereleaseComparison !== 0) return prereleaseComparison;
+  }
+  
   return 0;
+}
+
+/**
+ * Compare two pre-release identifiers (e.g., "alpha.1" vs "alpha.2")
+ * @param {string} prerelease1 - First pre-release string
+ * @param {string} prerelease2 - Second pre-release string
+ * @returns {number} 1 if prerelease1 > prerelease2, -1 if prerelease1 < prerelease2, 0 if equal
+ */
+function comparePrerelease(prerelease1, prerelease2) {
+  const identifiers1 = prerelease1.split('.');
+  const identifiers2 = prerelease2.split('.');
+
+  const maxLength = Math.max(identifiers1.length, identifiers2.length);
+  for (let i = 0; i < maxLength; i++) {
+    const id1 = identifiers1[i];
+    const id2 = identifiers2[i];
+
+    if (id1 === undefined) return -1;
+    if (id2 === undefined) return 1;
+
+    const isNumeric1 = /^[0-9]+$/.test(id1);
+    const isNumeric2 = /^[0-9]+$/.test(id2);
+
+    if (isNumeric1 && isNumeric2) {
+      const num1 = parseInt(id1, 10);
+      const num2 = parseInt(id2, 10);
+      if (num1 > num2) return 1;
+      if (num1 < num2) return -1;
+      continue;
+    }
+
+    if (isNumeric1 && !isNumeric2) return -1;
+    if (!isNumeric1 && isNumeric2) return 1;
+
+    if (id1 > id2) return 1;
+    if (id1 < id2) return -1;
+  }
+
+  return 0;
+}
+
+/**
+ * Initialize dashboard - call this when navigating to dashboard
+ */
+export function initDashboard() {
+  setupVisibilityHandler();
+  startUptimeInterval();
 }
 
 // Expose functions to window for HTML onclick handlers
 window.loadDashboard = loadDashboard;
 window.checkLatestVersion = checkLatestVersion;
+window.cleanupDashboard = cleanupDashboard;
+window.initDashboard = initDashboard;

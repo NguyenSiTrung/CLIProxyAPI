@@ -320,6 +320,101 @@
   flex: 1;
 }
 
+/* Focus Visible Styles for Keyboard Navigation */
+.quick-action-btn:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(0, 229, 255, 0.2);
+}
+
+.stat-card:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+}
+
+.server-status-item:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+}
+
+#dashboardRefreshBtn:focus-visible,
+#checkUpdateBtn:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(0, 229, 255, 0.2);
+}
+
+/* Pause animations when tab is not visible or user prefers reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .health-pulse {
+    animation: none;
+  }
+  
+  .dashboard-last-updated.refreshing svg {
+    animation: none;
+  }
+}
+
+/* Pause health pulse animation when document is hidden */
+.health-indicator.paused .health-pulse {
+  animation-play-state: paused;
+}
+
+/* Loading skeleton animation for stats */
+.stat-card.loading .stat-value {
+  background: linear-gradient(90deg, rgba(100, 100, 150, 0.2) 25%, rgba(100, 100, 150, 0.4) 50%, rgba(100, 100, 150, 0.2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+  color: transparent;
+  min-width: 40px;
+  min-height: 28px;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Tooltip positioning fix - prevent cut-off at top */
+.quick-action-btn:first-child::after,
+.quick-action-btn:nth-child(2)::after,
+.quick-action-btn:nth-child(3)::after {
+  bottom: auto;
+  top: calc(100% + 8px);
+}
+
+.quick-action-btn:first-child::before,
+.quick-action-btn:nth-child(2)::before,
+.quick-action-btn:nth-child(3)::before {
+  bottom: auto;
+  top: calc(100% + 4px);
+  border-top-color: transparent;
+  border-bottom-color: rgba(0, 0, 0, 0.9);
+}
+
+/* Auto-refresh indicator */
+.dashboard-auto-refresh {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+  padding: 4px 10px;
+  background: rgba(34, 211, 160, 0.1);
+  border: 1px solid rgba(34, 211, 160, 0.3);
+  border-radius: 12px;
+}
+
+.dashboard-auto-refresh.active {
+  color: var(--accent-green);
+}
+
+.dashboard-auto-refresh svg {
+  width: 12px;
+  height: 12px;
+}
+
 /* Responsive */
 @media (max-width: 1024px) {
   .quick-actions-grid {

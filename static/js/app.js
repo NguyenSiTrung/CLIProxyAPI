@@ -18,7 +18,7 @@ import {
 } from './core/router.js';
 
 // Page modules
-import { loadDashboard, setFetchModelsFunc } from './pages/dashboard.js';
+import { loadDashboard, setFetchModelsFunc, cleanupDashboard, initDashboard } from './pages/dashboard.js';
 import { loadModels, fetchModels } from './pages/models.js';
 import { loadAuthFiles } from './pages/auth-files.js';
 import { loadKeys, setupKeysTabHandlers } from './pages/keys.js';
@@ -36,6 +36,7 @@ setFetchModelsFunc(fetchModels);
 /**
  * Callback before navigating away from a page
  * Used to clean up page-specific resources
+ * @param {string} page - The page being navigated TO
  */
 function onBeforeNavigate(page) {
   // Stop log auto-refresh when leaving logs page
@@ -49,6 +50,10 @@ function onBeforeNavigate(page) {
   // Clean up chart instances when leaving usage page
   if (page !== 'usage') {
     destroyUsageCharts();
+  }
+  // Clean up dashboard resources when leaving dashboard page
+  if (page !== 'dashboard') {
+    cleanupDashboard();
   }
 }
 
