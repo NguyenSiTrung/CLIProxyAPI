@@ -64,7 +64,7 @@ type User struct {
 func NewBot(cfg config.TelegramConfig) *Bot {
 	return &Bot{
 		config:    cfg,
-		client:    &http.Client{Timeout: 30 * time.Second},
+		client:    &http.Client{Timeout: 45 * time.Second},
 		startTime: time.Now(),
 		stopCh:    make(chan struct{}),
 	}
