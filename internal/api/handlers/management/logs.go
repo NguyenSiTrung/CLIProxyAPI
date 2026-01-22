@@ -84,6 +84,54 @@ func (h *Handler) GetLogs(c *gin.Context) {
 	})
 }
 
+// GetLogFileInfo returns information about the log file (path and size).
+func (h *Handler) GetLogFileInfo(c *gin.Context) {
+	if h == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "handler unavailable"})
+		return
+	}
+	if h.cfg == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "configuration unavailable"})
+		return
+	}
+	if !h.cfg.LoggingToFile {
+		c.JSON(http.StatusOK, gin.H{
+			"enabled": false,
+			"path":    "",
+			"size":    0,
+		})
+		return
+	}
+
+	logDir := h.logDirectory()
+	if strings.TrimSpace(logDir) == "" {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "log directory not configured"})
+		return
+	}
+
+	logPath := filepath.Join(logDir, defaultLogFileName)
+	var totalSize int64
+
+	files, err := h.collectLogFiles(logDir)
+	if err != nil && !os.IsNotExist(err) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to list log files: %v", err)})
+		return
+	}
+
+	for _, f := range files {
+		if info, errStat := os.Stat(f); errStat == nil {
+			totalSize += info.Size()
+		}
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"enabled":    true,
+		"path":       logPath,
+		"size":       totalSize,
+		"file_count": len(files),
+	})
+}
+
 // DeleteLogs removes all rotated log files and truncates the active log.
 func (h *Handler) DeleteLogs(c *gin.Context) {
 	if h == nil {

@@ -572,6 +572,7 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.DELETE("/gemini-api-key", s.mgmt.DeleteGeminiKey)
 
 		mgmt.GET("/logs", s.mgmt.GetLogs)
+		mgmt.GET("/logs/info", s.mgmt.GetLogFileInfo)
 		mgmt.DELETE("/logs", s.mgmt.DeleteLogs)
 		mgmt.GET("/request-error-logs", s.mgmt.GetRequestErrorLogs)
 		mgmt.GET("/request-error-logs/:name", s.mgmt.DownloadRequestErrorLog)

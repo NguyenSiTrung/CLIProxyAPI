@@ -660,6 +660,10 @@ export async function loadLogs(isAuto = false) {
     renderLogs();
     updateLogStatusUI();
     updateLogStats();
+    
+    if (!isAuto) {
+      loadLogFileInfo();
+    }
 
   } catch (e) {
     if (thisRequestId === loadRequestId && !isAuto) {
@@ -667,6 +671,43 @@ export async function loadLogs(isAuto = false) {
     }
   } finally {
     if (btn) btn.classList.remove('loading');
+  }
+}
+
+/**
+ * Format bytes to human readable size
+ */
+function formatFileSize(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+/**
+ * Load and display log file info (path and size)
+ */
+async function loadLogFileInfo() {
+  const infoEl = document.getElementById('logFileInfo');
+  if (!infoEl) return;
+
+  try {
+    const data = await api('GET', '/logs/info');
+    
+    if (data.enabled && data.path) {
+      const size = formatFileSize(data.size || 0);
+      const fileCount = data.file_count || 1;
+      const fileLabel = fileCount > 1 ? `${fileCount} files` : '1 file';
+      infoEl.textContent = `📁 ${data.path} (${size}, ${fileLabel})`;
+      infoEl.title = `Log file: ${data.path}\nTotal size: ${size}\nFiles: ${fileLabel}`;
+      infoEl.style.display = 'inline';
+    } else {
+      infoEl.textContent = '📁 File logging disabled';
+      infoEl.style.display = 'inline';
+    }
+  } catch (e) {
+    infoEl.style.display = 'none';
   }
 }
 
