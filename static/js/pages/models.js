@@ -1,6 +1,7 @@
 /**
  * Models Page Module
  * Handles model listing, filtering, provider grouping, and pricing configuration
+ * Enhanced with favorites, grid/list views, sorting, keyboard shortcuts, and cost calculator
  */
 
 import { api, getApiKey } from '../core/api.js';
@@ -22,6 +23,291 @@ import {
 // Track current load request for race condition prevention
 let currentModelsLoadId = 0;
 let currentModelsAbort = null;
+
+// UI State
+let currentView = 'grouped'; // 'grouped', 'grid', 'list'
+let currentSort = 'name-asc'; // 'name-asc', 'name-desc', 'provider', 'favorites'
+let showFavoritesOnly = false;
+let favoriteModels = new Set();
+
+// LocalStorage keys
+const STORAGE_KEY_FAVORITES = 'cliproxy_model_favorites';
+const STORAGE_KEY_VIEW = 'cliproxy_models_view';
+const STORAGE_KEY_SORT = 'cliproxy_models_sort';
+
+/**
+ * Initialize favorites from localStorage
+ */
+function initFavorites() {
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY_FAVORITES);
+    if (stored) {
+      favoriteModels = new Set(JSON.parse(stored));
+    }
+  } catch (e) {
+    console.warn('Failed to load favorites from localStorage:', e);
+    favoriteModels = new Set();
+  }
+  updateFavoritesCount();
+}
+
+/**
+ * Save favorites to localStorage
+ */
+function saveFavorites() {
+  try {
+    localStorage.setItem(STORAGE_KEY_FAVORITES, JSON.stringify([...favoriteModels]));
+  } catch (e) {
+    console.warn('Failed to save favorites to localStorage:', e);
+  }
+}
+
+/**
+ * Toggle a model as favorite
+ */
+export function toggleFavorite(modelId, event) {
+  if (event) {
+    event.stopPropagation();
+  }
+  
+  if (favoriteModels.has(modelId)) {
+    favoriteModels.delete(modelId);
+    toast(`Removed ${modelId} from favorites`, 'info');
+  } else {
+    favoriteModels.add(modelId);
+    toast(`Added ${modelId} to favorites`, 'success');
+  }
+  
+  saveFavorites();
+  updateFavoritesCount();
+  
+  // Re-render if needed
+  if (showFavoritesOnly || currentSort === 'favorites') {
+    filterModels();
+  } else {
+    // Just update the visual state of favorite buttons
+    updateFavoriteButtons(modelId);
+  }
+}
+
+/**
+ * Update favorite button states for a specific model
+ */
+function updateFavoriteButtons(modelId) {
+  const isFav = favoriteModels.has(modelId);
+  document.querySelectorAll(`[data-model-id="${modelId}"]`).forEach(el => {
+    el.classList.toggle('is-favorite', isFav);
+    const favBtn = el.querySelector('.favorite-btn, .btn-favorite, .model-row-favorite');
+    if (favBtn) {
+      favBtn.classList.toggle('favorited', isFav);
+      favBtn.classList.toggle('active', isFav);
+    }
+  });
+}
+
+/**
+ * Update favorites count in UI
+ */
+function updateFavoritesCount() {
+  const countEl = document.getElementById('modelsFavoritesCount');
+  if (countEl) {
+    countEl.textContent = favoriteModels.size;
+  }
+}
+
+/**
+ * Toggle favorites-only filter
+ */
+export function toggleFavoritesFilter() {
+  showFavoritesOnly = !showFavoritesOnly;
+  const btn = document.getElementById('modelsFavoritesBtn');
+  if (btn) {
+    btn.classList.toggle('active', showFavoritesOnly);
+  }
+  filterModels();
+}
+
+/**
+ * Set the current view mode
+ */
+export function setModelsView(view) {
+  currentView = view;
+  try {
+    localStorage.setItem(STORAGE_KEY_VIEW, view);
+  } catch (e) {}
+  
+  // Update toggle buttons
+  document.querySelectorAll('.view-toggle-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === view);
+  });
+  
+  filterModels();
+}
+
+/**
+ * Toggle sort dropdown
+ */
+export function toggleSortDropdown() {
+  const dropdown = document.querySelector('.models-sort-dropdown');
+  if (dropdown) {
+    dropdown.classList.toggle('open');
+  }
+}
+
+/**
+ * Set the current sort order
+ */
+export function setModelsSort(sort) {
+  currentSort = sort;
+  try {
+    localStorage.setItem(STORAGE_KEY_SORT, sort);
+  } catch (e) {}
+  
+  // Update sort options
+  document.querySelectorAll('.sort-option').forEach(opt => {
+    opt.classList.toggle('active', opt.dataset.sort === sort);
+  });
+  
+  // Update label
+  const label = document.getElementById('modelsSortLabel');
+  if (label) {
+    const labels = {
+      'name-asc': 'A-Z',
+      'name-desc': 'Z-A',
+      'provider': 'Provider',
+      'favorites': 'Favorites'
+    };
+    label.textContent = labels[sort] || 'Sort';
+  }
+  
+  // Close dropdown
+  const dropdown = document.querySelector('.models-sort-dropdown');
+  if (dropdown) {
+    dropdown.classList.remove('open');
+  }
+  
+  filterModels();
+}
+
+// Track if keyboard shortcuts have been initialized
+let keyboardShortcutsInitialized = false;
+
+/**
+ * Initialize keyboard shortcuts for the models page
+ */
+export function initModelsKeyboardShortcuts() {
+  if (keyboardShortcutsInitialized) return;
+  keyboardShortcutsInitialized = true;
+  
+  // Keyboard shortcuts
+  document.addEventListener('keydown', (e) => {
+    // Only handle if models page is active
+    const modelsPage = document.getElementById('page-models');
+    if (!modelsPage?.classList.contains('active')) return;
+    
+    // Don't handle if typing in an input
+    if (e.target.matches('input, textarea, select')) return;
+    
+    switch (e.key.toLowerCase()) {
+      case '/':
+        e.preventDefault();
+        document.getElementById('modelSearch')?.focus();
+        break;
+      case 'f':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          toggleFavoritesFilter();
+        }
+        break;
+      case 'g':
+        if (!e.ctrlKey && !e.metaKey) {
+          e.preventDefault();
+          const views = ['grouped', 'grid', 'list'];
+          const nextIndex = (views.indexOf(currentView) + 1) % views.length;
+          setModelsView(views[nextIndex]);
+        }
+        break;
+      case '?':
+        e.preventDefault();
+        showKeyboardShortcutsModal();
+        break;
+      case 'escape':
+        // Close sort dropdown if open
+        const dropdown = document.querySelector('.models-sort-dropdown');
+        if (dropdown?.classList.contains('open')) {
+          dropdown.classList.remove('open');
+          return;
+        }
+        // Clear search if focused
+        const searchInput = document.getElementById('modelSearch');
+        if (searchInput && document.activeElement === searchInput) {
+          searchInput.blur();
+          clearModelSearch();
+        }
+        break;
+    }
+  });
+  
+  // Click outside to close sort dropdown
+  document.addEventListener('click', (e) => {
+    const dropdown = document.querySelector('.models-sort-dropdown');
+    if (dropdown && !dropdown.contains(e.target)) {
+      dropdown.classList.remove('open');
+    }
+  });
+}
+
+/**
+ * Show keyboard shortcuts modal
+ */
+function showKeyboardShortcutsModal() {
+  const content = `
+    <div style="padding: 20px;">
+      <div style="display: grid; gap: 12px;">
+        <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(0,0,0,0.2); border-radius: 6px;">
+          <span><kbd style="background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px; margin-right: 8px;">/</kbd> Focus search</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(0,0,0,0.2); border-radius: 6px;">
+          <span><kbd style="background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px; margin-right: 8px;">F</kbd> Toggle favorites filter</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(0,0,0,0.2); border-radius: 6px;">
+          <span><kbd style="background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px; margin-right: 8px;">G</kbd> Cycle view modes</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(0,0,0,0.2); border-radius: 6px;">
+          <span><kbd style="background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px; margin-right: 8px;">Esc</kbd> Clear search / Close</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: rgba(0,0,0,0.2); border-radius: 6px;">
+          <span><kbd style="background: rgba(255,255,255,0.1); padding: 2px 8px; border-radius: 4px; margin-right: 8px;">?</kbd> Show this help</span>
+        </div>
+      </div>
+    </div>
+  `;
+  showModal('Keyboard Shortcuts', content);
+}
+
+/**
+ * Load saved preferences
+ */
+function loadPreferences() {
+  try {
+    const savedView = localStorage.getItem(STORAGE_KEY_VIEW);
+    if (savedView && ['grouped', 'grid', 'list'].includes(savedView)) {
+      currentView = savedView;
+    }
+    const savedSort = localStorage.getItem(STORAGE_KEY_SORT);
+    if (savedSort) {
+      currentSort = savedSort;
+    }
+  } catch (e) {}
+  
+  // Update UI
+  document.querySelectorAll('.view-toggle-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === currentView);
+  });
+  document.querySelectorAll('.sort-option').forEach(opt => {
+    opt.classList.toggle('active', opt.dataset.sort === currentSort);
+  });
+}
 
 /**
  * Escape HTML special characters to prevent XSS
@@ -225,6 +511,11 @@ export async function loadModels() {
   const abortController = new AbortController();
   currentModelsAbort = abortController;
   
+  // Initialize favorites and preferences on first load
+  initFavorites();
+  loadPreferences();
+  initModelsKeyboardShortcuts();
+  
   const refreshBtn = document.getElementById('modelsRefreshBtn');
   if (refreshBtn) {
     refreshBtn.classList.add('loading');
@@ -232,10 +523,48 @@ export async function loadModels() {
   }
 
   const container = document.getElementById('modelsContainer');
+  // Show skeleton loader instead of spinner
   container.innerHTML = `
-    <div class="models-loading">
-      <div class="models-loading-spinner"></div>
-      <p>Loading models...</p>
+    <div class="models-skeleton-loader">
+      <div class="skeleton-provider-card">
+        <div class="skeleton-header">
+          <div class="skeleton-icon"></div>
+          <div class="skeleton-title"></div>
+          <div class="skeleton-count"></div>
+        </div>
+        <div class="skeleton-models">
+          <div class="skeleton-badge"></div>
+          <div class="skeleton-badge"></div>
+          <div class="skeleton-badge"></div>
+          <div class="skeleton-badge"></div>
+          <div class="skeleton-badge"></div>
+        </div>
+      </div>
+      <div class="skeleton-provider-card">
+        <div class="skeleton-header">
+          <div class="skeleton-icon"></div>
+          <div class="skeleton-title"></div>
+          <div class="skeleton-count"></div>
+        </div>
+        <div class="skeleton-models">
+          <div class="skeleton-badge"></div>
+          <div class="skeleton-badge"></div>
+          <div class="skeleton-badge"></div>
+        </div>
+      </div>
+      <div class="skeleton-provider-card">
+        <div class="skeleton-header">
+          <div class="skeleton-icon"></div>
+          <div class="skeleton-title"></div>
+          <div class="skeleton-count"></div>
+        </div>
+        <div class="skeleton-models">
+          <div class="skeleton-badge"></div>
+          <div class="skeleton-badge"></div>
+          <div class="skeleton-badge"></div>
+          <div class="skeleton-badge"></div>
+        </div>
+      </div>
     </div>
   `;
 
@@ -367,16 +696,54 @@ export function filterModelsByProvider(provider) {
 }
 
 /**
- * Render the models list grouped by provider with safe DOM operations
+ * Sort models based on current sort setting
+ * @param {Array} models - Models to sort
+ * @returns {Array} Sorted models
+ */
+function sortModels(models) {
+  const sorted = [...models];
+  
+  switch (currentSort) {
+    case 'name-asc':
+      sorted.sort((a, b) => (a.id || a.name || '').localeCompare(b.id || b.name || ''));
+      break;
+    case 'name-desc':
+      sorted.sort((a, b) => (b.id || b.name || '').localeCompare(a.id || a.name || ''));
+      break;
+    case 'provider':
+      sorted.sort((a, b) => {
+        const provA = a.owned_by || a.provider || 'other';
+        const provB = b.owned_by || b.provider || 'other';
+        return provA.localeCompare(provB) || (a.id || '').localeCompare(b.id || '');
+      });
+      break;
+    case 'favorites':
+      sorted.sort((a, b) => {
+        const aFav = favoriteModels.has(a.id || a.name) ? 0 : 1;
+        const bFav = favoriteModels.has(b.id || b.name) ? 0 : 1;
+        return aFav - bFav || (a.id || '').localeCompare(b.id || '');
+      });
+      break;
+  }
+  
+  return sorted;
+}
+
+/**
+ * Render the models list with support for grouped, grid, and list views
  * @param {Array} models - List of models to render
  */
 export function renderModels(models) {
   const container = document.getElementById('modelsContainer');
   const countEl = document.getElementById('modelsTotalCount');
 
-  countEl.textContent = `${models.length} model${models.length !== 1 ? 's' : ''}`;
+  // Sort models
+  const sortedModels = sortModels(models);
 
-  if (!models.length) {
+  countEl.textContent = `${sortedModels.length} model${sortedModels.length !== 1 ? 's' : ''}`;
+
+  if (!sortedModels.length) {
+    container.className = 'models-grid-container';
     container.innerHTML = `
       <div class="models-empty">
         <div class="models-empty-icon">
@@ -385,12 +752,125 @@ export function renderModels(models) {
           </svg>
         </div>
         <h4>No models found</h4>
-        <p>Try adjusting your search or filter criteria.</p>
+        <p>${showFavoritesOnly ? 'No favorite models yet. Click the star icon on models to add them.' : 'Try adjusting your search or filter criteria.'}</p>
       </div>
     `;
     return;
   }
 
+  // Set container class based on view
+  container.className = `models-grid-container view-${currentView}`;
+  container.replaceChildren();
+
+  if (currentView === 'grid') {
+    renderGridView(container, sortedModels);
+  } else if (currentView === 'list') {
+    renderListView(container, sortedModels);
+  } else {
+    renderGroupedView(container, sortedModels);
+  }
+}
+
+/**
+ * Render models in grid view (cards)
+ */
+function renderGridView(container, models) {
+  models.forEach(m => {
+    const id = m.id || m.name || 'unknown';
+    const owner = m.owned_by || m.provider || 'other';
+    const { icon, class: iconClass } = getProviderIcon(owner);
+    const isFavorite = favoriteModels.has(id);
+    
+    const card = document.createElement('div');
+    card.className = `model-card-grid${isFavorite ? ' is-favorite' : ''}`;
+    card.dataset.modelId = id;
+    
+    card.innerHTML = `
+      <div class="model-card-header">
+        <div class="model-card-title">${escapeHtml(id)}</div>
+      </div>
+      <div class="model-card-provider">
+        <div class="model-card-provider-icon ${iconClass}">${icon}</div>
+        <span>${escapeHtml(owner)}</span>
+      </div>
+      <div class="model-card-actions">
+        <button class="model-card-btn btn-favorite${isFavorite ? ' active' : ''}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${isFavorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+            <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+          </svg>
+        </button>
+        <button class="model-card-btn btn-copy" title="Copy model ID">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+          Copy
+        </button>
+      </div>
+    `;
+    
+    // Add event listeners
+    card.querySelector('.btn-favorite').addEventListener('click', (e) => toggleFavorite(id, e));
+    card.querySelector('.btn-copy').addEventListener('click', (e) => {
+      e.stopPropagation();
+      copyModelIdWithConfetti(card, id);
+    });
+    
+    container.appendChild(card);
+  });
+}
+
+/**
+ * Render models in list view (rows)
+ */
+function renderListView(container, models) {
+  models.forEach(m => {
+    const id = m.id || m.name || 'unknown';
+    const owner = m.owned_by || m.provider || 'other';
+    const { icon, class: iconClass } = getProviderIcon(owner);
+    const isFavorite = favoriteModels.has(id);
+    
+    const row = document.createElement('div');
+    row.className = `model-row-list${isFavorite ? ' is-favorite' : ''}`;
+    row.dataset.modelId = id;
+    
+    row.innerHTML = `
+      <div class="model-row-favorite${isFavorite ? ' active' : ''}" title="${isFavorite ? 'Remove from favorites' : 'Add to favorites'}">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${isFavorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2">
+          <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+        </svg>
+      </div>
+      <div class="model-row-name">${escapeHtml(id)}</div>
+      <div class="model-row-provider">
+        <div class="model-row-provider-icon ${iconClass}">${icon}</div>
+        <span>${escapeHtml(owner)}</span>
+      </div>
+      <div class="model-row-actions">
+        <button class="model-row-btn btn-copy" title="Copy model ID">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+          </svg>
+          Copy
+        </button>
+      </div>
+    `;
+    
+    // Add event listeners
+    row.querySelector('.model-row-favorite').addEventListener('click', (e) => toggleFavorite(id, e));
+    row.querySelector('.btn-copy').addEventListener('click', (e) => {
+      e.stopPropagation();
+      copyModelIdWithConfetti(row, id);
+    });
+    
+    container.appendChild(row);
+  });
+}
+
+/**
+ * Render models in grouped view (by provider, accordion style)
+ */
+function renderGroupedView(container, models) {
   const grouped = {};
   models.forEach(m => {
     const id = m.id || m.name || 'unknown';
@@ -398,8 +878,6 @@ export function renderModels(models) {
     if (!grouped[owner]) grouped[owner] = [];
     grouped[owner].push(id);
   });
-
-  container.replaceChildren();
   
   Object.entries(grouped).sort((a, b) => a[0].localeCompare(b[0])).forEach(([owner, modelList]) => {
     const { icon, class: iconClass } = getProviderIcon(owner);
@@ -439,10 +917,13 @@ export function renderModels(models) {
     list.className = 'models-list';
     
     modelList.forEach(id => {
+      const isFavorite = favoriteModels.has(id);
+      
       const badge = document.createElement('div');
-      badge.className = 'model-badge';
+      badge.className = `model-badge${isFavorite ? ' is-favorite' : ''}`;
+      badge.dataset.modelId = id;
       badge.title = 'Click to copy';
-      badge.addEventListener('click', () => copyModelId(badge, id));
+      badge.addEventListener('click', () => copyModelIdWithConfetti(badge, id));
       
       const span = document.createElement('span');
       span.textContent = id;
@@ -450,13 +931,61 @@ export function renderModels(models) {
       const copyIcon = document.createElement('span');
       copyIcon.innerHTML = `<svg class="copy-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
       
-      badge.append(span, copyIcon);
+      // Add favorite button
+      const favBtn = document.createElement('button');
+      favBtn.className = `favorite-btn${isFavorite ? ' favorited' : ''}`;
+      favBtn.title = isFavorite ? 'Remove from favorites' : 'Add to favorites';
+      favBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="${isFavorite ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+      favBtn.addEventListener('click', (e) => toggleFavorite(id, e));
+      
+      badge.append(span, copyIcon, favBtn);
       list.appendChild(badge);
     });
     
     card.append(header, list);
     container.appendChild(card);
   });
+}
+
+/**
+ * Copy model ID with confetti animation
+ */
+function copyModelIdWithConfetti(element, id) {
+  navigator.clipboard.writeText(id).then(() => {
+    element.classList.add('copied');
+    
+    // Create confetti effect
+    createConfetti(element);
+    
+    setTimeout(() => {
+      element.classList.remove('copied');
+    }, 1500);
+  }).catch(() => {
+    toast('Failed to copy', 'error');
+  });
+}
+
+/**
+ * Create confetti particles for copy animation
+ */
+function createConfetti(element) {
+  const colors = ['#00e5ff', '#a78bfa', '#22d3a0', '#fbbf24', '#f87171'];
+  const confettiContainer = document.createElement('div');
+  confettiContainer.className = 'copy-confetti';
+  element.appendChild(confettiContainer);
+  
+  for (let i = 0; i < 8; i++) {
+    const particle = document.createElement('div');
+    particle.className = 'confetti-particle';
+    particle.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+    const angle = (i / 8) * Math.PI * 2;
+    const distance = 20 + Math.random() * 20;
+    particle.style.setProperty('--x', `${Math.cos(angle) * distance}px`);
+    particle.style.setProperty('--y', `${Math.sin(angle) * distance}px`);
+    confettiContainer.appendChild(particle);
+  }
+  
+  setTimeout(() => confettiContainer.remove(), 600);
 }
 
 /**
@@ -493,18 +1022,29 @@ export function clearModelSearch() {
 }
 
 /**
- * Filter models based on search input and provider filter
+ * Filter models based on search input, provider filter, and favorites
  */
 export function filterModels() {
-  const search = document.getElementById('modelSearch').value.toLowerCase();
+  const search = document.getElementById('modelSearch')?.value.toLowerCase() || '';
   const clearBtn = document.getElementById('modelSearchClear');
   const currentProviderFilter = getCurrentProviderFilter();
-  const allModels = getAllModels();
+  const allModels = getAllModels() || [];
 
-  clearBtn.style.display = search ? 'flex' : 'none';
+  if (clearBtn) {
+    clearBtn.style.display = search ? 'flex' : 'none';
+  }
 
   let filtered = allModels;
 
+  // Filter by favorites if enabled
+  if (showFavoritesOnly) {
+    filtered = filtered.filter(m => {
+      const id = m.id || m.name || '';
+      return favoriteModels.has(id);
+    });
+  }
+
+  // Filter by provider
   if (currentProviderFilter !== 'all') {
     filtered = filtered.filter(m => {
       const owner = m.owned_by || m.provider || 'other';
@@ -512,6 +1052,7 @@ export function filterModels() {
     });
   }
 
+  // Filter by search
   if (search) {
     filtered = filtered.filter(m => {
       const id = (m.id || m.name || '').toLowerCase();
@@ -524,6 +1065,275 @@ export function filterModels() {
 }
 
 export const debouncedFilterModels = debounce(filterModels, 150);
+
+// ========== Cost Calculator Functions ==========
+
+/**
+ * Initialize the cost calculator
+ */
+export function initCalculator() {
+  populateCalculatorModels();
+}
+
+/**
+ * Populate the calculator model dropdown
+ */
+function populateCalculatorModels() {
+  const select = document.getElementById('calcModelSelect');
+  if (!select) return;
+  
+  const allModels = getAllModels() || [];
+  const modelPricingConfig = getModelPricingConfig();
+  
+  // Get all models with pricing (from config or defaults)
+  const modelsWithPricing = [];
+  
+  // Add models from pricing config
+  Object.keys(modelPricingConfig).forEach(id => {
+    modelsWithPricing.push({ id, source: 'configured' });
+  });
+  
+  // Add models from default pricing
+  Object.keys(DEFAULT_MODEL_PRICING).forEach(id => {
+    if (!modelPricingConfig[id]) {
+      modelsWithPricing.push({ id, source: 'default' });
+    }
+  });
+  
+  // Add API models that might have default pricing
+  allModels.forEach(m => {
+    const id = m.id || m.name;
+    if (id && !modelPricingConfig[id] && !DEFAULT_MODEL_PRICING[id]) {
+      const defaultPrice = getDefaultPricing(id);
+      if (defaultPrice) {
+        modelsWithPricing.push({ id, source: 'matched' });
+      }
+    }
+  });
+  
+  // Sort by name
+  modelsWithPricing.sort((a, b) => a.id.localeCompare(b.id));
+  
+  // Build options
+  select.innerHTML = '<option value="">-- Select a model --</option>';
+  
+  if (modelsWithPricing.length > 0) {
+    const configured = modelsWithPricing.filter(m => m.source === 'configured');
+    const defaults = modelsWithPricing.filter(m => m.source !== 'configured');
+    
+    if (configured.length > 0) {
+      const group = document.createElement('optgroup');
+      group.label = 'Configured Pricing';
+      configured.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = m.id;
+        group.appendChild(opt);
+      });
+      select.appendChild(group);
+    }
+    
+    if (defaults.length > 0) {
+      const group = document.createElement('optgroup');
+      group.label = 'Default Pricing';
+      defaults.forEach(m => {
+        const opt = document.createElement('option');
+        opt.value = m.id;
+        opt.textContent = m.id;
+        group.appendChild(opt);
+      });
+      select.appendChild(group);
+    }
+  }
+}
+
+/**
+ * Update calculator preview/results
+ */
+export function updateCalculatorPreview() {
+  const modelId = document.getElementById('calcModelSelect')?.value;
+  const inputTokens = parseInt(document.getElementById('calcInputTokens')?.value) || 0;
+  const outputTokens = parseInt(document.getElementById('calcOutputTokens')?.value) || 0;
+  const cachedTokens = parseInt(document.getElementById('calcCachedTokens')?.value) || 0;
+  const numRequests = parseInt(document.getElementById('calcRequests')?.value) || 1;
+  
+  const resultsContainer = document.getElementById('calculatorResults');
+  const pricingContainer = document.getElementById('calcModelPricing');
+  const comparisonContainer = document.getElementById('calculatorComparison');
+  
+  if (!modelId) {
+    resultsContainer.innerHTML = `
+      <div class="calculator-empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <p>Select a model and enter token counts to see cost estimates</p>
+      </div>
+    `;
+    pricingContainer.style.display = 'none';
+    updateComparisonBars(inputTokens, outputTokens, cachedTokens, numRequests);
+    return;
+  }
+  
+  // Get pricing for selected model
+  const modelPricingConfig = getModelPricingConfig();
+  let pricing = modelPricingConfig[modelId] || getDefaultPricing(modelId);
+  
+  if (!pricing) {
+    resultsContainer.innerHTML = `
+      <div class="calculator-empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <p>No pricing configured for this model. <a href="#" onclick="switchModelsTab('models-pricing');return false;" style="color:var(--accent-cyan)">Configure pricing</a></p>
+      </div>
+    `;
+    pricingContainer.style.display = 'none';
+    return;
+  }
+  
+  // Calculate costs
+  const inputCost = (inputTokens / 1_000_000) * (pricing.input || 0);
+  const outputCost = (outputTokens / 1_000_000) * (pricing.output || 0);
+  const cachedCost = (cachedTokens / 1_000_000) * (pricing.cached_input || pricing.input || 0);
+  const totalCost = (inputCost + outputCost + cachedCost) * numRequests;
+  
+  // Update pricing info
+  document.getElementById('calcPriceInput').textContent = `$${(pricing.input || 0).toFixed(2)}`;
+  document.getElementById('calcPriceOutput').textContent = `$${(pricing.output || 0).toFixed(2)}`;
+  document.getElementById('calcPriceCached').textContent = `$${(pricing.cached_input || 0).toFixed(2)}`;
+  pricingContainer.style.display = 'block';
+  
+  // Update results
+  if (inputTokens === 0 && outputTokens === 0 && cachedTokens === 0) {
+    resultsContainer.innerHTML = `
+      <div class="calculator-empty-state">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <p>Enter token counts to calculate cost</p>
+      </div>
+    `;
+  } else {
+    resultsContainer.innerHTML = `
+      <div class="calculator-result-display">
+        <div class="calculator-total-cost">$${totalCost.toFixed(4)}</div>
+        <div class="calculator-cost-label">Estimated Total Cost${numRequests > 1 ? ` (${numRequests} requests)` : ''}</div>
+        <div class="calculator-breakdown">
+          <div class="breakdown-item">
+            <div class="label">Input</div>
+            <div class="value cyan">$${(inputCost * numRequests).toFixed(4)}</div>
+          </div>
+          <div class="breakdown-item">
+            <div class="label">Output</div>
+            <div class="value purple">$${(outputCost * numRequests).toFixed(4)}</div>
+          </div>
+          <div class="breakdown-item">
+            <div class="label">Cached</div>
+            <div class="value green">$${(cachedCost * numRequests).toFixed(4)}</div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+  
+  // Update comparison bars
+  updateComparisonBars(inputTokens, outputTokens, cachedTokens, numRequests);
+}
+
+/**
+ * Update comparison bars with costs for all models
+ */
+function updateComparisonBars(inputTokens, outputTokens, cachedTokens, numRequests) {
+  const container = document.getElementById('calculatorComparison');
+  if (!container) return;
+  
+  if (inputTokens === 0 && outputTokens === 0) {
+    container.innerHTML = `
+      <div class="comparison-empty-state">
+        <p>Enter token counts above to compare costs across all configured models</p>
+      </div>
+    `;
+    return;
+  }
+  
+  const modelPricingConfig = getModelPricingConfig();
+  const costs = [];
+  
+  // Calculate costs for all configured models
+  Object.entries(modelPricingConfig).forEach(([id, pricing]) => {
+    const inputCost = (inputTokens / 1_000_000) * (pricing.input || 0);
+    const outputCost = (outputTokens / 1_000_000) * (pricing.output || 0);
+    const cachedCost = (cachedTokens / 1_000_000) * (pricing.cached_input || pricing.input || 0);
+    const total = (inputCost + outputCost + cachedCost) * numRequests;
+    costs.push({ id, total });
+  });
+  
+  // Add defaults for comparison if not already configured
+  Object.entries(DEFAULT_MODEL_PRICING).forEach(([id, pricing]) => {
+    if (!modelPricingConfig[id]) {
+      const inputCost = (inputTokens / 1_000_000) * (pricing.input || 0);
+      const outputCost = (outputTokens / 1_000_000) * (pricing.output || 0);
+      const cachedCost = (cachedTokens / 1_000_000) * (pricing.cached_input || pricing.input || 0);
+      const total = (inputCost + outputCost + cachedCost) * numRequests;
+      costs.push({ id, total });
+    }
+  });
+  
+  if (costs.length === 0) {
+    container.innerHTML = `
+      <div class="comparison-empty-state">
+        <p>No models with pricing configured. <a href="#" onclick="switchModelsTab('models-pricing');return false;" style="color:var(--accent-cyan)">Configure pricing</a></p>
+      </div>
+    `;
+    return;
+  }
+  
+  // Sort by cost
+  costs.sort((a, b) => a.total - b.total);
+  
+  // Take top 10
+  const topCosts = costs.slice(0, 10);
+  const maxCost = Math.max(...topCosts.map(c => c.total));
+  
+  container.innerHTML = `
+    <div class="comparison-bars">
+      ${topCosts.map((c, i) => `
+        <div class="comparison-bar-item${i === 0 ? ' cheapest' : ''}">
+          <div class="comparison-bar-name" title="${escapeHtml(c.id)}">${escapeHtml(c.id)}</div>
+          <div class="comparison-bar-wrapper">
+            <div class="comparison-bar-fill${i === 0 ? ' cheapest' : ''}" style="width: ${maxCost > 0 ? (c.total / maxCost * 100) : 0}%"></div>
+          </div>
+          <div class="comparison-bar-cost">$${c.total.toFixed(4)}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+/**
+ * Set calculator preset values
+ */
+export function setCalcPreset(preset) {
+  const presets = {
+    small: { input: 10000, output: 5000 },
+    medium: { input: 100000, output: 50000 },
+    large: { input: 1000000, output: 500000 }
+  };
+  
+  const p = presets[preset];
+  if (p) {
+    document.getElementById('calcInputTokens').value = p.input;
+    document.getElementById('calcOutputTokens').value = p.output;
+    updateCalculatorPreview();
+  }
+}
 
 /**
  * Load pricing configuration from server
@@ -567,6 +1377,9 @@ export async function switchModelsTab(tabId) {
   if (tabId === 'models-pricing') {
     await loadPricingConfig();
     renderPricingModels();
+  } else if (tabId === 'models-calculator') {
+    await loadPricingConfig();
+    initCalculator();
   }
 }
 
@@ -1094,7 +1907,16 @@ window.modelsModule = {
   applyDefaultPricing,
   clearAllPricing,
   exportPricing,
-  importPricingPrompt
+  importPricingPrompt,
+  // New functions
+  toggleFavorite,
+  toggleFavoritesFilter,
+  setModelsView,
+  setModelsSort,
+  toggleSortDropdown,
+  initCalculator,
+  updateCalculatorPreview,
+  setCalcPreset
 };
 
 // Also expose directly for simpler onclick handlers
@@ -1118,3 +1940,13 @@ window.applyDefaultPricing = applyDefaultPricing;
 window.clearAllPricing = clearAllPricing;
 window.exportPricing = exportPricing;
 window.importPricingPrompt = importPricingPrompt;
+
+// New functions
+window.toggleFavorite = toggleFavorite;
+window.toggleFavoritesFilter = toggleFavoritesFilter;
+window.setModelsView = setModelsView;
+window.setModelsSort = setModelsSort;
+window.toggleSortDropdown = toggleSortDropdown;
+window.initCalculator = initCalculator;
+window.updateCalculatorPreview = updateCalculatorPreview;
+window.setCalcPreset = setCalcPreset;
