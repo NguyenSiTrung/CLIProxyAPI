@@ -55,3 +55,6 @@ conductor/*
 
 # Git
 .gitattributes
+
+# Factory AI
+.factory/
