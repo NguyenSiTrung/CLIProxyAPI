@@ -1968,6 +1968,7 @@ export function initModelsTabEventListeners() {
   const modelsTabBtn = document.getElementById('models-tab-btn');
   const pricingTabBtn = document.getElementById('pricing-tab-btn');
   const calculatorTabBtn = document.getElementById('calculator-tab-btn');
+  const examplesTabBtn = document.getElementById('examples-tab-btn');
   
   if (modelsTabBtn) {
     modelsTabBtn.addEventListener('click', () => switchModelsTab('models-list'));
@@ -1977,6 +1978,9 @@ export function initModelsTabEventListeners() {
   }
   if (calculatorTabBtn) {
     calculatorTabBtn.addEventListener('click', () => switchModelsTab('models-calculator'));
+  }
+  if (examplesTabBtn) {
+    examplesTabBtn.addEventListener('click', () => switchModelsTab('models-examples'));
   }
   
   // Search inputs
@@ -2078,4 +2082,45 @@ if (document.readyState === 'loading') {
   initModelsTabEventListeners();
 }
 
+/**
+ * Copy API example code to clipboard
+ * @param {string} exampleId - The ID of the example element to copy
+ */
+export async function copyApiExample(exampleId) {
+  const codeElement = document.getElementById(exampleId);
+  if (!codeElement) {
+    toast.error('Could not find example code');
+    return;
+  }
+
+  const code = codeElement.textContent;
+  const button = codeElement.closest('.api-example-card')?.querySelector('.btn-copy-code');
+
+  try {
+    await navigator.clipboard.writeText(code);
+    
+    if (button) {
+      const originalHTML = button.innerHTML;
+      button.classList.add('copied');
+      button.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        Copied!
+      `;
+      
+      setTimeout(() => {
+        button.classList.remove('copied');
+        button.innerHTML = originalHTML;
+      }, 2000);
+    }
+    
+    toast.success('Copied to clipboard');
+  } catch (err) {
+    console.error('Failed to copy:', err);
+    toast.error('Failed to copy to clipboard');
+  }
+}
+
 window.initModelsTabEventListeners = initModelsTabEventListeners;
+window.copyApiExample = copyApiExample;

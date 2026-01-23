@@ -567,6 +567,13 @@
             </svg>
             Cost Calculator
           </button>
+          <button class="models-tab" id="examples-tab-btn" data-tab="models-examples" role="tab" aria-selected="false" aria-controls="models-examples">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="16 18 22 12 16 6"/>
+              <polyline points="8 6 2 12 8 18"/>
+            </svg>
+            API Examples
+          </button>
         </div>
 
         <!-- Keyboard Shortcuts Hint -->
@@ -881,6 +888,180 @@
                   <p>Enter token counts above to compare costs across all configured models</p>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- API Examples Tab Content -->
+        <div id="models-examples" class="models-tab-content" role="tabpanel" aria-labelledby="examples-tab-btn">
+          <div class="api-examples-container">
+            <div class="api-examples-header">
+              <h3>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="16 18 22 12 16 6"/>
+                  <polyline points="8 6 2 12 8 18"/>
+                </svg>
+                API Usage Examples
+              </h3>
+              <p class="api-examples-subtitle">Copy these curl examples to test your proxy. Replace <code>YOUR_API_KEY</code> with your access key and <code>YOUR_HOST</code> with your server address.</p>
+            </div>
+
+            <!-- OpenAI Compatible Format -->
+            <div class="api-example-card">
+              <div class="api-example-header">
+                <div class="api-example-title">
+                  <span class="api-example-badge openai">OpenAI Compatible</span>
+                  <h4>Chat Completions (Recommended)</h4>
+                </div>
+                <button class="btn-copy-code" onclick="copyApiExample('openai-compatible')" title="Copy to clipboard">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  </svg>
+                  Copy
+                </button>
+              </div>
+              <div class="api-example-description">
+                <p>Use this format for OpenAI SDK compatibility. Works with any model through the unified endpoint.</p>
+              </div>
+              <pre class="api-example-code" id="openai-compatible"><code>curl -X POST "http://YOUR_HOST:8080/v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{
+    "model": "claude-sonnet-4-20250514",
+    "messages": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Hello, how are you?"}
+    ],
+    "max_tokens": 1024,
+    "temperature": 0.7,
+    "stream": false
+  }'</code></pre>
+              <div class="api-example-notes">
+                <strong>Streaming example:</strong>
+                <pre class="api-example-code-inline"><code>curl -X POST "http://YOUR_HOST:8080/v1/chat/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{
+    "model": "gemini-2.5-pro",
+    "messages": [{"role": "user", "content": "Write a poem"}],
+    "stream": true
+  }'</code></pre>
+              </div>
+            </div>
+
+            <!-- OpenAI Legacy Format -->
+            <div class="api-example-card">
+              <div class="api-example-header">
+                <div class="api-example-title">
+                  <span class="api-example-badge legacy">OpenAI Legacy</span>
+                  <h4>Completions (Legacy)</h4>
+                </div>
+                <button class="btn-copy-code" onclick="copyApiExample('openai-legacy')" title="Copy to clipboard">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  </svg>
+                  Copy
+                </button>
+              </div>
+              <div class="api-example-description">
+                <p>Legacy completions endpoint for older applications. Uses prompt-based format instead of messages.</p>
+              </div>
+              <pre class="api-example-code" id="openai-legacy"><code>curl -X POST "http://YOUR_HOST:8080/v1/completions" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{
+    "model": "gemini-2.5-flash",
+    "prompt": "Write a short story about a robot:",
+    "max_tokens": 512,
+    "temperature": 0.8
+  }'</code></pre>
+            </div>
+
+            <!-- Anthropic Native Format -->
+            <div class="api-example-card">
+              <div class="api-example-header">
+                <div class="api-example-title">
+                  <span class="api-example-badge anthropic">Anthropic Native</span>
+                  <h4>Messages API</h4>
+                </div>
+                <button class="btn-copy-code" onclick="copyApiExample('anthropic-native')" title="Copy to clipboard">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  </svg>
+                  Copy
+                </button>
+              </div>
+              <div class="api-example-description">
+                <p>Native Anthropic format for Claude models. Uses <code>x-api-key</code> header and Anthropic's message structure.</p>
+              </div>
+              <pre class="api-example-code" id="anthropic-native"><code>curl -X POST "http://YOUR_HOST:8080/v1/messages" \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: YOUR_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -d '{
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 1024,
+    "system": "You are a helpful coding assistant.",
+    "messages": [
+      {"role": "user", "content": "Explain async/await in JavaScript"}
+    ]
+  }'</code></pre>
+              <div class="api-example-notes">
+                <strong>With streaming:</strong>
+                <pre class="api-example-code-inline"><code>curl -X POST "http://YOUR_HOST:8080/v1/messages" \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: YOUR_API_KEY" \
+  -H "anthropic-version: 2023-06-01" \
+  -d '{
+    "model": "claude-sonnet-4-20250514",
+    "max_tokens": 1024,
+    "stream": true,
+    "messages": [{"role": "user", "content": "Hello Claude!"}]
+  }'</code></pre>
+              </div>
+            </div>
+
+            <!-- List Models -->
+            <div class="api-example-card">
+              <div class="api-example-header">
+                <div class="api-example-title">
+                  <span class="api-example-badge utility">Utility</span>
+                  <h4>List Available Models</h4>
+                </div>
+                <button class="btn-copy-code" onclick="copyApiExample('list-models')" title="Copy to clipboard">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
+                    <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                  </svg>
+                  Copy
+                </button>
+              </div>
+              <div class="api-example-description">
+                <p>Retrieve the list of all available models from the proxy.</p>
+              </div>
+              <pre class="api-example-code" id="list-models"><code>curl "http://YOUR_HOST:8080/v1/models" \
+  -H "Authorization: Bearer YOUR_API_KEY"</code></pre>
+            </div>
+
+            <!-- Tips Section -->
+            <div class="api-examples-tips">
+              <h4>
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="12" y1="16" x2="12" y2="12"/>
+                  <line x1="12" y1="8" x2="12.01" y2="8"/>
+                </svg>
+                Tips
+              </h4>
+              <ul>
+                <li><strong>Model names:</strong> Use any model from the "Available Models" tab. The proxy routes to the correct provider automatically.</li>
+                <li><strong>API Keys:</strong> Create access keys in the "API Keys" tab. Use them in the <code>Authorization</code> header.</li>
+                <li><strong>Streaming:</strong> Add <code>"stream": true</code> for real-time token streaming responses.</li>
+                <li><strong>Provider routing:</strong> You can prefix model names with provider (e.g., <code>anthropic/claude-sonnet-4-20250514</code>) for explicit routing.</li>
+              </ul>
             </div>
           </div>
         </div>
