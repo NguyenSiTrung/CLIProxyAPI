@@ -149,8 +149,13 @@ export function setModelsView(view) {
  */
 export function toggleSortDropdown() {
   const dropdown = document.querySelector('.models-sort-dropdown');
+  const sortBtn = document.getElementById('modelsSortBtn');
   if (dropdown) {
-    dropdown.classList.toggle('open');
+    const isOpen = dropdown.classList.toggle('open');
+    // Update aria-expanded attribute for accessibility
+    if (sortBtn) {
+      sortBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    }
   }
 }
 
@@ -1368,7 +1373,10 @@ export async function savePricingConfig() {
  */
 export async function switchModelsTab(tabId) {
   document.querySelectorAll('.models-tab').forEach(tab => {
-    tab.classList.toggle('active', tab.dataset.tab === tabId);
+    const isActive = tab.dataset.tab === tabId;
+    tab.classList.toggle('active', isActive);
+    // Update aria-selected attribute for accessibility
+    tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
   });
   document.querySelectorAll('.models-tab-content').forEach(content => {
     content.classList.toggle('active', content.id === tabId);
@@ -1950,3 +1958,124 @@ window.toggleSortDropdown = toggleSortDropdown;
 window.initCalculator = initCalculator;
 window.updateCalculatorPreview = updateCalculatorPreview;
 window.setCalcPreset = setCalcPreset;
+
+/**
+ * Initialize event listeners for the Models tab section
+ * This replaces inline onclick handlers for better accessibility and code quality
+ */
+export function initModelsTabEventListeners() {
+  // Tab buttons
+  const modelsTabBtn = document.getElementById('models-tab-btn');
+  const pricingTabBtn = document.getElementById('pricing-tab-btn');
+  const calculatorTabBtn = document.getElementById('calculator-tab-btn');
+  
+  if (modelsTabBtn) {
+    modelsTabBtn.addEventListener('click', () => switchModelsTab('models-list'));
+  }
+  if (pricingTabBtn) {
+    pricingTabBtn.addEventListener('click', () => switchModelsTab('models-pricing'));
+  }
+  if (calculatorTabBtn) {
+    calculatorTabBtn.addEventListener('click', () => switchModelsTab('models-calculator'));
+  }
+  
+  // Search inputs
+  const modelSearch = document.getElementById('modelSearch');
+  const pricingSearch = document.getElementById('pricingSearch');
+  
+  if (modelSearch) {
+    modelSearch.addEventListener('input', debouncedFilterModels);
+  }
+  if (pricingSearch) {
+    pricingSearch.addEventListener('input', debouncedFilterPricingModels);
+  }
+  
+  // Clear search button
+  const modelSearchClear = document.getElementById('modelSearchClear');
+  if (modelSearchClear) {
+    modelSearchClear.addEventListener('click', clearModelSearch);
+  }
+  
+  // Favorites button
+  const favoritesBtn = document.getElementById('modelsFavoritesBtn');
+  if (favoritesBtn) {
+    favoritesBtn.addEventListener('click', toggleFavoritesFilter);
+  }
+  
+  // Sort button and options
+  const sortBtn = document.getElementById('modelsSortBtn');
+  if (sortBtn) {
+    sortBtn.addEventListener('click', toggleSortDropdown);
+  }
+  
+  // Sort options
+  const sortMenu = document.getElementById('modelsSortMenu');
+  if (sortMenu) {
+    sortMenu.querySelectorAll('.sort-option').forEach(option => {
+      option.addEventListener('click', () => {
+        const sort = option.dataset.sort;
+        if (sort) {
+          setModelsSort(sort);
+          toggleSortDropdown(); // Close dropdown after selection
+        }
+      });
+    });
+  }
+  
+  // View toggle buttons
+  document.querySelectorAll('.view-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const view = btn.dataset.view;
+      if (view) {
+        setModelsView(view);
+      }
+    });
+  });
+  
+  // Filter pills (delegate to container for dynamically added pills)
+  const filterPillsContainer = document.getElementById('modelsFilterPills');
+  if (filterPillsContainer) {
+    filterPillsContainer.addEventListener('click', (e) => {
+      const pill = e.target.closest('.models-filter-pill');
+      if (pill) {
+        const provider = pill.dataset.provider;
+        if (provider) {
+          filterModelsByProvider(provider);
+        }
+      }
+    });
+  }
+  
+  // Pricing preset buttons
+  const addCustomModelBtn = document.getElementById('addCustomModelBtn');
+  const applyDefaultPricingBtn = document.getElementById('applyDefaultPricingBtn');
+  const clearAllPricingBtn = document.getElementById('clearAllPricingBtn');
+  const exportPricingBtn = document.getElementById('exportPricingBtn');
+  const importPricingBtn = document.getElementById('importPricingBtn');
+  
+  if (addCustomModelBtn) {
+    addCustomModelBtn.addEventListener('click', openCustomPricingModal);
+  }
+  if (applyDefaultPricingBtn) {
+    applyDefaultPricingBtn.addEventListener('click', applyDefaultPricing);
+  }
+  if (clearAllPricingBtn) {
+    clearAllPricingBtn.addEventListener('click', clearAllPricing);
+  }
+  if (exportPricingBtn) {
+    exportPricingBtn.addEventListener('click', exportPricing);
+  }
+  if (importPricingBtn) {
+    importPricingBtn.addEventListener('click', importPricingPrompt);
+  }
+}
+
+// Initialize event listeners when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initModelsTabEventListeners);
+} else {
+  // DOM is already ready, initialize immediately
+  initModelsTabEventListeners();
+}
+
+window.initModelsTabEventListeners = initModelsTabEventListeners;

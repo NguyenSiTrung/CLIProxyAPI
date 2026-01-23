@@ -539,21 +539,21 @@
         </div>
 
         <!-- Models Tabs -->
-        <div class="models-tabs">
-          <button class="models-tab active" data-tab="models-list" onclick="switchModelsTab('models-list')">
+        <div class="models-tabs" role="tablist">
+          <button class="models-tab active" id="models-tab-btn" data-tab="models-list" role="tab" aria-selected="true" aria-controls="models-list">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
             </svg>
             Available Models
           </button>
-          <button class="models-tab" data-tab="models-pricing" onclick="switchModelsTab('models-pricing')">
+          <button class="models-tab" id="pricing-tab-btn" data-tab="models-pricing" role="tab" aria-selected="false" aria-controls="models-pricing">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="12" y1="1" x2="12" y2="23"/>
               <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
             </svg>
             Model Pricing
           </button>
-          <button class="models-tab" data-tab="models-calculator" onclick="switchModelsTab('models-calculator')">
+          <button class="models-tab" id="calculator-tab-btn" data-tab="models-calculator" role="tab" aria-selected="false" aria-controls="models-calculator">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="4" y="2" width="16" height="20" rx="2"/>
               <line x1="8" y1="6" x2="16" y2="6"/>
@@ -578,14 +578,14 @@
         </div>
 
         <!-- Available Models Tab Content -->
-        <div id="models-list" class="models-tab-content active">
+        <div id="models-list" class="models-tab-content active" role="tabpanel" aria-labelledby="models-tab-btn">
           <div class="models-toolbar">
             <div class="models-search-container">
               <svg class="models-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
               </svg>
-              <input type="text" id="modelSearch" class="models-search-input" placeholder="Search models by name or provider... (Press /)" oninput="debouncedFilterModels()">
-              <button class="models-search-clear" id="modelSearchClear" onclick="clearModelSearch()" style="display:none">
+              <input type="text" id="modelSearch" class="models-search-input" placeholder="Search models by name or provider... (Press /)" aria-label="Search models by name or provider">
+              <button class="models-search-clear" id="modelSearchClear" style="display:none" aria-label="Clear search">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
@@ -594,7 +594,7 @@
             
             <!-- View Toggle & Sort Controls -->
             <div class="models-view-controls">
-              <button class="models-favorites-btn" id="modelsFavoritesBtn" onclick="toggleFavoritesFilter()" title="Show favorites only (F)">
+              <button class="models-favorites-btn" id="modelsFavoritesBtn" title="Show favorites only (F)" aria-label="Show favorites only">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                   <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
                 </svg>
@@ -602,7 +602,7 @@
               </button>
               
               <div class="models-sort-dropdown">
-                <button class="models-sort-btn" id="modelsSortBtn" onclick="toggleSortDropdown()">
+                <button class="models-sort-btn" id="modelsSortBtn" aria-label="Sort models" aria-expanded="false" aria-haspopup="listbox">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="4" y1="6" x2="20" y2="6"/>
                     <line x1="4" y1="12" x2="16" y2="12"/>
@@ -613,20 +613,20 @@
                     <polyline points="6 9 12 15 18 9"/>
                   </svg>
                 </button>
-                <div class="models-sort-menu" id="modelsSortMenu">
-                  <button class="sort-option active" data-sort="name-asc" onclick="setModelsSort('name-asc')">
+                <div class="models-sort-menu" id="modelsSortMenu" role="listbox">
+                  <button class="sort-option active" data-sort="name-asc" role="option">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"/></svg>
                     Name (A-Z)
                   </button>
-                  <button class="sort-option" data-sort="name-desc" onclick="setModelsSort('name-desc')">
+                  <button class="sort-option" data-sort="name-desc" role="option">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
                     Name (Z-A)
                   </button>
-                  <button class="sort-option" data-sort="provider" onclick="setModelsSort('provider')">
+                  <button class="sort-option" data-sort="provider" role="option">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
                     Provider
                   </button>
-                  <button class="sort-option" data-sort="favorites" onclick="setModelsSort('favorites')">
+                  <button class="sort-option" data-sort="favorites" role="option">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
                     Favorites First
                   </button>
@@ -634,7 +634,7 @@
               </div>
               
               <div class="models-view-toggle">
-                <button class="view-toggle-btn active" data-view="grouped" onclick="setModelsView('grouped')" title="Grouped View">
+                <button class="view-toggle-btn active" data-view="grouped" title="Grouped View" aria-label="Grouped view">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="3" y="3" width="7" height="7"/>
                     <rect x="14" y="3" width="7" height="7"/>
@@ -642,7 +642,7 @@
                     <rect x="14" y="14" width="7" height="7"/>
                   </svg>
                 </button>
-                <button class="view-toggle-btn" data-view="grid" onclick="setModelsView('grid')" title="Grid View (G)">
+                <button class="view-toggle-btn" data-view="grid" title="Grid View (G)" aria-label="Grid view">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <rect x="3" y="3" width="7" height="7" rx="1"/>
                     <rect x="14" y="3" width="7" height="7" rx="1"/>
@@ -650,7 +650,7 @@
                     <rect x="14" y="14" width="7" height="7" rx="1"/>
                   </svg>
                 </button>
-                <button class="view-toggle-btn" data-view="list" onclick="setModelsView('list')" title="List View">
+                <button class="view-toggle-btn" data-view="list" title="List View" aria-label="List view">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="8" y1="6" x2="21" y2="6"/>
                     <line x1="8" y1="12" x2="21" y2="12"/>
@@ -665,7 +665,7 @@
           </div>
           
           <div class="models-filter-pills" id="modelsFilterPills">
-            <button class="models-filter-pill active" data-provider="all" onclick="filterModelsByProvider('all')">All</button>
+            <button class="models-filter-pill active" data-provider="all">All</button>
           </div>
           
           <div id="modelsContainer" class="models-grid-container">
@@ -715,12 +715,12 @@
         </div>
 
         <!-- Model Pricing Tab Content -->
-        <div id="models-pricing" class="models-tab-content">
+        <div id="models-pricing" class="models-tab-content" role="tabpanel" aria-labelledby="pricing-tab-btn">
           <div class="pricing-search-container">
             <svg class="pricing-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
             </svg>
-            <input type="text" id="pricingSearch" class="pricing-search-input" placeholder="Search models to configure pricing..." oninput="debouncedFilterPricingModels()">
+            <input type="text" id="pricingSearch" class="pricing-search-input" placeholder="Search models to configure pricing..." aria-label="Search models to configure pricing">
           </div>
 
           <div class="pricing-presets">
@@ -731,11 +731,11 @@
               Quick Actions
             </div>
             <div class="pricing-preset-btns">
-              <button class="pricing-preset-btn" onclick="openCustomPricingModal()">+ Add Custom Model</button>
-              <button class="pricing-preset-btn" onclick="applyDefaultPricing()">Apply Default Pricing (All Known Models)</button>
-              <button class="pricing-preset-btn" onclick="clearAllPricing()">Clear All Pricing</button>
-              <button class="pricing-preset-btn" onclick="exportPricing()">Export Pricing Config</button>
-              <button class="pricing-preset-btn" onclick="importPricingPrompt()">Import Pricing Config</button>
+              <button class="pricing-preset-btn" id="addCustomModelBtn">+ Add Custom Model</button>
+              <button class="pricing-preset-btn" id="applyDefaultPricingBtn">Apply Default Pricing (All Known Models)</button>
+              <button class="pricing-preset-btn" id="clearAllPricingBtn">Clear All Pricing</button>
+              <button class="pricing-preset-btn" id="exportPricingBtn">Export Pricing Config</button>
+              <button class="pricing-preset-btn" id="importPricingBtn">Import Pricing Config</button>
             </div>
           </div>
 
@@ -748,7 +748,7 @@
         </div>
 
         <!-- Cost Calculator Tab Content -->
-        <div id="models-calculator" class="models-tab-content">
+        <div id="models-calculator" class="models-tab-content" role="tabpanel" aria-labelledby="calculator-tab-btn">
           <div class="calculator-container">
             <div class="calculator-intro">
               <div class="calculator-intro-icon">
