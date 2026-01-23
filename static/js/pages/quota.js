@@ -2755,6 +2755,7 @@ window.resetQuotaFilters = resetQuotaFilters;
 window.handleQuotaBulkAction = handleQuotaBulkAction;
 window.toggleQuotaMoreMenu = toggleQuotaMoreMenu;
 window.closeQuotaMoreMenu = closeQuotaMoreMenu;
+window.fetchVisibleQuotas = fetchVisibleQuotas;
 window.openQuotaFilterDrawer = openQuotaFilterDrawer;
 window.closeQuotaFilterDrawer = closeQuotaFilterDrawer;
 

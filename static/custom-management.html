@@ -2745,7 +2745,7 @@
             </div>
             <div class="quota-sync-status" id="quotaSyncStatus">
               <span class="quota-sync-indicator" id="quotaSyncIndicator"></span>
-              <span id="quotaSyncText">Click Fetch All to load</span>
+              <span id="quotaSyncText" aria-live="polite">Click Fetch All to load</span>
             </div>
           </div>
 
@@ -2761,7 +2761,7 @@
                   <circle cx="11" cy="11" r="8" />
                   <line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
-                <input type="text" id="quotaSearch" class="quota-search-input" placeholder="Search files..." oninput="setQuotaSearch(this.value)">
+                <input type="text" id="quotaSearch" class="quota-search-input" placeholder="Search files..." oninput="setQuotaSearch(this.value)" aria-label="Search quota files">
                 <button class="quota-search-clear" id="quotaSearchClear" onclick="clearQuotaSearch()" style="display:none" aria-label="Clear search">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18" />
@@ -2802,22 +2802,22 @@
                 <span>Fetch All</span>
               </button>
               <div class="quota-more-actions">
-                <button class="quota-more-btn" onclick="toggleQuotaMoreMenu()" aria-label="More actions" id="quotaMoreBtn">
+                <button class="quota-more-btn" onclick="toggleQuotaMoreMenu()" aria-label="More actions" aria-haspopup="menu" aria-expanded="false" id="quotaMoreBtn">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="1"></circle>
                     <circle cx="12" cy="5" r="1"></circle>
                     <circle cx="12" cy="19" r="1"></circle>
                   </svg>
                 </button>
-                <div class="quota-more-menu" id="quotaMoreMenu">
-                  <button class="quota-menu-item" onclick="fetchVisibleQuotas(); closeQuotaMoreMenu()">
+                <div class="quota-more-menu" id="quotaMoreMenu" role="menu">
+                  <button class="quota-menu-item" role="menuitem" onclick="fetchVisibleQuotas(); closeQuotaMoreMenu()">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
                       <circle cx="12" cy="12" r="3" />
                     </svg>
                     Fetch visible only
                   </button>
-                  <button class="quota-menu-item" onclick="resetQuotaFilters(); closeQuotaMoreMenu()">
+                  <button class="quota-menu-item" role="menuitem" onclick="resetQuotaFilters(); closeQuotaMoreMenu()">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M3 6h18" />
                       <path d="M7 12h10" />
@@ -2825,14 +2825,14 @@
                     </svg>
                     Reset all filters
                   </button>
-                  <button class="quota-menu-item" onclick="openManageFavoritesModal(); closeQuotaMoreMenu()">
+                  <button class="quota-menu-item" role="menuitem" onclick="openManageFavoritesModal(); closeQuotaMoreMenu()">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
                     </svg>
                     Manage Favorites
                   </button>
                   <div class="quota-menu-divider"></div>
-                  <button class="quota-menu-item" onclick="setViewMode('detailed'); closeQuotaMoreMenu()">
+                  <button class="quota-menu-item" role="menuitem" onclick="setViewMode('detailed'); closeQuotaMoreMenu()">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <rect x="3" y="3" width="7" height="7"></rect>
                       <rect x="14" y="3" width="7" height="7"></rect>
@@ -2841,7 +2841,7 @@
                     </svg>
                     Detailed view
                   </button>
-                  <button class="quota-menu-item" onclick="setViewMode('compact'); closeQuotaMoreMenu()">
+                  <button class="quota-menu-item" role="menuitem" onclick="setViewMode('compact'); closeQuotaMoreMenu()">
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <line x1="8" y1="6" x2="21" y2="6"></line>
                       <line x1="8" y1="12" x2="21" y2="12"></line>
@@ -2876,7 +2876,7 @@
           <div class="quota-page-info" id="quotaPageInfo"></div>
           <div class="quota-page-controls" id="quotaPageControls"></div>
           <div class="quota-page-size">
-            <span>Show:</span>
+            <label for="quotaPageSize">Show:</label>
             <select id="quotaPageSize" onchange="setQuotaPageSize(this.value)">
               <option value="6">6</option>
               <option value="9" selected>9</option>
