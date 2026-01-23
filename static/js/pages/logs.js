@@ -13,6 +13,20 @@ let scrollThrottleFrame = null;
 let loadRequestId = 0;
 
 /**
+ * Close the modal and clear currentDetailLog reference
+ */
+function closeLogModal() {
+  currentDetailLog = null;
+  closeModal();
+}
+
+// Store event listener references for cleanup
+let scrollHandler = null;
+let clickHandler = null;
+let keydownHandler = null;
+let keyboardShortcutHandler = null;
+
+/**
  * Escape HTML to prevent XSS
  */
 function escapeHtml(text) {
@@ -154,7 +168,14 @@ function getFilteredLogs() {
         regexError = true;
         errorMessage = 'Pattern too long (max 200 chars)';
       } else {
-        searchRegex = new RegExp(searchRaw, 'i');
+        // Check for potentially dangerous regex patterns (nested quantifiers, excessive backtracking)
+        const dangerousPatterns = /(\+|\*|\{[0-9]+,?\})\s*(\+|\*|\?|\{)/;
+        if (dangerousPatterns.test(searchRaw)) {
+          regexError = true;
+          errorMessage = 'Pattern too complex (nested quantifiers not allowed)';
+        } else {
+          searchRegex = new RegExp(searchRaw, 'i');
+        }
       }
     } catch (e) {
       regexError = true;
@@ -165,7 +186,14 @@ function getFilteredLogs() {
   const logs = logState.allLogs.filter(l => {
     if (filter !== 'ALL' && l.level !== filter) return false;
     if (searchRaw) {
-      if (searchRegex) return searchRegex.test(l.raw);
+      if (searchRegex) {
+        try {
+          return searchRegex.test(l.raw);
+        } catch (e) {
+          // Fallback to simple string matching if regex execution fails
+          return l.raw.toLowerCase().includes(searchLower);
+        }
+      }
       return l.raw.toLowerCase().includes(searchLower);
     }
     return true;
@@ -307,7 +335,7 @@ export function showLogDetail(idx) {
     </div>
   `;
   document.getElementById('modalFooter').innerHTML = `
-    <button class="btn btn-secondary" onclick="window.logsModule.closeModal()">Close</button>
+    <button class="btn btn-secondary" onclick="window.logsModule.closeLogModal()">Close</button>
   `;
   
   const modalContent = document.getElementById('modalContent');
@@ -418,6 +446,46 @@ export function stopLogAutoRefresh() {
 }
 
 /**
+ * Cleanup all event listeners and resources
+ * Call this when leaving the logs page to prevent memory leaks
+ */
+export function cleanupLogs() {
+  // Stop auto-refresh and clear timers
+  stopLogAutoRefresh();
+  
+  // Cancel any pending scroll throttle frame
+  if (scrollThrottleFrame) {
+    cancelAnimationFrame(scrollThrottleFrame);
+    scrollThrottleFrame = null;
+  }
+  
+  // Remove scroll event listener
+  const v = document.getElementById('logViewer');
+  if (v && scrollHandler) {
+    v.removeEventListener('scroll', scrollHandler);
+  }
+  
+  // Remove event delegation listeners
+  if (v && clickHandler) {
+    v.removeEventListener('click', clickHandler);
+  }
+  if (v && keydownHandler) {
+    v.removeEventListener('keydown', keydownHandler);
+  }
+  
+  // Remove keyboard shortcut listener
+  if (keyboardShortcutHandler) {
+    document.removeEventListener('keydown', keyboardShortcutHandler);
+  }
+  
+  // Clear handler references
+  scrollHandler = null;
+  clickHandler = null;
+  keydownHandler = null;
+  keyboardShortcutHandler = null;
+}
+
+/**
  * Scroll logs to bottom
  */
 export function scrollLogsToBottom() {
@@ -438,36 +506,43 @@ export function scrollLogsToBottom() {
  */
 export function setupLogScrollTracking() {
   const v = document.getElementById('logViewer');
-  if (v) {
-    v.addEventListener('scroll', () => {
-      if (scrollThrottleFrame) return;
-      
-      scrollThrottleFrame = requestAnimationFrame(() => {
-        scrollThrottleFrame = null;
-        
-        const logState = getLogState();
-        const isAtBottom = v.scrollTop + v.clientHeight >= v.scrollHeight - 50;
-        
-        if (logState.isAtBottom !== isAtBottom) {
-          updateLogState({ isAtBottom });
-        }
-        
-        const btn = document.getElementById('scrollBottomBtn');
-        if (btn) {
-          if (!isAtBottom && logState.allLogs.length > 10) {
-            btn.classList.add('visible');
-          } else {
-            btn.classList.remove('visible');
-            if (logState.newLogsWhileScrolled !== 0) {
-              updateLogState({ newLogsWhileScrolled: 0 });
-            }
-            const badge = document.getElementById('newLogsBadge');
-            if (badge) badge.style.display = 'none';
-          }
-        }
-      });
-    });
+  if (!v) return;
+  
+  // Remove existing handler if present to prevent duplicates
+  if (scrollHandler) {
+    v.removeEventListener('scroll', scrollHandler);
   }
+  
+  scrollHandler = () => {
+    if (scrollThrottleFrame) return;
+    
+    scrollThrottleFrame = requestAnimationFrame(() => {
+      scrollThrottleFrame = null;
+      
+      const logState = getLogState();
+      const isAtBottom = v.scrollTop + v.clientHeight >= v.scrollHeight - 50;
+      
+      if (logState.isAtBottom !== isAtBottom) {
+        updateLogState({ isAtBottom });
+      }
+      
+      const btn = document.getElementById('scrollBottomBtn');
+      if (btn) {
+        if (!isAtBottom && logState.allLogs.length > 10) {
+          btn.classList.add('visible');
+        } else {
+          btn.classList.remove('visible');
+          if (logState.newLogsWhileScrolled !== 0) {
+            updateLogState({ newLogsWhileScrolled: 0 });
+          }
+          const badge = document.getElementById('newLogsBadge');
+          if (badge) badge.style.display = 'none';
+        }
+      }
+    });
+  };
+  
+  v.addEventListener('scroll', scrollHandler);
 }
 
 /**
@@ -478,7 +553,15 @@ export function setupLogEventDelegation() {
   const v = document.getElementById('logViewer');
   if (!v) return;
   
-  v.addEventListener('click', (e) => {
+  // Remove existing handlers if present to prevent duplicates
+  if (clickHandler) {
+    v.removeEventListener('click', clickHandler);
+  }
+  if (keydownHandler) {
+    v.removeEventListener('keydown', keydownHandler);
+  }
+  
+  clickHandler = (e) => {
     const copyBtn = e.target.closest('.copy-btn');
     const detailsBtn = e.target.closest('.details-btn');
     const logEntry = e.target.closest('.log-entry');
@@ -497,9 +580,9 @@ export function setupLogEventDelegation() {
       }
       return;
     }
-  });
+  };
   
-  v.addEventListener('keydown', (e) => {
+  keydownHandler = (e) => {
     const logEntry = e.target.closest('.log-entry');
     if (!logEntry) return;
     
@@ -513,7 +596,10 @@ export function setupLogEventDelegation() {
       e.preventDefault();
       copyLogEntry(logEntry);
     }
-  });
+  };
+  
+  v.addEventListener('click', clickHandler);
+  v.addEventListener('keydown', keydownHandler);
 }
 
 /**
@@ -530,13 +616,19 @@ export function exportLogs() {
   const blob = new Blob([logText], { type: 'text/plain' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  a.href = url;
-  a.download = `cliproxy-logs-${new Date().toISOString().slice(0, 10)}.txt`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  toast('Logs exported successfully', 'success');
+  
+  try {
+    a.href = url;
+    a.download = `cliproxy-logs-${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    toast('Logs exported successfully', 'success');
+  } catch (e) {
+    toast('Failed to export logs: ' + e.message, 'error');
+  } finally {
+    URL.revokeObjectURL(url);
+  }
 }
 
 /**
@@ -575,7 +667,7 @@ export function clearLogs(confirmed = false) {
       </div>
     `;
     document.getElementById('modalFooter').innerHTML = `
-      <button class="btn btn-secondary" onclick="window.logsModule.closeModal()">Cancel</button>
+      <button class="btn btn-secondary" onclick="window.logsModule.closeLogModal()">Cancel</button>
       <button class="btn btn-danger" onclick="window.logsModule.clearLogs(true)">Yes, Clear All</button>
     `;
     document.getElementById('modal').classList.add('active');
@@ -622,6 +714,7 @@ export async function loadLogs(isAuto = false) {
 
     const d = await api('GET', url);
     
+    // Check if this request is still the latest one before processing
     if (thisRequestId !== loadRequestId) {
       return;
     }
@@ -630,6 +723,11 @@ export async function loadLogs(isAuto = false) {
     const newLogs = lines
       .filter(l => !l.includes('/v0/management/logs'))
       .map(parseLogLine);
+
+    // Re-check after processing to ensure we're still the latest request
+    if (thisRequestId !== loadRequestId) {
+      return;
+    }
 
     if (isAuto && logState.latestTimestamp > 0 && newLogs.length > 0) {
       const allLogs = [...logState.allLogs, ...newLogs].slice(-1000);
@@ -655,6 +753,12 @@ export async function loadLogs(isAuto = false) {
       else if (l.level === 'INFO') infoCount++;
       else if (l.level === 'DEBUG') debugCount++;
     }
+    
+    // Final check before updating UI state
+    if (thisRequestId !== loadRequestId) {
+      return;
+    }
+    
     updateLogState({ errorCount, warnCount, infoCount, debugCount });
 
     renderLogs();
@@ -670,7 +774,10 @@ export async function loadLogs(isAuto = false) {
       toast('Failed to load logs: ' + e.message, 'error');
     }
   } finally {
-    if (btn) btn.classList.remove('loading');
+    // Only remove loading state if this is still the latest request
+    if (thisRequestId === loadRequestId && btn) {
+      btn.classList.remove('loading');
+    }
   }
 }
 
@@ -715,7 +822,12 @@ async function loadLogFileInfo() {
  * Initialize log keyboard shortcuts
  */
 export function initLogKeyboardShortcuts() {
-  document.addEventListener('keydown', (e) => {
+  // Remove existing handler if present to prevent duplicates
+  if (keyboardShortcutHandler) {
+    document.removeEventListener('keydown', keyboardShortcutHandler);
+  }
+  
+  keyboardShortcutHandler = (e) => {
     const logsPage = document.getElementById('page-logs');
     if (!logsPage || !logsPage.classList.contains('active')) return;
 
@@ -731,7 +843,9 @@ export function initLogKeyboardShortcuts() {
       e.preventDefault();
       scrollLogsToBottom();
     }
-  });
+  };
+  
+  document.addEventListener('keydown', keyboardShortcutHandler);
 }
 
 // Expose module functions globally for onclick handlers
@@ -743,6 +857,7 @@ window.logsModule = {
   clearLogFilters,
   toggleAutoRefresh,
   stopLogAutoRefresh,
+  cleanupLogs,
   scrollLogsToBottom,
   jumpToNextError,
   exportLogs,
@@ -750,6 +865,7 @@ window.logsModule = {
   copyLogToClipboard,
   copyLogEntry,
   closeModal,
+  closeLogModal,
   setupLogEventDelegation
 };
 
@@ -761,6 +877,7 @@ window.clearLogs = clearLogs;
 window.clearLogFilters = clearLogFilters;
 window.toggleAutoRefresh = toggleAutoRefresh;
 window.stopLogAutoRefresh = stopLogAutoRefresh;
+window.cleanupLogs = cleanupLogs;
 window.scrollLogsToBottom = scrollLogsToBottom;
 window.jumpToNextError = jumpToNextError;
 window.exportLogs = exportLogs;

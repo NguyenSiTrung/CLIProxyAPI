@@ -157,6 +157,14 @@ export function updateConfigState(updates) {
 // --- Reset functions ---
 
 export function resetLogState() {
+  // Clear any existing timers before resetting to prevent orphaned timers
+  if (logState.autoRefreshInterval) {
+    clearInterval(logState.autoRefreshInterval);
+  }
+  if (logState.searchDebounceTimer) {
+    clearTimeout(logState.searchDebounceTimer);
+  }
+  
   logState = {
     allLogs: [],
     renderedLogs: [],
