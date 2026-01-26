@@ -392,6 +392,35 @@ export function handleGenerateKey() {
 }
 
 /**
+ * Handle expiration dropdown change - show/hide custom input
+ */
+export function handleExpirationChange(select) {
+  const container = document.getElementById('customExpirationContainer');
+  const customInput = document.getElementById('customExpirationInput');
+  if (select.value === 'custom') {
+    container.style.display = 'block';
+    customInput?.focus();
+  } else {
+    container.style.display = 'none';
+    if (customInput) customInput.value = '';
+  }
+}
+
+/**
+ * Get the expiration value - either from dropdown or custom input
+ */
+function getExpirationValue() {
+  const select = document.getElementById('newKeyExpiration');
+  if (!select) return '';
+  
+  if (select.value === 'custom') {
+    const customInput = document.getElementById('customExpirationInput');
+    return customInput?.value.trim() || '';
+  }
+  return select.value;
+}
+
+/**
  * Open modal to add a new key
  */
 export function openAddKeyModal(type) {
@@ -410,7 +439,7 @@ export function openAddKeyModal(type) {
   const expirationDropdownHtml = isAccessKey ? `
     <div class="form-group">
       <label>Expires In (optional)</label>
-      <select id="newKeyExpiration" class="form-input">
+      <select id="newKeyExpiration" class="form-input" onchange="window.keysModule.handleExpirationChange(this)">
         <option value="">Never expires</option>
         <option value="1h">1 hour</option>
         <option value="2h">2 hours</option>
@@ -420,7 +449,12 @@ export function openAddKeyModal(type) {
         <option value="2d">2 days</option>
         <option value="7d">7 days</option>
         <option value="30d">30 days</option>
+        <option value="custom">Custom...</option>
       </select>
+      <div id="customExpirationContainer" style="display: none; margin-top: 8px;">
+        <input type="text" id="customExpirationInput" class="form-input" placeholder="e.g. 3h12m, 2d6h, 90m" autocomplete="off">
+        <small style="color: var(--text-muted); margin-top: 4px; display: block;">Format: Xh (hours), Xm (minutes), Xd (days). Examples: 3h12m, 2d6h, 90m</small>
+      </div>
     </div>` : '';
 
   const content = `
@@ -473,7 +507,7 @@ export async function addApiKey(type) {
 
     const body = { old: '', new: v };
     if (type === 'access') {
-      const expiresIn = document.getElementById('newKeyExpiration')?.value;
+      const expiresIn = getExpirationValue();
       if (expiresIn) {
         body.expires_in = expiresIn;
       }
@@ -1761,6 +1795,7 @@ export const keysModule = {
   setupKeysTabHandlers,
   generateRandomKey,
   handleGenerateKey,
+  handleExpirationChange,
   loadCostLimits,
   refreshCostLimits,
   refreshAllCostData,

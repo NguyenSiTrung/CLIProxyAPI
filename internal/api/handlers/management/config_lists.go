@@ -78,7 +78,8 @@ func (h *Handler) patchStringList(c *gin.Context, target *[]string, after func()
 
 // parseExpiresIn parses a duration string and returns the expiration time.
 // Supported formats:
-//   - Duration with suffix: "1h", "2h", "1d", "2d", "7d" (h=hours, d=days)
+//   - Simple duration: "1h", "2h", "1d", "2d", "7d", "30m" (h=hours, d=days, m=minutes)
+//   - Compound duration: "3h12m", "2d6h", "1d12h30m" (multiple units combined)
 //   - RFC3339 timestamp: "2006-01-02T15:04:05Z07:00"
 //
 // Returns nil if the input is empty or invalid.
@@ -93,30 +94,69 @@ func parseExpiresIn(expiresIn string) (*time.Time, error) {
 		return &t, nil
 	}
 
-	// Parse duration string like "1h", "2h", "1d", "2d", "7d"
-	if len(expiresIn) < 2 {
-		return nil, fmt.Errorf("invalid expires_in format: %s", expiresIn)
+	// Parse compound duration string like "3h12m", "2d6h", "1d12h30m"
+	duration, err := parseCompoundDuration(expiresIn)
+	if err != nil {
+		return nil, err
 	}
-
-	suffix := expiresIn[len(expiresIn)-1]
-	numStr := expiresIn[:len(expiresIn)-1]
-	num, err := strconv.Atoi(numStr)
-	if err != nil || num <= 0 {
-		return nil, fmt.Errorf("invalid expires_in format: %s", expiresIn)
-	}
-
-	var duration time.Duration
-	switch suffix {
-	case 'h', 'H':
-		duration = time.Duration(num) * time.Hour
-	case 'd', 'D':
-		duration = time.Duration(num) * 24 * time.Hour
-	default:
-		return nil, fmt.Errorf("invalid expires_in format: %s (supported suffixes: h, d)", expiresIn)
+	if duration <= 0 {
+		return nil, fmt.Errorf("invalid expires_in format: %s (duration must be positive)", expiresIn)
 	}
 
 	expiresAt := time.Now().Add(duration)
 	return &expiresAt, nil
+}
+
+// parseCompoundDuration parses a compound duration string like "3h12m", "2d6h", "1d12h30m".
+// Supported units: d (days), h (hours), m (minutes)
+func parseCompoundDuration(s string) (time.Duration, error) {
+	s = strings.ToLower(strings.TrimSpace(s))
+	if s == "" {
+		return 0, fmt.Errorf("empty duration string")
+	}
+
+	var total time.Duration
+	var numBuf strings.Builder
+	hasAnyUnit := false
+
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= '0' && c <= '9' {
+			numBuf.WriteByte(c)
+		} else if c == 'd' || c == 'h' || c == 'm' {
+			if numBuf.Len() == 0 {
+				return 0, fmt.Errorf("invalid duration format: missing number before '%c' in %s", c, s)
+			}
+			num, err := strconv.Atoi(numBuf.String())
+			if err != nil {
+				return 0, fmt.Errorf("invalid duration format: %s", s)
+			}
+			numBuf.Reset()
+			hasAnyUnit = true
+
+			switch c {
+			case 'd':
+				total += time.Duration(num) * 24 * time.Hour
+			case 'h':
+				total += time.Duration(num) * time.Hour
+			case 'm':
+				total += time.Duration(num) * time.Minute
+			}
+		} else {
+			return 0, fmt.Errorf("invalid duration format: unexpected character '%c' in %s (supported: d, h, m)", c, s)
+		}
+	}
+
+	// Check for trailing digits without unit
+	if numBuf.Len() > 0 {
+		return 0, fmt.Errorf("invalid duration format: trailing number without unit in %s", s)
+	}
+
+	if !hasAnyUnit {
+		return 0, fmt.Errorf("invalid duration format: no valid units found in %s (supported: d, h, m)", s)
+	}
+
+	return total, nil
 }
 
 func (h *Handler) deleteFromStringList(c *gin.Context, target *[]string, after func()) {
