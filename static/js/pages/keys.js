@@ -269,10 +269,19 @@ function renderKeyList(id, keys, type) {
     const displayKey = isRevealed ? escapeHtml(fullKey) : escapeHtml(maskedKey);
     const escapedKey = escapeJsString(fullKey);
 
-    // For access keys, check if has cost limit
-    const keyHasLimit = isAccessKey && limitsMap[fullKey] !== undefined;
+    const keyLimitData = isAccessKey ? limitsMap[fullKey] : null;
+    const hasConfiguredLimit = !!(keyLimitData && (
+      (keyLimitData.max_cost && keyLimitData.max_cost > 0) ||
+      (keyLimitData.max_requests && keyLimitData.max_requests > 0) ||
+      (Array.isArray(keyLimitData.quota_rules) && keyLimitData.quota_rules.length > 0)
+    ));
+    const keyHasLimit = isAccessKey && hasConfiguredLimit;
     const limitBadge = keyHasLimit ? '<span class="key-limit-badge" title="Cost limit configured">$</span>' : '';
     const limitButtonLabel = keyHasLimit ? 'Edit Limit' : 'Set Limit';
+
+    // For access keys, check if has expiration set
+    const hasExpiration = keyLimitData && keyLimitData.expires_at;
+    const expirationBadge = hasExpiration ? '<span class="key-expiration-badge" title="Key has expiration">⏱</span>' : '';
     const limitData = limitsMap[fullKey] || {};
     const limitButtonOnclick = keyHasLimit 
       ? `window.keysModule.openEditLimitModal('${escapedKey}', ${limitData.max_cost || 0}, ${limitData.max_requests || 0}, '${escapeJsString(limitData.auto_reset_interval || '')}')`
@@ -294,6 +303,7 @@ function renderKeyList(id, keys, type) {
       '<div class="key-value-wrapper">' +
       '<div class="key-value ' + (isRevealed ? 'revealed' : '') + '" id="key-display-' + keyId + '">' + displayKey + '</div>' +
       limitBadge +
+      expirationBadge +
       '</div>' +
       '<div class="key-meta">' + escapeHtml(keyMeta) + '</div>' +
       '</div>' +
@@ -396,6 +406,23 @@ export function openAddKeyModal(type) {
       </svg>
     </button>` : '';
   
+  // Expiration dropdown HTML - only for access keys
+  const expirationDropdownHtml = isAccessKey ? `
+    <div class="form-group">
+      <label>Expires In (optional)</label>
+      <select id="newKeyExpiration" class="form-input">
+        <option value="">Never expires</option>
+        <option value="1h">1 hour</option>
+        <option value="2h">2 hours</option>
+        <option value="6h">6 hours</option>
+        <option value="12h">12 hours</option>
+        <option value="1d">1 day</option>
+        <option value="2d">2 days</option>
+        <option value="7d">7 days</option>
+        <option value="30d">30 days</option>
+      </select>
+    </div>` : '';
+
   const content = `
     <div class="key-format-hint">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -409,7 +436,8 @@ export function openAddKeyModal(type) {
         <input type="text" id="newKeyValue" class="form-input" placeholder="${typeInfo.prefix ? 'e.g. ' + typeInfo.prefix + '...' : 'Enter your API key'}" autocomplete="off" spellcheck="false" style="flex: 1;">
         ${generateButtonHtml}
       </div>
-    </div>`;
+    </div>
+    ${expirationDropdownHtml}`;
 
   const footer = `
     <button class="btn btn-secondary" onclick="window.closeModal()">Cancel</button>
@@ -443,7 +471,14 @@ export async function addApiKey(type) {
     };
     const ep = epMap[type];
 
-    await api('PATCH', ep, { old: '', new: v });
+    const body = { old: '', new: v };
+    if (type === 'access') {
+      const expiresIn = document.getElementById('newKeyExpiration')?.value;
+      if (expiresIn) {
+        body.expires_in = expiresIn;
+      }
+    }
+    await api('PATCH', ep, body);
     closeModal();
     toast('API key added successfully', 'success');
     loadKeys();

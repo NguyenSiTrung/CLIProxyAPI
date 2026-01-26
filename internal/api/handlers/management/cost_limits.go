@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
@@ -44,7 +45,16 @@ func (h *Handler) GetAccessKeyLimits(c *gin.Context) {
 		CurrentRequests   int64           `json:"current_requests"`
 		AutoResetInterval string          `json:"auto_reset_interval,omitempty"`
 		NextResetTime     string          `json:"next_reset_time,omitempty"`
+		ExpiresAt         string          `json:"expires_at,omitempty"`
 		QuotaRules        []quotaRuleInfo `json:"quota_rules,omitempty"`
+	}
+
+	// Build a map of ExpiresAt from config for lookup
+	expiresAtMap := make(map[string]*time.Time)
+	for _, keyLimit := range h.cfg.AccessKeyLimits.Keys {
+		if keyLimit.ExpiresAt != nil {
+			expiresAtMap[keyLimit.APIKey] = keyLimit.ExpiresAt
+		}
 	}
 
 	keys := costManager.GetAllLimits()
@@ -57,6 +67,11 @@ func (h *Handler) GetAccessKeyLimits(c *gin.Context) {
 			MaxRequests:       k.MaxRequests,
 			CurrentRequests:   k.CurrentRequests,
 			AutoResetInterval: k.AutoResetInterval,
+		}
+
+		// Include expires_at if set
+		if expiresAt, ok := expiresAtMap[k.APIKey]; ok && expiresAt != nil {
+			info.ExpiresAt = expiresAt.Format(time.RFC3339)
 		}
 
 		// For legacy single-tier keys, compute next reset time
@@ -87,11 +102,11 @@ func (h *Handler) GetAccessKeyLimits(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"enabled":                      costManager.IsEnabled(),
-		"default_max_cost":             costManager.GetDefaultMaxCost(),
-		"default_max_requests":         costManager.GetDefaultMaxRequests(),
-		"count_only_success_requests":  costManager.CountOnlySuccessRequests(),
-		"keys":                         keyInfos,
+		"enabled":                     costManager.IsEnabled(),
+		"default_max_cost":            costManager.GetDefaultMaxCost(),
+		"default_max_requests":        costManager.GetDefaultMaxRequests(),
+		"count_only_success_requests": costManager.CountOnlySuccessRequests(),
+		"keys":                        keyInfos,
 	})
 }
 
@@ -169,10 +184,23 @@ func (h *Handler) PutAccessKeyLimit(c *gin.Context) {
 		MaxRequests       *int64            `json:"max_requests"`
 		AutoResetInterval *string           `json:"auto_reset_interval"`
 		QuotaRules        *[]QuotaRuleInput `json:"quota_rules"`
+		ExpiresAt         *string           `json:"expires_at"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON body"})
 		return
+	}
+
+	// Parse expires_at if provided (empty string clears expiration)
+	expiresAtProvided := body.ExpiresAt != nil
+	var expiresAt *time.Time
+	if expiresAtProvided && strings.TrimSpace(*body.ExpiresAt) != "" {
+		t, err := time.Parse(time.RFC3339, strings.TrimSpace(*body.ExpiresAt))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid expires_at format: expected RFC3339 timestamp"})
+			return
+		}
+		expiresAt = &t
 	}
 
 	// Check if this is a multi-tier update (quota_rules is present)
@@ -185,6 +213,9 @@ func (h *Handler) PutAccessKeyLimit(c *gin.Context) {
 			h.mu.Lock()
 			h.updateAccessKeyQuotaRulesLocked(apiKey, nil) // Clear multi-tier rules
 			h.updateAccessKeyLimitLocked(apiKey, body.MaxCost, body.MaxRequests, body.AutoResetInterval)
+			if expiresAtProvided {
+				h.updateAccessKeyExpiresAtLocked(apiKey, expiresAt)
+			}
 			h.mu.Unlock()
 			h.persist(c)
 			return
@@ -210,14 +241,17 @@ func (h *Handler) PutAccessKeyLimit(c *gin.Context) {
 		// Lock and update
 		h.mu.Lock()
 		h.updateAccessKeyQuotaRulesLocked(apiKey, configRules)
+		if expiresAtProvided {
+			h.updateAccessKeyExpiresAtLocked(apiKey, expiresAt)
+		}
 		h.mu.Unlock()
 		h.persist(c)
 		return
 	}
 
 	// Legacy single-tier mode
-	if body.MaxCost == nil && body.MaxRequests == nil && body.AutoResetInterval == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "at least one of max_cost, max_requests, auto_reset_interval, or quota_rules is required"})
+	if body.MaxCost == nil && body.MaxRequests == nil && body.AutoResetInterval == nil && !expiresAtProvided {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "at least one of max_cost, max_requests, auto_reset_interval, quota_rules, or expires_at is required"})
 		return
 	}
 
@@ -234,6 +268,9 @@ func (h *Handler) PutAccessKeyLimit(c *gin.Context) {
 	// Lock to ensure thread-safe modification of config and atomic persist
 	h.mu.Lock()
 	h.updateAccessKeyLimitLocked(apiKey, body.MaxCost, body.MaxRequests, body.AutoResetInterval)
+	if expiresAtProvided {
+		h.updateAccessKeyExpiresAtLocked(apiKey, expiresAt)
+	}
 	h.mu.Unlock()
 	h.persist(c)
 }
@@ -336,6 +373,28 @@ func (h *Handler) updateAccessKeyLimitLocked(apiKey string, maxCost *float64, ma
 		newEntry.AutoResetInterval = *autoResetInterval
 	}
 	h.cfg.AccessKeyLimits.Keys = append(h.cfg.AccessKeyLimits.Keys, newEntry)
+}
+
+// updateAccessKeyExpiresAtLocked updates the expiration time for a specific API key.
+// If expiresAt is nil, the expiration is cleared. If the key doesn't exist, it creates a new entry.
+// IMPORTANT: Caller must hold h.mu lock.
+func (h *Handler) updateAccessKeyExpiresAtLocked(apiKey string, expiresAt *time.Time) {
+	// Find existing key entry
+	for i, keyLimit := range h.cfg.AccessKeyLimits.Keys {
+		if keyLimit.APIKey == apiKey {
+			h.cfg.AccessKeyLimits.Keys[i].ExpiresAt = expiresAt
+			return
+		}
+	}
+
+	// Key not found, only create new entry if expiresAt is set
+	if expiresAt != nil {
+		newEntry := config.AccessKeyLimit{
+			APIKey:    apiKey,
+			ExpiresAt: expiresAt,
+		}
+		h.cfg.AccessKeyLimits.Keys = append(h.cfg.AccessKeyLimits.Keys, newEntry)
+	}
 }
 
 // ResetAccessKeyLimit resets the accumulated cost/requests for a specific API key to zero.

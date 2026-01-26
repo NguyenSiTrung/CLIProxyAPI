@@ -3,7 +3,9 @@ package management
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
@@ -74,6 +76,49 @@ func (h *Handler) patchStringList(c *gin.Context, target *[]string, after func()
 	c.JSON(400, gin.H{"error": "missing fields"})
 }
 
+// parseExpiresIn parses a duration string and returns the expiration time.
+// Supported formats:
+//   - Duration with suffix: "1h", "2h", "1d", "2d", "7d" (h=hours, d=days)
+//   - RFC3339 timestamp: "2006-01-02T15:04:05Z07:00"
+//
+// Returns nil if the input is empty or invalid.
+func parseExpiresIn(expiresIn string) (*time.Time, error) {
+	expiresIn = strings.TrimSpace(expiresIn)
+	if expiresIn == "" {
+		return nil, nil
+	}
+
+	// Try parsing as RFC3339 timestamp first
+	if t, err := time.Parse(time.RFC3339, expiresIn); err == nil {
+		return &t, nil
+	}
+
+	// Parse duration string like "1h", "2h", "1d", "2d", "7d"
+	if len(expiresIn) < 2 {
+		return nil, fmt.Errorf("invalid expires_in format: %s", expiresIn)
+	}
+
+	suffix := expiresIn[len(expiresIn)-1]
+	numStr := expiresIn[:len(expiresIn)-1]
+	num, err := strconv.Atoi(numStr)
+	if err != nil || num <= 0 {
+		return nil, fmt.Errorf("invalid expires_in format: %s", expiresIn)
+	}
+
+	var duration time.Duration
+	switch suffix {
+	case 'h', 'H':
+		duration = time.Duration(num) * time.Hour
+	case 'd', 'D':
+		duration = time.Duration(num) * 24 * time.Hour
+	default:
+		return nil, fmt.Errorf("invalid expires_in format: %s (supported suffixes: h, d)", expiresIn)
+	}
+
+	expiresAt := time.Now().Add(duration)
+	return &expiresAt, nil
+}
+
 func (h *Handler) deleteFromStringList(c *gin.Context, target *[]string, after func()) {
 	if idxStr := c.Query("index"); idxStr != "" {
 		var idx int
@@ -113,8 +158,82 @@ func (h *Handler) PutAPIKeys(c *gin.Context) {
 	}, nil)
 }
 func (h *Handler) PatchAPIKeys(c *gin.Context) {
-	h.patchStringList(c, &h.cfg.APIKeys, func() { h.cfg.Access.Providers = nil })
+	var body struct {
+		Old       *string `json:"old"`
+		New       *string `json:"new"`
+		Index     *int    `json:"index"`
+		Value     *string `json:"value"`
+		ExpiresIn *string `json:"expires_in"`
+	}
+	if err := c.ShouldBindJSON(&body); err != nil {
+		c.JSON(400, gin.H{"error": "invalid body"})
+		return
+	}
+
+	// Parse expires_in if provided
+	var expiresAt *time.Time
+	if body.ExpiresIn != nil {
+		var err error
+		expiresAt, err = parseExpiresIn(*body.ExpiresIn)
+		if err != nil {
+			c.JSON(400, gin.H{"error": err.Error()})
+			return
+		}
+	}
+
+	// Handle update by index
+	if body.Index != nil && body.Value != nil && *body.Index >= 0 && *body.Index < len(h.cfg.APIKeys) {
+		h.cfg.APIKeys[*body.Index] = *body.Value
+		h.cfg.Access.Providers = nil
+		h.persist(c)
+		return
+	}
+
+	// Handle update/add by old/new values
+	if body.Old != nil && body.New != nil {
+		newKey := *body.New
+		isNewKey := true
+		for i := range h.cfg.APIKeys {
+			if h.cfg.APIKeys[i] == *body.Old {
+				h.cfg.APIKeys[i] = newKey
+				isNewKey = false
+				break
+			}
+		}
+		if isNewKey {
+			h.cfg.APIKeys = append(h.cfg.APIKeys, newKey)
+		}
+		h.cfg.Access.Providers = nil
+
+		// If expires_in was provided, set the expiration in AccessKeyLimits
+		if expiresAt != nil {
+			h.setAccessKeyExpiration(newKey, expiresAt)
+		}
+
+		h.persist(c)
+		return
+	}
+
+	c.JSON(400, gin.H{"error": "missing fields"})
 }
+
+// setAccessKeyExpiration sets the expiration time for an access key in AccessKeyLimits.
+func (h *Handler) setAccessKeyExpiration(apiKey string, expiresAt *time.Time) {
+	// Find existing key entry
+	for i, keyLimit := range h.cfg.AccessKeyLimits.Keys {
+		if keyLimit.APIKey == apiKey {
+			h.cfg.AccessKeyLimits.Keys[i].ExpiresAt = expiresAt
+			return
+		}
+	}
+	// Key not found, create new entry with just the expiration
+	newEntry := config.AccessKeyLimit{
+		APIKey:    apiKey,
+		ExpiresAt: expiresAt,
+	}
+	h.cfg.AccessKeyLimits.Keys = append(h.cfg.AccessKeyLimits.Keys, newEntry)
+}
+
 func (h *Handler) DeleteAPIKeys(c *gin.Context) {
 	h.deleteFromStringList(c, &h.cfg.APIKeys, func() { h.cfg.Access.Providers = nil })
 }

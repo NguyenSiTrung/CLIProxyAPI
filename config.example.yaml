@@ -68,6 +68,7 @@ api-keys:
 #       max-cost: 25.00          # Higher limit for power users
 #       max-requests: 5000       # Request count limit
 #       auto-reset-interval: daily  # Reset counters daily (hourly/daily/weekly/monthly/none/5h)
+#       expires-at: "2026-12-31T00:00:00Z" # Optional expiration time (RFC3339)
 #     - api-key: "your-api-key-2"
 #       max-cost: 5.00           # Lower limit for testing
 #       max-requests: 100        # Lower request limit

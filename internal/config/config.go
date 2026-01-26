@@ -12,6 +12,7 @@ import (
 	"os"
 	"strings"
 	"syscall"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/bcrypt"
@@ -195,6 +196,9 @@ type AccessKeyLimit struct {
 	// All rules are checked and the request is blocked if ANY rule is exceeded.
 	// Each rule resets independently based on its own interval.
 	QuotaRules []QuotaRule `yaml:"quota-rules,omitempty" json:"quota_rules,omitempty"`
+	// ExpiresAt is the time when this access key should be automatically removed.
+	// If nil or zero, the key does not expire.
+	ExpiresAt *time.Time `yaml:"expires-at,omitempty" json:"expires_at,omitempty"`
 }
 
 // AccessKeyAuth defines a binding between a client API key and auth file IDs.

@@ -293,6 +293,20 @@ func (h *Handler) persist(c *gin.Context) bool {
 	return true
 }
 
+// PersistConfigToFile saves the current in-memory config to disk without requiring a gin.Context.
+// This is useful for background operations like expired key cleanup.
+func (h *Handler) PersistConfigToFile() error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if err := config.SaveConfigPreserveComments(h.configFilePath, h.cfg); err != nil {
+		return err
+	}
+	if h.OnConfigChange != nil {
+		h.OnConfigChange(h.cfg)
+	}
+	return nil
+}
+
 // Helper methods for simple types
 func (h *Handler) updateBoolField(c *gin.Context, set func(bool)) {
 	var body struct {

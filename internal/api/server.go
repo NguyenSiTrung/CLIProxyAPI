@@ -282,6 +282,13 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 	cost.DefaultCostLimitPlugin().SetManager(s.costManager)
 	// Set cost manager for management API endpoints
 	s.mgmt.SetCostManager(s.costManager)
+	// Wire up callback to persist config when expired keys are removed
+	s.costManager.SetOnKeysExpired(func(expiredKeys []string) {
+		log.Infof("Removed %d expired access key(s)", len(expiredKeys))
+		if err := s.mgmt.PersistConfigToFile(); err != nil {
+			log.Errorf("Failed to persist config after removing expired keys: %v", err)
+		}
+	})
 	// Load pricing data from /v0/management/model-pricing endpoint (use defaults if unavailable)
 	if s.costManager.Calculator() != nil {
 		// Use localhost when host is empty (binds to all interfaces)

@@ -24,6 +24,9 @@ type Manager struct {
 	requestAccumulator *RequestAccumulator
 	autoResetScheduler *AutoResetScheduler
 	dataDir            string
+	// onKeysExpired is called when expired keys are removed, allowing external
+	// systems (e.g., config persistence) to be notified of the change.
+	onKeysExpired func([]string)
 }
 
 // NewManager creates a new cost limit manager.
@@ -805,8 +808,16 @@ func (m *Manager) StopAutoReset() {
 
 // checkAndPerformAutoResets checks all configured keys and resets counters as needed.
 // For multi-tier quotas, each tier resets independently based on its own interval.
+// It also checks for and removes expired keys at the beginning of each cycle.
 func (m *Manager) checkAndPerformAutoResets() {
-	if m == nil || m.cfg == nil || !m.IsEnabled() {
+	if m == nil || m.cfg == nil {
+		return
+	}
+
+	// Check and remove expired keys first
+	m.CheckAndRemoveExpiredKeys()
+
+	if !m.IsEnabled() {
 		return
 	}
 
@@ -937,4 +948,111 @@ func (m *Manager) GetNextResetTime(apiKey string) time.Time {
 		return time.Time{}
 	}
 	return NextResetTime(lastReset, interval)
+}
+
+// SetOnKeysExpired sets the callback function that is invoked when expired keys are removed.
+// The callback receives a slice of API keys that were removed due to expiration.
+func (m *Manager) SetOnKeysExpired(callback func([]string)) {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.onKeysExpired = callback
+}
+
+// CheckAndRemoveExpiredKeys removes API keys that have passed their expiration time.
+// Returns the list of expired keys that were removed and whether any changes were made.
+func (m *Manager) CheckAndRemoveExpiredKeys() (removed []string, changed bool) {
+	if m == nil || m.cfg == nil {
+		return nil, false
+	}
+
+	m.mu.Lock()
+	now := time.Now()
+
+	// Collect expired keys
+	var expiredKeys []string
+	for _, keyLimit := range m.cfg.AccessKeyLimits.Keys {
+		if keyLimit.ExpiresAt != nil && keyLimit.ExpiresAt.Before(now) {
+			expiredKeys = append(expiredKeys, keyLimit.APIKey)
+		}
+	}
+
+	if len(expiredKeys) == 0 {
+		m.mu.Unlock()
+		return nil, false
+	}
+
+	// Build a set for efficient lookup
+	expiredSet := make(map[string]struct{}, len(expiredKeys))
+	for _, key := range expiredKeys {
+		expiredSet[key] = struct{}{}
+	}
+
+	// Remove expired keys from APIKeys slice
+	newAPIKeys := make([]string, 0, len(m.cfg.APIKeys))
+	for _, key := range m.cfg.APIKeys {
+		if _, expired := expiredSet[key]; !expired {
+			newAPIKeys = append(newAPIKeys, key)
+		}
+	}
+	m.cfg.APIKeys = newAPIKeys
+
+	// Remove expired keys from AccessKeyLimits.Keys slice
+	newLimitKeys := make([]config.AccessKeyLimit, 0, len(m.cfg.AccessKeyLimits.Keys))
+	for _, keyLimit := range m.cfg.AccessKeyLimits.Keys {
+		if _, expired := expiredSet[keyLimit.APIKey]; !expired {
+			newLimitKeys = append(newLimitKeys, keyLimit)
+		}
+	}
+	m.cfg.AccessKeyLimits.Keys = newLimitKeys
+
+	// Get callback reference before unlocking
+	callback := m.onKeysExpired
+	m.mu.Unlock()
+
+	// Clean up accumulated data for each expired key (RemoveLimit handles its own locking)
+	for _, apiKey := range expiredKeys {
+		m.removeAccumulatedData(apiKey)
+	}
+
+	// Invoke callback if set
+	if callback != nil {
+		callback(expiredKeys)
+	}
+
+	return expiredKeys, true
+}
+
+// removeAccumulatedData removes accumulated cost/request data for an API key without modifying config.
+// This is an internal helper used by CheckAndRemoveExpiredKeys after config has already been updated.
+func (m *Manager) removeAccumulatedData(apiKey string) {
+	// Delete accumulated data - legacy/base key
+	m.accumulator.Delete(apiKey)
+	m.requestAccumulator.Delete(apiKey)
+
+	// Delete tier data by prefix scan (works even if config entry was already removed)
+	prefix := apiKey + TierKeyDelimiter
+	for k := range m.accumulator.GetAll() {
+		if len(k) > len(prefix) && k[:len(prefix)] == prefix {
+			m.accumulator.Delete(k)
+			if m.autoResetScheduler != nil {
+				m.autoResetScheduler.Cancel(k)
+			}
+		}
+	}
+	for k := range m.requestAccumulator.GetAll() {
+		if len(k) > len(prefix) && k[:len(prefix)] == prefix {
+			m.requestAccumulator.Delete(k)
+			if m.autoResetScheduler != nil {
+				m.autoResetScheduler.Cancel(k)
+			}
+		}
+	}
+
+	// Remove base key from auto-reset scheduler
+	if m.autoResetScheduler != nil {
+		m.autoResetScheduler.Cancel(apiKey)
+	}
 }
