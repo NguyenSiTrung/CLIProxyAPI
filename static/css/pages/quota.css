@@ -71,7 +71,21 @@
 .quota-subtitle {
   color: var(--text-muted);
   font-size: 14px;
+  font-weight: 500;
   margin: 4px 0 0;
+}
+
+.quota-summary-header {
+  display: flex;
+  align-items: center;
+  margin: 2px 0 -6px;
+}
+
+.quota-summary-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
 }
 
 .quota-sync-status {
@@ -304,7 +318,8 @@
 }
 
 .quota-search-input::placeholder {
-  color: var(--text-muted);
+  color: rgba(148, 163, 184, 0.85);
+  letter-spacing: 0.01em;
 }
 
 .quota-search-clear {
@@ -331,6 +346,20 @@
 }
 
 /* Provider Filter */
+.quota-filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.quota-filter-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 .quota-provider-filter {
   display: flex;
   gap: 4px;
@@ -423,6 +452,16 @@
 /* More Actions Dropdown */
 .quota-more-actions {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.quota-more-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
 }
 
 .quota-more-btn {
@@ -543,6 +582,15 @@
 
 .quota-active-filters:empty {
   display: none;
+}
+
+.quota-active-filters:not(:empty)::before {
+  content: "Active filters";
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-right: 4px;
 }
 
 .quota-filter-chip {
@@ -1358,6 +1406,16 @@
   outline-offset: 2px;
 }
 
+.quota-search-input:focus-visible,
+.quota-provider-btn:focus-visible,
+.quota-more-btn:focus-visible,
+.quota-menu-item:focus-visible,
+.quota-filter-chip-remove:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px rgba(0, 229, 255, 0.12);
+}
+
 .quota-card:focus-within {
   border-color: var(--border-glow);
 }
@@ -1403,26 +1461,32 @@
     align-items: stretch;
     gap: 12px;
   }
-  
+
   .quota-toolbar-left {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
+  .quota-filter-group {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
   .quota-toolbar-right {
     justify-content: flex-end;
   }
-  
+
   .quota-search {
     max-width: none;
   }
-  
+
   .quota-provider-filter {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
   }
-  
+
   .quota-provider-filter::-webkit-scrollbar {
     display: none;
   }
@@ -1435,85 +1499,89 @@
   .quota-page-header {
     gap: 16px;
   }
-  
+
   .quota-title-zone {
     flex-direction: column;
     gap: 12px;
   }
-  
+
   .quota-sync-status {
     align-self: flex-start;
   }
-  
+
   .quota-summary-bar {
     padding: 12px;
     gap: 8px;
   }
-  
+
   .quota-summary-divider {
     display: none;
   }
-  
+
   .quota-status-badge {
     flex: 1;
     min-width: 0;
     justify-content: center;
     padding: 10px 8px;
   }
-  
+
   .quota-toolbar {
     padding: 12px;
   }
-  
+
   .quota-toolbar-left {
     gap: 10px;
   }
-  
+
+  .quota-filter-group {
+    display: none;
+  }
+
   .quota-provider-filter {
     display: none;
   }
-  
+
   .quota-toolbar-right {
     width: 100%;
     justify-content: space-between;
   }
-  
+
   .quota-fetch-btn {
     flex: 1;
   }
-  
+
   .quota-cards-grid {
     grid-template-columns: 1fr;
     gap: 12px;
   }
-  
+
   .quota-card {
     padding: 14px;
   }
-  
+
   .quota-circular-progress {
     width: 42px;
     height: 42px;
   }
-  
+
   .quota-circular-progress .progress-text {
     font-size: 10px;
   }
-  
+
   .quota-pagination {
     flex-direction: column;
     gap: 12px;
     align-items: stretch;
   }
-  
+
   .quota-page-controls {
     justify-content: center;
   }
-  
+
   .quota-page-size {
     justify-content: center;
   }
-  
+
   /* Touch-friendly targets */
   .quota-status-badge,
   .quota-provider-btn,
@@ -1521,7 +1589,7 @@
   .quota-page-btn {
     min-height: 44px;
   }
-  
+
   .quota-refresh-btn {
     width: 40px;
     height: 40px;

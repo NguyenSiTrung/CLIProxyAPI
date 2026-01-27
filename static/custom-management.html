@@ -2931,6 +2931,9 @@
           </div>
 
           <!-- Zone 2: Overview Summary (clickable status filters) -->
+          <div class="quota-summary-header">
+            <span class="quota-summary-label">Summary</span>
+          </div>
           <div id="quotaSummaryBar" class="quota-summary-bar"></div>
 
           <!-- Zone 3: Toolbar -->
@@ -2942,7 +2945,7 @@
                   <circle cx="11" cy="11" r="8" />
                   <line x1="21" y1="21" x2="16.65" y2="16.65" />
                 </svg>
-                <input type="text" id="quotaSearch" class="quota-search-input" placeholder="Search files..." oninput="setQuotaSearch(this.value)" aria-label="Search quota files">
+                <input type="text" id="quotaSearch" class="quota-search-input" placeholder="Search auth files or labels..." oninput="setQuotaSearch(this.value)" aria-label="Search quota files">
                 <button class="quota-search-clear" id="quotaSearchClear" onclick="clearQuotaSearch()" style="display:none" aria-label="Clear search">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <line x1="18" y1="6" x2="6" y2="18" />
@@ -2950,24 +2953,27 @@
                   </svg>
                 </button>
               </div>
-              <div class="quota-provider-filter" role="group" aria-label="Provider filter">
-                <button class="quota-provider-btn active" data-filter="all" onclick="setQuotaFilter('all')" aria-pressed="true">All</button>
-                <button class="quota-provider-btn quota-favorites-btn" id="quotaFavoritesFilter" onclick="toggleFavoritesFilter()" aria-pressed="false">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
-                  </svg>
-                  <span>Favorites</span>
-                  <span class="favorites-count"></span>
-                </button>
-                <button class="quota-provider-btn" data-filter="antigravity" onclick="setQuotaFilter('antigravity')" aria-pressed="false">
-                  <span class="provider-dot antigravity"></span>Antigravity
-                </button>
-                <button class="quota-provider-btn" data-filter="codex" onclick="setQuotaFilter('codex')" aria-pressed="false">
-                  <span class="provider-dot codex"></span>Codex
-                </button>
-                <button class="quota-provider-btn" data-filter="gemini-cli" onclick="setQuotaFilter('gemini-cli')" aria-pressed="false">
-                  <span class="provider-dot gemini-cli"></span>Gemini CLI
-                </button>
+              <div class="quota-filter-group">
+                <span class="quota-filter-label">Provider</span>
+                <div class="quota-provider-filter" role="group" aria-label="Provider filter">
+                  <button class="quota-provider-btn active" data-filter="all" onclick="setQuotaFilter('all')" aria-pressed="true">All</button>
+                  <button class="quota-provider-btn quota-favorites-btn" id="quotaFavoritesFilter" onclick="toggleFavoritesFilter()" aria-pressed="false">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+                    </svg>
+                    <span>Favorites</span>
+                    <span class="favorites-count"></span>
+                  </button>
+                  <button class="quota-provider-btn" data-filter="antigravity" onclick="setQuotaFilter('antigravity')" aria-pressed="false">
+                    <span class="provider-dot antigravity"></span>Antigravity
+                  </button>
+                  <button class="quota-provider-btn" data-filter="codex" onclick="setQuotaFilter('codex')" aria-pressed="false">
+                    <span class="provider-dot codex"></span>Codex
+                  </button>
+                  <button class="quota-provider-btn" data-filter="gemini-cli" onclick="setQuotaFilter('gemini-cli')" aria-pressed="false">
+                    <span class="provider-dot gemini-cli"></span>Gemini CLI
+                  </button>
+                </div>
               </div>
             </div>
             
@@ -2983,6 +2989,7 @@
                 <span>Fetch All</span>
               </button>
               <div class="quota-more-actions">
+                <span class="quota-more-label">More</span>
                 <button class="quota-more-btn" onclick="toggleQuotaMoreMenu()" aria-label="More actions" aria-haspopup="menu" aria-expanded="false" id="quotaMoreBtn">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="12" cy="12" r="1"></circle>
