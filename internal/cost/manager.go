@@ -341,21 +341,22 @@ func (m *Manager) CheckRequestLimit(apiKey string) (allowed bool, current int64,
 
 // CheckAndRecordRequest atomically checks the request limit for an API key and,
 // when allowed, increments the request count by 1. It returns whether the
-// request is allowed, the resulting request count, and the configured limit.
+// request is allowed, the resulting request count, the configured limit, and
+// the tier ID that applied (empty for legacy single-tier).
 // When limits are disabled or limit is zero (unlimited), it still increments
 // the counter for tracking purposes.
 // For multi-tier quotas, increments ALL tiers atomically and blocks if ANY tier would exceed.
-func (m *Manager) CheckAndRecordRequest(apiKey string) (allowed bool, current int64, limit int64) {
+func (m *Manager) CheckAndRecordRequest(apiKey string) (allowed bool, current int64, limit int64, tierID string) {
 	if m == nil {
-		return true, 0, 0
+		return true, 0, 0, ""
 	}
 	if !m.IsEnabled() {
-		return true, 0, 0
+		return true, 0, 0, ""
 	}
 
 	rules := m.resolveRules(apiKey)
 	if len(rules) == 0 {
-		return true, 0, 0
+		return true, 0, 0, ""
 	}
 
 	// Single rule: use atomic accumulator method (no lock needed)
@@ -366,13 +367,13 @@ func (m *Manager) CheckAndRecordRequest(apiKey string) (allowed bool, current in
 			m.requestAccumulator.Add(rule.key, 1)
 			current = m.requestAccumulator.Get(rule.key)
 			_ = m.saveRequests()
-			return true, current, 0
+			return true, current, 0, rule.id
 		}
 		ok, newCount := m.requestAccumulator.CheckAndAdd(rule.key, rule.maxReq)
 		if ok {
 			_ = m.saveRequests()
 		}
-		return ok, newCount, rule.maxReq
+		return ok, newCount, rule.maxReq, rule.id
 	}
 
 	// Multi-rule: use per-key lock to ensure atomic check+increment across all tiers
@@ -385,7 +386,7 @@ func (m *Manager) CheckAndRecordRequest(apiKey string) (allowed bool, current in
 			curr := m.requestAccumulator.Get(rule.key)
 			if curr >= rule.maxReq {
 				// Return the exceeded tier's values
-				return false, curr, rule.maxReq
+				return false, curr, rule.maxReq, rule.id
 			}
 		}
 	}
@@ -399,7 +400,7 @@ func (m *Manager) CheckAndRecordRequest(apiKey string) (allowed bool, current in
 	// Return first tier's values for backward compatibility
 	current = m.requestAccumulator.Get(rules[0].key)
 	limit = rules[0].maxReq
-	return true, current, limit
+	return true, current, limit, rules[0].id
 }
 
 // RecordRequest increments the request count for an API key.
@@ -423,18 +424,18 @@ func (m *Manager) GetCurrentRequestCount(apiKey string) int64 {
 // TryReserveRequestSlot attempts to reserve a slot for a request in "count only success" mode.
 // It checks if the combined count of persisted requests plus in-flight reservations is below the limit.
 // For multi-tier quotas, reserves across ALL tiers atomically and blocks if ANY tier would exceed.
-// Returns: allowed, current persisted count, limit.
-func (m *Manager) TryReserveRequestSlot(apiKey string) (allowed bool, current int64, limit int64) {
+// Returns: allowed, current persisted count, limit, tier ID (empty for legacy single-tier).
+func (m *Manager) TryReserveRequestSlot(apiKey string) (allowed bool, current int64, limit int64, tierID string) {
 	if m == nil {
-		return true, 0, 0
+		return true, 0, 0, ""
 	}
 	if !m.IsEnabled() {
-		return true, 0, 0
+		return true, 0, 0, ""
 	}
 
 	rules := m.resolveRules(apiKey)
 	if len(rules) == 0 {
-		return true, 0, 0
+		return true, 0, 0, ""
 	}
 
 	// For multi-tier, use per-key lock to ensure atomic reservation across all tiers
@@ -455,7 +456,7 @@ func (m *Manager) TryReserveRequestSlot(apiKey string) (allowed bool, current in
 					}
 					m.requestAccumulator.Complete(prevRule.key, false)
 				}
-				return false, m.requestAccumulator.Get(rule.key), rule.maxReq
+				return false, m.requestAccumulator.Get(rule.key), rule.maxReq, rule.id
 			}
 		} else {
 			// Unlimited tier - still reserve for tracking
@@ -466,7 +467,7 @@ func (m *Manager) TryReserveRequestSlot(apiKey string) (allowed bool, current in
 	// Return first tier's values for backward compatibility
 	current = m.requestAccumulator.Get(rules[0].key)
 	limit = rules[0].maxReq
-	return true, current, limit
+	return true, current, limit, rules[0].id
 }
 
 // CompleteRequestSlot finalizes a reserved request slot.
@@ -680,25 +681,54 @@ func (m *Manager) GetAllLimits() []KeyLimitInfo {
 			}
 			info.QuotaRules = quotaRules
 
-			// For backward compatibility, aggregate totals from all tiers
-			// Use the first tier with a non-zero value for MaxCost/MaxRequests
-			var aggregatedCost, aggregatedRequests int64
-			var maxCost float64
-			var maxRequests int64
-			for _, rule := range quotaRules {
-				aggregatedCost += int64(rule.CurrentCost * 100) // cents for precision
-				aggregatedRequests += rule.CurrentRequests
-				if maxCost == 0 && rule.MaxCost > 0 {
-					maxCost = rule.MaxCost
+			// For multi-tier keys, choose representative values instead of summing.
+			// We surface the most restrictive tier (highest utilization) for each limit type.
+			var maxCurrentCost float64
+			var maxCurrentRequests int64
+			bestCostIdx := -1
+			bestCostRatio := -1.0
+			bestReqIdx := -1
+			bestReqRatio := -1.0
+
+			for i := range quotaRules {
+				rule := quotaRules[i]
+				if rule.CurrentCost > maxCurrentCost {
+					maxCurrentCost = rule.CurrentCost
 				}
-				if maxRequests == 0 && rule.MaxRequests > 0 {
-					maxRequests = rule.MaxRequests
+				if rule.CurrentRequests > maxCurrentRequests {
+					maxCurrentRequests = rule.CurrentRequests
+				}
+				if rule.MaxCost > 0 {
+					ratio := rule.CurrentCost / rule.MaxCost
+					if ratio > bestCostRatio {
+						bestCostRatio = ratio
+						bestCostIdx = i
+					}
+				}
+				if rule.MaxRequests > 0 {
+					ratio := float64(rule.CurrentRequests) / float64(rule.MaxRequests)
+					if ratio > bestReqRatio {
+						bestReqRatio = ratio
+						bestReqIdx = i
+					}
 				}
 			}
-			info.MaxCost = maxCost
-			info.CurrentCost = float64(aggregatedCost) / 100.0
-			info.MaxRequests = maxRequests
-			info.CurrentRequests = aggregatedRequests
+
+			if bestCostIdx >= 0 {
+				info.MaxCost = quotaRules[bestCostIdx].MaxCost
+				info.CurrentCost = quotaRules[bestCostIdx].CurrentCost
+			} else {
+				info.MaxCost = 0
+				info.CurrentCost = maxCurrentCost
+			}
+
+			if bestReqIdx >= 0 {
+				info.MaxRequests = quotaRules[bestReqIdx].MaxRequests
+				info.CurrentRequests = quotaRules[bestReqIdx].CurrentRequests
+			} else {
+				info.MaxRequests = 0
+				info.CurrentRequests = maxCurrentRequests
+			}
 		} else {
 			// Legacy single-tier mode
 			info.MaxCost = keyLimit.MaxCost

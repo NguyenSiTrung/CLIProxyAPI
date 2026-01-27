@@ -35,10 +35,10 @@ func CostLimitMiddleware(manager *cost.Manager) gin.HandlerFunc {
 			return
 		}
 
-		allowed, current, limit, exceeded := manager.CheckLimit(apiKeyStr)
-		if !allowed {
+		result := manager.CheckLimitDetailed(apiKeyStr)
+		if !result.Allowed {
 			var errorMsg, errorCode string
-			switch exceeded {
+			switch result.Exceeded {
 			case cost.LimitCost:
 				errorCode = "cost_limit_exceeded"
 				errorMsg = "API key has exceeded its cost limit. Contact administrator to reset."
@@ -52,9 +52,10 @@ func CostLimitMiddleware(manager *cost.Manager) gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
 				"error":        errorCode,
 				"message":      errorMsg,
-				"limit_type":   string(exceeded),
-				"current_cost": current,
-				"max_cost":     limit,
+				"limit_type":   string(result.Exceeded),
+				"tier_id":      result.TierID,
+				"current_cost": result.CurrentCost,
+				"max_cost":     result.CostLimit,
 				"currency":     "USD",
 				"api_key":      maskAPIKey(apiKeyStr),
 			})
@@ -64,7 +65,7 @@ func CostLimitMiddleware(manager *cost.Manager) gin.HandlerFunc {
 		// Check if we should count only successful requests
 		if manager.CountOnlySuccessRequests() {
 			// Use reservation system: reserve before, finalize after based on response status
-			allowed, currentReq, reqLimit := manager.TryReserveRequestSlot(apiKeyStr)
+			allowed, currentReq, reqLimit, tierID := manager.TryReserveRequestSlot(apiKeyStr)
 			if !allowed {
 				errorCode := "request_limit_exceeded"
 				errorMsg := "API key has exceeded its request count limit. Contact administrator to reset."
@@ -72,8 +73,9 @@ func CostLimitMiddleware(manager *cost.Manager) gin.HandlerFunc {
 					"error":            errorCode,
 					"message":          errorMsg,
 					"limit_type":       string(cost.LimitRequest),
-					"current_cost":     current,
-					"max_cost":         limit,
+					"tier_id":          tierID,
+					"current_cost":     result.CurrentCost,
+					"max_cost":         result.CostLimit,
 					"currency":         "USD",
 					"api_key":          maskAPIKey(apiKeyStr),
 					"current_requests": currentReq,
@@ -100,15 +102,16 @@ func CostLimitMiddleware(manager *cost.Manager) gin.HandlerFunc {
 
 		// Default mode: count all requests (legacy behavior)
 		// Atomically record the request to enforce request limits without race conditions.
-		if allowed, currentReq, reqLimit := manager.CheckAndRecordRequest(apiKeyStr); !allowed {
+		if allowed, currentReq, reqLimit, tierID := manager.CheckAndRecordRequest(apiKeyStr); !allowed {
 			errorCode := "request_limit_exceeded"
 			errorMsg := "API key has exceeded its request count limit. Contact administrator to reset."
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
 				"error":            errorCode,
 				"message":          errorMsg,
 				"limit_type":       string(cost.LimitRequest),
-				"current_cost":     current,
-				"max_cost":         limit,
+				"tier_id":          tierID,
+				"current_cost":     result.CurrentCost,
+				"max_cost":         result.CostLimit,
 				"currency":         "USD",
 				"api_key":          maskAPIKey(apiKeyStr),
 				"current_requests": currentReq,

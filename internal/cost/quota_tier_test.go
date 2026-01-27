@@ -42,14 +42,14 @@ func TestMultiTierQuotas(t *testing.T) {
 
 		// Make 5 requests (burst limit)
 		for i := 0; i < 5; i++ {
-			allowed, _, _ := m.CheckAndRecordRequest(apiKey)
+			allowed, _, _, _ := m.CheckAndRecordRequest(apiKey)
 			if !allowed {
 				t.Errorf("request %d should be allowed", i+1)
 			}
 		}
 
 		// 6th request should be blocked (burst limit exceeded)
-		allowed, current, limit := m.CheckAndRecordRequest(apiKey)
+		allowed, current, limit, _ := m.CheckAndRecordRequest(apiKey)
 		if allowed {
 			t.Errorf("6th request should be blocked by burst tier")
 		}
@@ -64,7 +64,7 @@ func TestMultiTierQuotas(t *testing.T) {
 		m.resetTier(apiKey, "burst")
 
 		// Now should be allowed again
-		allowed, _, _ = m.CheckAndRecordRequest(apiKey)
+		allowed, _, _, _ = m.CheckAndRecordRequest(apiKey)
 		if !allowed {
 			t.Errorf("request after burst reset should be allowed")
 		}
@@ -100,14 +100,14 @@ func TestMultiTierQuotas(t *testing.T) {
 
 		// Make 10 requests
 		for i := 0; i < 10; i++ {
-			allowed, _, _ := m.CheckAndRecordRequest(apiKey)
+			allowed, _, _, _ := m.CheckAndRecordRequest(apiKey)
 			if !allowed {
 				t.Errorf("request %d should be allowed", i+1)
 			}
 		}
 
 		// 11th should be blocked
-		allowed, _, limit := m.CheckAndRecordRequest(apiKey)
+		allowed, _, limit, _ := m.CheckAndRecordRequest(apiKey)
 		if allowed {
 			t.Errorf("11th request should be blocked")
 		}
@@ -158,6 +158,35 @@ func TestMultiTierQuotas(t *testing.T) {
 			t.Errorf("expected LimitRequest exceeded, got %v", result.Exceeded)
 		}
 	})
+
+	t.Run("GetAllLimits uses most restrictive tier values", func(t *testing.T) {
+		apiKey := "multi-tier-key"
+
+		// Reset tiers and add 5 requests (hits burst limit exactly).
+		m.resetTier(apiKey, "burst")
+		m.resetTier(apiKey, "daily")
+		for i := 0; i < 5; i++ {
+			m.CheckAndRecordRequest(apiKey)
+		}
+
+		limits := m.GetAllLimits()
+		var found *KeyLimitInfo
+		for i := range limits {
+			if limits[i].APIKey == apiKey {
+				found = &limits[i]
+				break
+			}
+		}
+		if found == nil {
+			t.Fatalf("expected to find limit info for %s", apiKey)
+		}
+		if found.MaxRequests != 5 {
+			t.Errorf("expected MaxRequests=5 (burst tier), got %d", found.MaxRequests)
+		}
+		if found.CurrentRequests != 5 {
+			t.Errorf("expected CurrentRequests=5 (burst tier), got %d", found.CurrentRequests)
+		}
+	})
 }
 
 func TestMultiTierQuotaReservation(t *testing.T) {
@@ -189,15 +218,15 @@ func TestMultiTierQuotaReservation(t *testing.T) {
 		apiKey := "reserve-key"
 
 		// Reserve 2 slots (short tier limit)
-		allowed1, _, _ := m.TryReserveRequestSlot(apiKey)
-		allowed2, _, _ := m.TryReserveRequestSlot(apiKey)
+		allowed1, _, _, _ := m.TryReserveRequestSlot(apiKey)
+		allowed2, _, _, _ := m.TryReserveRequestSlot(apiKey)
 
 		if !allowed1 || !allowed2 {
 			t.Errorf("first 2 reservations should be allowed")
 		}
 
 		// 3rd should be blocked by short tier
-		allowed3, _, limit := m.TryReserveRequestSlot(apiKey)
+		allowed3, _, limit, _ := m.TryReserveRequestSlot(apiKey)
 		if allowed3 {
 			t.Errorf("3rd reservation should be blocked by short tier")
 		}
@@ -209,7 +238,7 @@ func TestMultiTierQuotaReservation(t *testing.T) {
 		m.CompleteRequestSlot(apiKey, false)
 
 		// Now should be able to reserve again
-		allowed4, _, _ := m.TryReserveRequestSlot(apiKey)
+		allowed4, _, _, _ := m.TryReserveRequestSlot(apiKey)
 		if !allowed4 {
 			t.Errorf("reservation should be allowed after release")
 		}
