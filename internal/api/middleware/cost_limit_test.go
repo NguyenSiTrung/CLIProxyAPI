@@ -263,6 +263,52 @@ func TestCostLimitMiddleware_PerKeyLimitOverride(t *testing.T) {
 	}
 }
 
+func TestCostLimitMiddleware_CountOnlySuccess_IgnoresResponseErrors(t *testing.T) {
+	cfg := &config.Config{
+		AccessKeyLimits: config.AccessKeyLimits{
+			Enabled:                  true,
+			DefaultMaxRequests:       1,
+			CountOnlySuccessRequests: true,
+		},
+	}
+	manager := cost.NewManager(cfg, "")
+
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		if apiKey := c.GetHeader("X-API-Key"); apiKey != "" {
+			c.Set("apiKey", apiKey)
+		}
+		c.Next()
+	})
+	r.Use(CostLimitMiddleware(manager))
+	r.GET("/test", func(c *gin.Context) {
+		// Simulate a streamed error where HTTP status stays 200 but an error is recorded.
+		c.Set("API_RESPONSE_ERROR", []string{"upstream_error"})
+		c.JSON(http.StatusOK, gin.H{"status": "error"})
+	})
+
+	req1, _ := http.NewRequest("GET", "/test", nil)
+	req1.Header.Set("X-API-Key", "test-key")
+	w1 := httptest.NewRecorder()
+	r.ServeHTTP(w1, req1)
+
+	if w1.Code != http.StatusOK {
+		t.Fatalf("expected first request to return OK, got %d", w1.Code)
+	}
+	if got := manager.GetCurrentRequestCount("test-key"); got != 0 {
+		t.Fatalf("expected failed request not to count, got %d", got)
+	}
+
+	req2, _ := http.NewRequest("GET", "/test", nil)
+	req2.Header.Set("X-API-Key", "test-key")
+	w2 := httptest.NewRecorder()
+	r.ServeHTTP(w2, req2)
+
+	if w2.Code != http.StatusOK {
+		t.Fatalf("expected second request to be allowed after failure, got %d", w2.Code)
+	}
+}
+
 func TestMaskAPIKey(t *testing.T) {
 	tests := []struct {
 		input    string

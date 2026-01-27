@@ -36,6 +36,18 @@ func (h *BaseAPIHandler) ForwardStream(c *gin.Context, flusher http.Flusher, can
 	if cancel == nil {
 		return
 	}
+	recordStreamError := func(errMsg *interfaces.ErrorMessage) {
+		if errMsg == nil {
+			return
+		}
+		if existing, exists := c.Get("API_RESPONSE_ERROR"); exists {
+			if existingErrors, ok := existing.([]*interfaces.ErrorMessage); ok {
+				c.Set("API_RESPONSE_ERROR", append(existingErrors, errMsg))
+				return
+			}
+		}
+		c.Set("API_RESPONSE_ERROR", []*interfaces.ErrorMessage{errMsg})
+	}
 
 	writeChunk := opts.WriteChunk
 	if writeChunk == nil {
@@ -80,6 +92,7 @@ func (h *BaseAPIHandler) ForwardStream(c *gin.Context, flusher http.Flusher, can
 					}
 				}
 				if terminalErr != nil {
+					recordStreamError(terminalErr)
 					if opts.WriteTerminalError != nil {
 						opts.WriteTerminalError(terminalErr)
 					}
@@ -101,6 +114,7 @@ func (h *BaseAPIHandler) ForwardStream(c *gin.Context, flusher http.Flusher, can
 				continue
 			}
 			if errMsg != nil {
+				recordStreamError(errMsg)
 				terminalErr = errMsg
 				if opts.WriteTerminalError != nil {
 					opts.WriteTerminalError(errMsg)

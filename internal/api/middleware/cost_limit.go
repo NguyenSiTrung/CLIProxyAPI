@@ -84,8 +84,13 @@ func CostLimitMiddleware(manager *cost.Manager) gin.HandlerFunc {
 
 			// Use defer to ensure reservation is released even if downstream panics
 			defer func() {
-				// Only count as success if HTTP status < 400
+				// Only count as success if HTTP status < 400 and no API_RESPONSE_ERROR was recorded.
 				success := c.Writer.Status() < 400
+				if success {
+					if _, exists := c.Get("API_RESPONSE_ERROR"); exists {
+						success = false
+					}
+				}
 				manager.CompleteRequestSlot(apiKeyStr, success)
 			}()
 
