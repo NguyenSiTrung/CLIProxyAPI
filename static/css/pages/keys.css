@@ -1157,3 +1157,23 @@
     max-width: 100%;
   }
 }
+
+/* Quota tier bar for usage stats (multi-tier progress display) */
+.quota-tier-bar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.quota-tier-label {
+  font-size: 8px;
+  color: var(--text-muted);
+  min-width: 35px;
+  white-space: nowrap;
+}
+
+.quota-tiers-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}

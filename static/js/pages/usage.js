@@ -510,6 +510,135 @@ function getCostLimitBarHtml(currentCost, maxCost) {
 }
 
 /**
+ * Get usage percentage bar HTML for request count limits
+ */
+function getRequestLimitBarHtml(currentRequests, maxRequests) {
+  if (!maxRequests || maxRequests === 0) {
+    return '';
+  }
+  const percentage = Math.min((currentRequests / maxRequests) * 100, 100);
+  let colorClass = 'usage-green';
+  if (percentage >= 90) {
+    colorClass = 'usage-red';
+  } else if (percentage >= 70) {
+    colorClass = 'usage-yellow';
+  }
+  return `
+    <div class="usage-bar-container" style="width:60px;height:16px" title="Requests: ${currentRequests}/${maxRequests}">
+      <div class="usage-bar ${colorClass}" style="width:${percentage}%"></div>
+      <span class="usage-text" style="font-size:9px">${percentage.toFixed(0)}%</span>
+    </div>`;
+}
+
+/**
+ * Build quota progress bars HTML for a key (handles both legacy and multi-tier)
+ * Returns an object with { barsHtml, hasQuota, isAnyExceeded, quotaSummary }
+ */
+function buildQuotaProgressInfo(limitInfo, stats) {
+  const result = {
+    barsHtml: '',
+    hasQuota: false,
+    isAnyExceeded: false,
+    quotaSummary: ''
+  };
+
+  if (!limitInfo) return result;
+
+  // Check if this is a multi-tier key
+  const quotaRules = limitInfo.quota_rules || [];
+  if (quotaRules.length > 0) {
+    // Multi-tier quota mode
+    result.hasQuota = true;
+    const bars = [];
+    const summaryParts = [];
+
+    for (const rule of quotaRules) {
+      const tierLabel = rule.id || 'default';
+      const currentCost = rule.current_cost || 0;
+      const maxCost = rule.max_cost || 0;
+      const currentReqs = rule.current_requests || 0;
+      const maxReqs = rule.max_requests || 0;
+
+      // Cost progress for this tier
+      if (maxCost > 0) {
+        const costPct = Math.min((currentCost / maxCost) * 100, 100);
+        let colorClass = 'usage-green';
+        if (costPct >= 90) {
+          colorClass = 'usage-red';
+          result.isAnyExceeded = true;
+        } else if (costPct >= 70) {
+          colorClass = 'usage-yellow';
+        }
+        bars.push(`
+          <div class="quota-tier-bar" title="${tierLabel}: $${currentCost.toFixed(2)} / $${maxCost.toFixed(2)} (cost)">
+            <span class="quota-tier-label" style="font-size:8px;color:var(--text-muted);min-width:35px">${tierLabel}$</span>
+            <div class="usage-bar-container" style="width:50px;height:14px">
+              <div class="usage-bar ${colorClass}" style="width:${costPct}%"></div>
+              <span class="usage-text" style="font-size:8px">${costPct.toFixed(0)}%</span>
+            </div>
+          </div>
+        `);
+        summaryParts.push(`${tierLabel}: $${currentCost.toFixed(2)}/$${maxCost.toFixed(2)}`);
+      }
+
+      // Request progress for this tier
+      if (maxReqs > 0) {
+        const reqPct = Math.min((currentReqs / maxReqs) * 100, 100);
+        let colorClass = 'usage-green';
+        if (reqPct >= 90) {
+          colorClass = 'usage-red';
+          result.isAnyExceeded = true;
+        } else if (reqPct >= 70) {
+          colorClass = 'usage-yellow';
+        }
+        bars.push(`
+          <div class="quota-tier-bar" title="${tierLabel}: ${currentReqs}/${maxReqs} requests">
+            <span class="quota-tier-label" style="font-size:8px;color:var(--text-muted);min-width:35px">${tierLabel}#</span>
+            <div class="usage-bar-container" style="width:50px;height:14px">
+              <div class="usage-bar ${colorClass}" style="width:${reqPct}%"></div>
+              <span class="usage-text" style="font-size:8px">${reqPct.toFixed(0)}%</span>
+            </div>
+          </div>
+        `);
+        summaryParts.push(`${tierLabel}: ${currentReqs}/${maxReqs} reqs`);
+      }
+    }
+
+    if (bars.length > 0) {
+      result.barsHtml = `<div class="quota-tiers-container" style="display:flex;flex-direction:column;gap:2px">${bars.join('')}</div>`;
+      result.quotaSummary = summaryParts.join(' | ');
+    }
+  } else {
+    // Legacy single-tier mode
+    const maxCost = limitInfo.max_cost || 0;
+    const maxReqs = limitInfo.max_requests || 0;
+    const currentCost = stats.cost || 0;
+    const currentReqs = limitInfo.current_requests || stats.requests || 0;
+
+    if (maxCost > 0 || maxReqs > 0) {
+      result.hasQuota = true;
+      const bars = [];
+
+      if (maxCost > 0) {
+        const costPct = Math.min((currentCost / maxCost) * 100, 100);
+        if (costPct >= 90) result.isAnyExceeded = true;
+        bars.push(getCostLimitBarHtml(currentCost, maxCost));
+      }
+
+      if (maxReqs > 0) {
+        const reqPct = Math.min((currentReqs / maxReqs) * 100, 100);
+        if (reqPct >= 90) result.isAnyExceeded = true;
+        bars.push(getRequestLimitBarHtml(currentReqs, maxReqs));
+      }
+
+      result.barsHtml = bars.join('');
+    }
+  }
+
+  return result;
+}
+
+/**
  * Render provider statistics
  */
 function renderProviderStats(providerUsage) {
@@ -534,28 +663,25 @@ function renderProviderStats(providerUsage) {
 
   providerContainer.innerHTML = '<div class="config-settings-list">' + pEntries.map(([name, stats], idx) => {
     const limitInfo = getCostLimitInfo(name);
-    // Use calculated cost (stats.cost) for limit exceeded check
-    const isLimitExceeded = limitInfo && limitInfo.max_cost > 0 && stats.cost >= limitInfo.max_cost;
-    const hasLimit = limitInfo && limitInfo.max_cost > 0;
+    
+    // Build quota progress info (handles both legacy and multi-tier)
+    const quotaInfo = buildQuotaProgressInfo(limitInfo, stats);
     
     let limitBadgeHtml = '';
-    if (isLimitExceeded) {
+    if (quotaInfo.isAnyExceeded) {
       limitBadgeHtml = '<span class="badge" style="background:rgba(248,113,113,0.2);color:var(--accent-red);font-size:9px;padding:2px 6px;margin-left:6px">Limit Exceeded</span>';
     }
     
-    let limitBarHtml = '';
-    if (hasLimit) {
-      // Use the calculated cost (stats.cost) for the progress bar, not the server-side accumulator
-      limitBarHtml = getCostLimitBarHtml(stats.cost, limitInfo.max_cost);
-    }
-    
+    // Build cost display - show estimated cost always, plus limit info if available
     let costDisplayHtml = `<span class="badge" style="background:rgba(251,191,36,0.15);color:var(--accent-yellow);font-weight:600">$${stats.cost.toFixed(4)}</span>`;
-    if (hasLimit) {
+    
+    // For legacy single-tier with max_cost, show the limit inline
+    if (limitInfo && limitInfo.max_cost > 0 && (!limitInfo.quota_rules || limitInfo.quota_rules.length === 0)) {
       costDisplayHtml = `<span class="badge" style="background:rgba(251,191,36,0.15);color:var(--accent-yellow);font-weight:600">$${stats.cost.toFixed(4)} / $${limitInfo.max_cost.toFixed(2)}</span>`;
     }
     
     return `
-    <div class="config-setting-item provider-clickable${isLimitExceeded ? ' provider-limit-exceeded' : ''}" role="button" tabindex="0" aria-label="View details for API key ${escapeHtml(name.slice(0, 25))}" style="padding:12px 16px;transition:all 0.2s;cursor:pointer${isLimitExceeded ? ';background:rgba(248,113,113,0.08)' : ''}" data-provider-key="${escapeHtml(name)}" data-provider-idx="${idx}">
+    <div class="config-setting-item provider-clickable${quotaInfo.isAnyExceeded ? ' provider-limit-exceeded' : ''}" role="button" tabindex="0" aria-label="View details for API key ${escapeHtml(name.slice(0, 25))}" style="padding:12px 16px;transition:all 0.2s;cursor:pointer${quotaInfo.isAnyExceeded ? ';background:rgba(248,113,113,0.08)' : ''}" data-provider-key="${escapeHtml(name)}" data-provider-idx="${idx}">
       <div class="config-setting-info">
         <div class="config-setting-text">
           <h4 style="font-family:monospace;font-size:13px" title="${escapeHtml(name)}">${escapeHtml(name.length > 25 ? name.slice(0, 22) + '...' : name)}${limitBadgeHtml}</h4>
@@ -563,7 +689,7 @@ function renderProviderStats(providerUsage) {
         </div>
       </div>
       <div style="display:flex;align-items:center;gap:12px">
-        ${limitBarHtml}
+        ${quotaInfo.barsHtml}
         ${costDisplayHtml}
         <span class="badge badge-green" title="Success">${stats.successCount.toLocaleString()}</span>
         <span class="badge badge-red" title="Failed">${stats.failureCount.toLocaleString()}</span>
