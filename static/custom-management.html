@@ -2756,24 +2756,49 @@
         </div>
 
         <div class="log-controls">
-          <div class="log-search-container" id="logSearchContainer">
-            <svg class="log-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-            <input type="text" class="log-search-input" id="logSearch" placeholder="Search logs (regex supported)..."
-              oninput="filterLogs()">
-            <span class="log-regex-error" id="logRegexError">Invalid regex pattern</span>
-          </div>
+<div class="log-search-container" id="logSearchContainer">
+<svg class="log-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+<circle cx="11" cy="11" r="8"></circle>
+<line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+</svg>
+<input type="text" 
+class="log-search-input" 
+id="logSearch" 
+placeholder="Search logs (regex supported)..."
+oninput="debouncedFilterLogs()"
+aria-label="Search logs with regex support"
+autocomplete="off">
+<button class="log-search-clear" id="logSearchClear" onclick="clearLogSearch()" 
+aria-label="Clear search">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+<line x1="18" y1="6" x2="6" y2="18"></line>
+<line x1="6" y1="6" x2="18" y2="18"></line>
+</svg>
+</button>
+<span class="log-regex-error" id="logRegexError" role="alert">Invalid regex pattern</span>
+</div>
 
-          <div class="log-filter-group">
-            <button class="log-filter-btn active" onclick="setLogFilter('ALL')" id="filter-ALL">ALL</button>
-            <button class="log-filter-btn filter-debug" onclick="setLogFilter('DEBUG')" id="filter-DEBUG">DEBUG</button>
-            <button class="log-filter-btn filter-info" onclick="setLogFilter('INFO')" id="filter-INFO">INFO</button>
-            <button class="log-filter-btn filter-warn" onclick="setLogFilter('WARN')" id="filter-WARN">WARN</button>
-            <button class="log-filter-btn filter-error" onclick="setLogFilter('ERROR')" id="filter-ERROR">ERROR</button>
-          </div>
+<div class="log-filter-group" role="group" aria-label="Log level filters">
+<button class="log-filter-btn active" onclick="setLogFilter('ALL')" id="filter-ALL" aria-pressed="true">
+ALL <span class="filter-count" id="count-ALL">0</span>
+</button>
+<button class="log-filter-btn filter-debug" onclick="setLogFilter('DEBUG')" id="filter-DEBUG" aria-pressed="false">
+DEBUG <span class="filter-count" id="count-DEBUG">0</span>
+</button>
+<button class="log-filter-btn filter-info" onclick="setLogFilter('INFO')" id="filter-INFO" aria-pressed="false">
+INFO <span class="filter-count" id="count-INFO">0</span>
+</button>
+<button class="log-filter-btn filter-warn" onclick="setLogFilter('WARN')" id="filter-WARN" aria-pressed="false">
+WARN <span class="filter-count" id="count-WARN">0</span>
+</button>
+<button class="log-filter-btn filter-error" onclick="setLogFilter('ERROR')" id="filter-ERROR" aria-pressed="false">
+ERROR <span class="filter-count" id="count-ERROR">0</span>
+</button>
+<button class="log-filter-btn clear-filters" onclick="clearLogFilters()" id="clearFilters">
+Clear All
+</button>
+</div>
 
           <div style="height:24px; width:1px; background:var(--border-color); margin:0 8px;"></div>
 
@@ -2855,34 +2880,67 @@
             </div>
           </div>
           
-          <!-- Log Statistics Bar -->
-          <div class="log-stats-bar" id="logStatsBar">
-            <div class="log-stat-item">
-              <span>Total:</span>
-              <span class="stat-value" id="statTotal">0</span>
-            </div>
-            <div class="log-stat-divider"></div>
-            <div class="log-stat-item errors">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
-              <span class="stat-value" id="statErrors">0</span>
-              <span>errors</span>
-            </div>
-            <div class="log-stat-item warnings">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-              <span class="stat-value" id="statWarnings">0</span>
-              <span>warnings</span>
-            </div>
-            <div class="log-stat-item info">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
-              <span class="stat-value" id="statInfo">0</span>
-              <span>info</span>
-            </div>
-            <div class="log-stat-item debug">
-              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 6v6l4 2"/></svg>
-              <span class="stat-value" id="statDebug">0</span>
-              <span>debug</span>
-            </div>
-          </div>
+<!-- Log Statistics Bar -->
+<div class="log-stats-bar" id="logStatsBar" role="toolbar" aria-label="Log statistics">
+<div class="log-stat-item clickable" onclick="setLogFilter('ALL')" tabindex="0" role="button" aria-label="Show all logs">
+<div class="stat-content">
+<span class="stat-label">Total</span>
+<span class="stat-value" id="statTotal">0</span>
+</div>
+<div class="stat-progress" aria-hidden="true">
+<div class="stat-progress-fill" id="progressTotal" style="width: 100%"></div>
+</div>
+</div>
+<div class="log-stat-divider" aria-hidden="true"></div>
+<div class="log-stat-item errors clickable" onclick="setLogFilter('ERROR')" tabindex="0" role="button" aria-label="Filter error logs">
+<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+</svg>
+<div class="stat-content">
+<span class="stat-value" id="statErrors">0</span>
+<span class="stat-label">Errors</span>
+</div>
+<div class="stat-progress" aria-hidden="true">
+<div class="stat-progress-fill errors" id="progressErrors" style="width: 0%"></div>
+</div>
+</div>
+<div class="log-stat-item warnings clickable" onclick="setLogFilter('WARN')" tabindex="0" role="button" aria-label="Filter warning logs">
+<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+<path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+</svg>
+<div class="stat-content">
+<span class="stat-value" id="statWarnings">0</span>
+<span class="stat-label">Warnings</span>
+</div>
+<div class="stat-progress" aria-hidden="true">
+<div class="stat-progress-fill warnings" id="progressWarnings" style="width: 0%"></div>
+</div>
+</div>
+<div class="log-stat-item info clickable" onclick="setLogFilter('INFO')" tabindex="0" role="button" aria-label="Filter info logs">
+<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+<circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/>
+</svg>
+<div class="stat-content">
+<span class="stat-value" id="statInfo">0</span>
+<span class="stat-label">Info</span>
+</div>
+<div class="stat-progress" aria-hidden="true">
+<div class="stat-progress-fill info" id="progressInfo" style="width: 0%"></div>
+</div>
+</div>
+<div class="log-stat-item debug clickable" onclick="setLogFilter('DEBUG')" tabindex="0" role="button" aria-label="Filter debug logs">
+<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+<path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M12 6v6l4 2"/>
+</svg>
+<div class="stat-content">
+<span class="stat-value" id="statDebug">0</span>
+<span class="stat-label">Debug</span>
+</div>
+<div class="stat-progress" aria-hidden="true">
+<div class="stat-progress-fill debug" id="progressDebug" style="width: 0%"></div>
+</div>
+</div>
+</div>
 
           <div id="logViewer" class="log-viewer-content" role="list" aria-label="System logs" aria-live="polite">
             <div class="empty-logs">

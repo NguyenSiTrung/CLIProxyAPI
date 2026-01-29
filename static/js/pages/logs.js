@@ -25,6 +25,7 @@ let scrollHandler = null;
 let clickHandler = null;
 let keydownHandler = null;
 let keyboardShortcutHandler = null;
+let statsKeydownHandler = null;
 
 /**
  * Escape HTML to prevent XSS
@@ -78,22 +79,13 @@ function parseLogLine(line) {
  */
 function updateLogStats() {
   const logState = getLogState();
-  const totalEl = document.getElementById('statTotal');
-  const errorsEl = document.getElementById('statErrors');
-  const warningsEl = document.getElementById('statWarnings');
-  const infoEl = document.getElementById('statInfo');
-  const debugEl = document.getElementById('statDebug');
   const truncatedHint = document.getElementById('logTruncatedHint');
-  
-  if (totalEl) totalEl.textContent = logState.allLogs.length;
-  if (errorsEl) errorsEl.textContent = logState.errorCount;
-  if (warningsEl) warningsEl.textContent = logState.warnCount;
-  if (infoEl) infoEl.textContent = logState.infoCount;
-  if (debugEl) debugEl.textContent = logState.debugCount;
   
   if (truncatedHint) {
     truncatedHint.style.display = logState.allLogs.length >= 500 ? 'inline' : 'none';
   }
+
+  updateStatsAndCounts();
 }
 
 /**
@@ -127,24 +119,6 @@ function updateLogStatusUI() {
   } else {
     statusText.innerText = 'Last updated: ' + new Date().toLocaleTimeString();
     statusText.style.color = 'var(--text-muted)';
-  }
-
-  const errorBtn = document.getElementById('filter-ERROR');
-  if (errorBtn) {
-    if (logState.errorCount > 0) {
-      errorBtn.innerHTML = `ERROR <span class="log-count-badge error">${logState.errorCount}</span>`;
-    } else {
-      errorBtn.textContent = 'ERROR';
-    }
-  }
-
-  const warnBtn = document.getElementById('filter-WARN');
-  if (warnBtn) {
-    if (logState.warnCount > 0) {
-      warnBtn.innerHTML = `WARN <span class="log-count-badge warn">${logState.warnCount}</span>`;
-    } else {
-      warnBtn.textContent = 'WARN';
-    }
   }
 }
 
@@ -248,6 +222,7 @@ function renderLogs() {
       <p>No logs found matching filters</p>
       <button class="btn btn-secondary btn-sm" onclick="window.logsModule.clearLogFilters()">Clear filters</button>
     </div>`;
+    updateStatsAndCounts();
     return;
   }
 
@@ -279,24 +254,141 @@ function renderLogs() {
   const wasAtBottom = v.scrollTop + v.clientHeight >= v.scrollHeight - 50;
   v.innerHTML = html;
 
-  if (wasAtBottom || !v.getAttribute('data-loaded')) {
-    v.scrollTop = v.scrollHeight;
-    v.setAttribute('data-loaded', 'true');
-    updateLogState({ isAtBottom: true });
-  }
+if (wasAtBottom || !v.getAttribute('data-loaded')) {
+v.scrollTop = v.scrollHeight;
+v.setAttribute('data-loaded', 'true');
+updateLogState({ isAtBottom: true });
+}
+
+// Update stats and counts
+updateStatsAndCounts();
 }
 
 /**
- * Clear log filters
- */
+* Update statistics bar and filter count badges
+*/
+function updateStatsAndCounts() {
+const logState = getLogState();
+const allLogs = logState.allLogs || [];
+
+// Count logs by level
+const counts = {
+ALL: allLogs.length,
+DEBUG: 0,
+INFO: 0,
+WARN: 0,
+ERROR: 0
+};
+
+allLogs.forEach(l => {
+const level = l.level;
+if (counts.hasOwnProperty(level)) {
+counts[level]++;
+}
+});
+
+// Update filter count badges
+Object.keys(counts).forEach(level => {
+const countEl = document.getElementById('count-' + level);
+if (countEl) {
+const prevCount = parseInt(countEl.textContent) || 0;
+const newCount = counts[level];
+countEl.textContent = newCount;
+
+// Add animation if count changed
+if (prevCount !== newCount) {
+countEl.classList.add('updated');
+setTimeout(() => countEl.classList.remove('updated'), 300);
+}
+}
+});
+
+// Update stats bar
+const totalEl = document.getElementById('statTotal');
+const errorsEl = document.getElementById('statErrors');
+const warningsEl = document.getElementById('statWarnings');
+const infoEl = document.getElementById('statInfo');
+const debugEl = document.getElementById('statDebug');
+
+if (totalEl) totalEl.textContent = counts.ALL.toLocaleString();
+if (errorsEl) errorsEl.textContent = counts.ERROR.toLocaleString();
+if (warningsEl) warningsEl.textContent = counts.WARN.toLocaleString();
+if (infoEl) infoEl.textContent = counts.INFO.toLocaleString();
+if (debugEl) debugEl.textContent = counts.DEBUG.toLocaleString();
+
+// Update progress bars
+const total = Math.max(counts.ALL, 1); // Prevent division by zero
+const progressTotal = document.getElementById('progressTotal');
+const progressErrors = document.getElementById('progressErrors');
+const progressWarnings = document.getElementById('progressWarnings');
+const progressInfo = document.getElementById('progressInfo');
+const progressDebug = document.getElementById('progressDebug');
+
+if (progressTotal) progressTotal.style.width = '100%';
+if (progressErrors) progressErrors.style.width = ((counts.ERROR / total) * 100) + '%';
+if (progressWarnings) progressWarnings.style.width = ((counts.WARN / total) * 100) + '%';
+if (progressInfo) progressInfo.style.width = ((counts.INFO / total) * 100) + '%';
+if (progressDebug) progressDebug.style.width = ((counts.DEBUG / total) * 100) + '%';
+
+// Update clear filters button visibility
+const clearBtn = document.getElementById('clearFilters');
+if (clearBtn) {
+const hasActiveFilter = logState.filter !== 'ALL' || (logState.search && logState.search.trim());
+clearBtn.style.display = hasActiveFilter ? 'inline-flex' : 'none';
+}
+}
+
+/**
+* Announce message to screen readers
+* @param {string} message - Message to announce
+*/
+function announceToScreenReader(message) {
+const announcement = document.createElement('div');
+announcement.setAttribute('role', 'status');
+announcement.setAttribute('aria-live', 'polite');
+announcement.setAttribute('aria-atomic', 'true');
+announcement.className = 'sr-only';
+announcement.style.cssText = 'position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden;';
+announcement.textContent = message;
+document.body.appendChild(announcement);
+setTimeout(() => announcement.remove(), 1000);
+}
+
+/**
+* Clear log filters
+*/
 export function clearLogFilters() {
-  const searchInput = document.getElementById('logSearch');
-  if (searchInput) searchInput.value = '';
-  updateLogState({ search: '', filter: 'ALL' });
-  document.querySelectorAll('.log-filter-btn').forEach(b => {
-    b.classList.toggle('active', b.id === 'filter-ALL');
-  });
-  renderLogs();
+// Clear search input
+const searchInput = document.getElementById('logSearch');
+if (searchInput) {
+searchInput.value = '';
+searchInput.focus();
+}
+
+// Update search clear button
+updateSearchClearButton();
+
+// Reset filter state
+updateLogState({ search: '', filter: 'ALL' });
+
+// Update all filter buttons
+const buttons = document.querySelectorAll('.log-filter-btn[id^="filter-"]');
+buttons.forEach(b => {
+const isActive = b.id === 'filter-ALL';
+b.classList.toggle('active', isActive);
+b.setAttribute('aria-pressed', isActive.toString());
+});
+
+// Hide clear filters button
+const clearBtn = document.getElementById('clearFilters');
+if (clearBtn) {
+clearBtn.style.display = 'none';
+}
+
+renderLogs();
+
+// Announce to screen readers
+announceToScreenReader('Filters cleared. Showing all logs.');
 }
 
 /**
@@ -381,29 +473,89 @@ export function copyLogEntry(element) {
 }
 
 /**
- * Set log filter
- */
+* Set log filter
+* Updates UI state and re-renders logs
+*/
 export function setLogFilter(filter) {
-  updateLogState({ filter });
-  document.querySelectorAll('.log-filter-btn').forEach(b => {
-    b.classList.toggle('active', b.id === 'filter-' + filter);
-  });
-  renderLogs();
+updateLogState({ filter });
+
+// Update filter button states
+const buttons = document.querySelectorAll('.log-filter-btn[id^="filter-"]');
+buttons.forEach(b => {
+const isActive = b.id === 'filter-' + filter;
+b.classList.toggle('active', isActive);
+b.setAttribute('aria-pressed', isActive.toString());
+});
+
+// Update clear filters button visibility
+const clearBtn = document.getElementById('clearFilters');
+if (clearBtn) {
+if (filter !== 'ALL') {
+clearBtn.style.display = 'inline-flex';
+} else {
+// Also check if search has value
+const searchInput = document.getElementById('logSearch');
+if (!searchInput || !searchInput.value) {
+clearBtn.style.display = 'none';
+}
+}
+}
+
+renderLogs();
 }
 
 /**
- * Filter logs (debounced)
- */
+* Filter logs (debounced)
+* Uses 300ms delay for better performance
+*/
 export function filterLogs() {
-  const logState = getLogState();
-  if (logState.searchDebounceTimer) {
-    clearTimeout(logState.searchDebounceTimer);
-  }
-  const timer = setTimeout(() => {
-    updateLogState({ search: document.getElementById('logSearch').value });
-    renderLogs();
-  }, 150);
-  updateLogState({ searchDebounceTimer: timer });
+const logState = getLogState();
+if (logState.searchDebounceTimer) {
+clearTimeout(logState.searchDebounceTimer);
+}
+const timer = setTimeout(() => {
+updateLogState({ search: document.getElementById('logSearch').value });
+updateSearchClearButton();
+renderLogs();
+}, 300);
+updateLogState({ searchDebounceTimer: timer });
+}
+
+/**
+* Debounced filter logs wrapper for HTML oninput handlers
+* Exported for use in onclick/oninput attributes
+*/
+export function debouncedFilterLogs() {
+filterLogs();
+}
+
+/**
+* Clear log search input
+*/
+export function clearLogSearch() {
+const searchInput = document.getElementById('logSearch');
+if (searchInput) {
+searchInput.value = '';
+searchInput.focus();
+updateLogState({ search: '' });
+updateSearchClearButton();
+renderLogs();
+}
+}
+
+/**
+* Update search clear button visibility
+*/
+function updateSearchClearButton() {
+const searchInput = document.getElementById('logSearch');
+const searchContainer = document.getElementById('logSearchContainer');
+if (searchInput && searchContainer) {
+if (searchInput.value) {
+searchContainer.classList.add('has-value');
+} else {
+searchContainer.classList.remove('has-value');
+}
+}
 }
 
 /**
@@ -477,12 +629,17 @@ export function cleanupLogs() {
   if (keyboardShortcutHandler) {
     document.removeEventListener('keydown', keyboardShortcutHandler);
   }
+  const logStatsBar = document.getElementById('logStatsBar');
+  if (logStatsBar && statsKeydownHandler) {
+    logStatsBar.removeEventListener('keydown', statsKeydownHandler);
+  }
   
   // Clear handler references
   scrollHandler = null;
   clickHandler = null;
   keydownHandler = null;
   keyboardShortcutHandler = null;
+  statsKeydownHandler = null;
 }
 
 /**
@@ -822,6 +979,25 @@ async function loadLogFileInfo() {
  * Initialize log keyboard shortcuts
  */
 export function initLogKeyboardShortcuts() {
+  const logStatsBar = document.getElementById('logStatsBar');
+  if (logStatsBar && statsKeydownHandler) {
+    logStatsBar.removeEventListener('keydown', statsKeydownHandler);
+  }
+
+  statsKeydownHandler = (e) => {
+    const statItem = e.target.closest('.log-stat-item.clickable');
+    if (!statItem) return;
+
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      statItem.click();
+    }
+  };
+
+  if (logStatsBar) {
+    logStatsBar.addEventListener('keydown', statsKeydownHandler);
+  }
+
   // Remove existing handler if present to prevent duplicates
   if (keyboardShortcutHandler) {
     document.removeEventListener('keydown', keyboardShortcutHandler);
@@ -850,30 +1026,34 @@ export function initLogKeyboardShortcuts() {
 
 // Expose module functions globally for onclick handlers
 window.logsModule = {
-  loadLogs,
-  filterLogs,
-  setLogFilter,
-  clearLogs,
-  clearLogFilters,
-  toggleAutoRefresh,
-  stopLogAutoRefresh,
-  cleanupLogs,
-  scrollLogsToBottom,
-  jumpToNextError,
-  exportLogs,
-  showLogDetail,
-  copyLogToClipboard,
-  copyLogEntry,
-  closeModal,
-  closeLogModal,
-  setupLogEventDelegation
+loadLogs,
+filterLogs,
+debouncedFilterLogs,
+setLogFilter,
+clearLogs,
+clearLogSearch,
+clearLogFilters,
+toggleAutoRefresh,
+stopLogAutoRefresh,
+cleanupLogs,
+scrollLogsToBottom,
+jumpToNextError,
+exportLogs,
+showLogDetail,
+copyLogToClipboard,
+copyLogEntry,
+closeModal,
+closeLogModal,
+setupLogEventDelegation
 };
 
 // Also expose directly for HTML onclick handlers
 window.loadLogs = loadLogs;
 window.filterLogs = filterLogs;
+window.debouncedFilterLogs = debouncedFilterLogs;
 window.setLogFilter = setLogFilter;
 window.clearLogs = clearLogs;
+window.clearLogSearch = clearLogSearch;
 window.clearLogFilters = clearLogFilters;
 window.toggleAutoRefresh = toggleAutoRefresh;
 window.stopLogAutoRefresh = stopLogAutoRefresh;
