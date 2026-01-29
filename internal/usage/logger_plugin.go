@@ -6,6 +6,7 @@ package usage
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -215,7 +216,7 @@ func (s *RequestStatistics) Record(ctx context.Context, record coreusage.Record)
 	s.updateAPIStats(stats, modelName, RequestDetail{
 		Timestamp:  timestamp,
 		Source:     record.Source,
-		AuthIndex:  record.AuthIndex,
+		AuthIndex:  func() uint64 { v, _ := strconv.ParseUint(record.AuthIndex, 10, 64); return v }(),
 		Tokens:     detail,
 		Failed:     failed,
 		ErrorCode:  record.ErrorCode,
