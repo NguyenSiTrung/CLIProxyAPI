@@ -804,6 +804,27 @@ align-self: center;
   }
 }
 
+/* Log Regex Error */
+.log-regex-error {
+  display: block;
+  font-size: 11px;
+  color: var(--accent-red);
+  margin-top: 6px;
+  opacity: 0;
+  height: 0;
+  overflow: hidden;
+  transition: all 0.2s ease;
+  font-weight: 500;
+  padding-left: 2px;
+}
+
+.log-regex-error.visible {
+  opacity: 1;
+  height: auto;
+  margin-top: 6px;
+  margin-bottom: 6px;
+}
+
 /* Reduced motion accessibility */
 @media (prefers-reduced-motion: reduce) {
   .log-viewer-content {
