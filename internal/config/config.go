@@ -173,6 +173,104 @@ type RateLimitKeyConfig struct {
 	QueueTimeout string `yaml:"queue-timeout,omitempty" json:"queue-timeout,omitempty"`
 }
 
+const (
+	DefaultRateLimitMinInterval  = "1s"
+	DefaultRateLimitMaxQueueSize = 100
+	DefaultRateLimitQueueTimeout = "30s"
+)
+
+// GetMinInterval returns the minimum interval as a time.Duration.
+// Returns the parsed duration and true if valid, or zero and false if parsing fails.
+func (c *RateLimitConfig) GetMinInterval() (time.Duration, bool) {
+	if c == nil {
+		return 0, false
+	}
+	interval := c.DefaultMinInterval
+	if interval == "" {
+		interval = DefaultRateLimitMinInterval
+	}
+	d, err := time.ParseDuration(interval)
+	if err != nil || d <= 0 {
+		return 0, false
+	}
+	return d, true
+}
+
+// GetQueueTimeout returns the queue timeout as a time.Duration.
+// Returns the parsed duration and true if valid, or zero and false if parsing fails.
+func (c *RateLimitConfig) GetQueueTimeout() (time.Duration, bool) {
+	if c == nil {
+		return 0, false
+	}
+	timeout := c.DefaultQueueTimeout
+	if timeout == "" {
+		timeout = DefaultRateLimitQueueTimeout
+	}
+	d, err := time.ParseDuration(timeout)
+	if err != nil || d <= 0 {
+		return 0, false
+	}
+	return d, true
+}
+
+// GetMaxQueueSize returns the max queue size with default fallback.
+func (c *RateLimitConfig) GetMaxQueueSize() int {
+	if c == nil || c.DefaultMaxQueueSize <= 0 {
+		return DefaultRateLimitMaxQueueSize
+	}
+	return c.DefaultMaxQueueSize
+}
+
+// Validate checks the RateLimitConfig for errors.
+// Returns an error if enabled but settings are invalid.
+func (c *RateLimitConfig) Validate() error {
+	if c == nil || !c.Enabled {
+		return nil
+	}
+	if _, ok := c.GetMinInterval(); !ok {
+		return fmt.Errorf("rate-limit: invalid default-min-interval: %q (must be a valid positive duration like \"1s\")", c.DefaultMinInterval)
+	}
+	if _, ok := c.GetQueueTimeout(); !ok {
+		return fmt.Errorf("rate-limit: invalid default-queue-timeout: %q (must be a valid positive duration like \"30s\")", c.DefaultQueueTimeout)
+	}
+	if c.DefaultMaxQueueSize < 0 {
+		return fmt.Errorf("rate-limit: default-max-queue-size must be >= 0")
+	}
+	return nil
+}
+
+// GetMinInterval returns the minimum interval for this key config, or the default if not set.
+func (c *RateLimitKeyConfig) GetMinInterval(defaultDuration time.Duration) time.Duration {
+	if c == nil || c.MinInterval == "" {
+		return defaultDuration
+	}
+	d, err := time.ParseDuration(c.MinInterval)
+	if err != nil || d <= 0 {
+		return defaultDuration
+	}
+	return d
+}
+
+// GetQueueTimeout returns the queue timeout for this key config, or the default if not set.
+func (c *RateLimitKeyConfig) GetQueueTimeout(defaultDuration time.Duration) time.Duration {
+	if c == nil || c.QueueTimeout == "" {
+		return defaultDuration
+	}
+	d, err := time.ParseDuration(c.QueueTimeout)
+	if err != nil || d <= 0 {
+		return defaultDuration
+	}
+	return d
+}
+
+// GetMaxQueueSize returns the max queue size for this key config, or the default if not set.
+func (c *RateLimitKeyConfig) GetMaxQueueSize(defaultSize int) int {
+	if c == nil || c.MaxQueueSize <= 0 {
+		return defaultSize
+	}
+	return c.MaxQueueSize
+}
+
 // AccessKeyLimits configures per-access-key cost limits for blocking requests
 // when accumulated costs exceed the configured maximum.
 type AccessKeyLimits struct {
