@@ -4,8 +4,18 @@ package ratelimit
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
+)
+
+var (
+	// ErrQueueFull is returned when the rate limit queue is at capacity.
+	ErrQueueFull = errors.New("rate limit queue full")
+	// ErrQueueTimeout is returned when a request times out waiting in queue.
+	ErrQueueTimeout = errors.New("rate limit queue timeout")
+	// ErrWorkerStopped is returned when the worker is stopped while request is queued.
+	ErrWorkerStopped = errors.New("rate limit worker stopped")
 )
 
 // QueueItem represents a request waiting in the rate limit queue.
