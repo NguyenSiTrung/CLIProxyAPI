@@ -48,6 +48,15 @@ GEMINI.md
 _bmad/*
 _bmad-output/*
 conductor/*
+!conductor/product.md
+!conductor/product-guidelines.md
+!conductor/tech-stack.md
+!conductor/workflow.md
+!conductor/tracks.md
+!conductor/tracks/
+!conductor/beads.json
+!conductor/refresh_state.json
+
 
 # macOS
 .DS_Store
