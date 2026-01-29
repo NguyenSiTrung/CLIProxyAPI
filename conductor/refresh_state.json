@@ -1,4 +1,8 @@
 {
-  "last_refresh": "2026-01-29T00:00:00Z",
-  "changes": []
+  "last_refresh": "2026-01-29T14:28:00Z",
+  "changes": [
+    "Added missing dependencies to tech-stack.md",
+    "Updated workflow.md to reflect Beads usage",
+    "Added refresh markers to core files"
+  ]
 }

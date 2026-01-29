@@ -1,0 +1,20 @@
+{
+  "track_id": "quota-ui-redesign_20251231",
+  "type": "feature",
+  "status": "new",
+  "priority": "high",
+  "depends_on": [],
+  "estimated_hours": null,
+  "created_at": "2025-12-31T12:00:00Z",
+  "updated_at": "2025-12-31T12:00:00Z",
+  "description": "Improve UI/UX for Quota tab in custom-management.html with Summary+Detail approach, circular progress indicators, collapsible groups, and better visual hierarchy",
+  "beads_epic": "CLIProxyAPI-685",
+  "beads_tasks": {
+    "phase1": "CLIProxyAPI-685.1",
+    "phase2": "CLIProxyAPI-685.2",
+    "phase3": "CLIProxyAPI-685.3",
+    "phase4": "CLIProxyAPI-685.4",
+    "phase5": "CLIProxyAPI-685.5",
+    "phase6": "CLIProxyAPI-685.6"
+  }
+}

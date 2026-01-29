@@ -1,0 +1,21 @@
+{
+  "track_id": "refactor-management-html_20251231",
+  "type": "refactor",
+  "status": "new",
+  "priority": "high",
+  "depends_on": [],
+  "estimated_hours": null,
+  "created_at": "2025-12-31T12:00:00Z",
+  "updated_at": "2025-12-31T12:00:00Z",
+  "description": "Refactor monolithic custom-management.html (14,519 lines) into modular CSS/JS files for better maintainability",
+  "beads_epic": "CLIProxyAPI-7jd",
+  "beads_tasks": {
+    "phase1": "CLIProxyAPI-7jd.1",
+    "phase2": "CLIProxyAPI-7jd.2",
+    "phase3": "CLIProxyAPI-7jd.3",
+    "phase4": "CLIProxyAPI-7jd.4",
+    "phase5": "CLIProxyAPI-7jd.5",
+    "phase6": "CLIProxyAPI-7jd.6",
+    "phase7": "CLIProxyAPI-7jd.7"
+  }
+}
