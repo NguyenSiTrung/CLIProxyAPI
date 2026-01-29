@@ -116,6 +116,9 @@ type Config struct {
 	// AccessKeyLimits configures per-access-key cost limits.
 	AccessKeyLimits AccessKeyLimits `yaml:"access-key-limits" json:"access-key-limits"`
 
+	// RateLimit configures request rate limiting with pooling/queuing.
+	RateLimit RateLimitConfig `yaml:"rate-limit" json:"rate-limit"`
+
 	// AccessKeyAuths binds client API keys to specific auth file IDs.
 	// When configured, requests authenticated with a matching API key
 	// are restricted to the listed auth files (optionally scoped by provider).
@@ -137,6 +140,37 @@ type TelegramConfig struct {
 	AllowedChatIDs []int64 `yaml:"allowed-chat-ids" json:"allowed-chat-ids"`
 	// ServerURL is the public URL of your proxy server (for docs links).
 	ServerURL string `yaml:"server-url" json:"server-url"`
+}
+
+// RateLimitConfig configures the global rate limiting feature with request pooling.
+// When enabled, requests from the same access key are queued and processed sequentially
+// with a minimum time interval between requests.
+type RateLimitConfig struct {
+	// Enabled controls whether rate limiting is active (default: false).
+	Enabled bool `yaml:"enabled" json:"enabled"`
+	// DefaultMinInterval is the default minimum time between requests for each access key.
+	// Accepts Go duration strings (e.g., "1s", "500ms", "2s").
+	DefaultMinInterval string `yaml:"default-min-interval" json:"default-min-interval"`
+	// DefaultMaxQueueSize is the default maximum number of requests to queue per access key.
+	// When exceeded, new requests are rejected with 429 rate_limit_queue_full.
+	DefaultMaxQueueSize int `yaml:"default-max-queue-size" json:"default-max-queue-size"`
+	// DefaultQueueTimeout is the default maximum time a request waits in queue.
+	// Accepts Go duration strings (e.g., "30s", "1m"). When exceeded, 429 rate_limit_timeout is returned.
+	DefaultQueueTimeout string `yaml:"default-queue-timeout" json:"default-queue-timeout"`
+}
+
+// RateLimitKeyConfig allows per-key overrides of rate limiting settings.
+// Zero/empty values inherit from the global RateLimitConfig defaults.
+type RateLimitKeyConfig struct {
+	// MinInterval overrides the minimum time between requests for this key.
+	// Empty string means use global default.
+	MinInterval string `yaml:"min-interval,omitempty" json:"min-interval,omitempty"`
+	// MaxQueueSize overrides the maximum queue size for this key.
+	// Zero means use global default.
+	MaxQueueSize int `yaml:"max-queue-size,omitempty" json:"max-queue-size,omitempty"`
+	// QueueTimeout overrides the queue timeout for this key.
+	// Empty string means use global default.
+	QueueTimeout string `yaml:"queue-timeout,omitempty" json:"queue-timeout,omitempty"`
 }
 
 // AccessKeyLimits configures per-access-key cost limits for blocking requests
@@ -199,6 +233,9 @@ type AccessKeyLimit struct {
 	// ExpiresAt is the time when this access key should be automatically removed.
 	// If nil or zero, the key does not expire.
 	ExpiresAt *time.Time `yaml:"expires-at,omitempty" json:"expires_at,omitempty"`
+	// RateLimit provides per-key rate limiting overrides.
+	// When set, these values override the global rate-limit defaults for this key.
+	RateLimit *RateLimitKeyConfig `yaml:"rate-limit,omitempty" json:"rate_limit,omitempty"`
 }
 
 // AccessKeyAuth defines a binding between a client API key and auth file IDs.
