@@ -93,13 +93,18 @@ api-keys:
 #           max-cost: 500.00
 #           auto-reset-interval: monthly
 #
-#     # Rate limiting per-key override example
+#     # Per-key rate limiting override example
+#     # When global rate-limit is enabled, you can customize per-key settings here.
 #     # These settings override the global rate-limit defaults for this specific key.
 #     - api-key: "your-api-key-5"
+#       max-cost: 100.00           # Standard quota settings still apply
+#       max-requests: 10000
+#       auto-reset-interval: daily
+#       # Rate limit overrides for this key (requires rate-limit.enabled: true globally)
 #       rate-limit:
-#         min-interval: "500ms"    # Faster interval for premium users
-#         max-queue-size: 20       # Allow more queued requests
-#         queue-timeout: "60s"     # Longer timeout for complex requests
+#         min-interval: "500ms"    # Faster interval for premium users (default: 1s)
+#         max-queue-size: 50       # Allow more queued requests (default: 10)
+#         queue-timeout: "60s"     # Longer timeout for complex requests (default: 30s)
 
 # Rate Limiting
 # Control request frequency per access key to prevent abuse and ensure fair usage.
