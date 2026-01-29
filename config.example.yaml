@@ -92,6 +92,34 @@ api-keys:
 #         - id: "monthly"          # Monthly budget
 #           max-cost: 500.00
 #           auto-reset-interval: monthly
+#
+#     # Rate limiting per-key override example
+#     # These settings override the global rate-limit defaults for this specific key.
+#     - api-key: "your-api-key-5"
+#       rate-limit:
+#         min-interval: "500ms"    # Faster interval for premium users
+#         max-queue-size: 20       # Allow more queued requests
+#         queue-timeout: "60s"     # Longer timeout for complex requests
+
+# Rate Limiting
+# Control request frequency per access key to prevent abuse and ensure fair usage.
+# When enabled, requests exceeding the rate limit are queued; if the queue is full,
+# requests are rejected with HTTP 429 (Too Many Requests).
+# rate-limit:
+#   # Enable rate limiting globally (default: false)
+#   enabled: false
+#   # Default minimum interval between requests per access key.
+#   # Requests arriving faster than this interval are queued.
+#   # Examples: "1s", "500ms", "2s", "100ms"
+#   default-min-interval: "1s"
+#   # Default maximum number of requests that can be queued per access key.
+#   # When the queue is full, new requests are immediately rejected with HTTP 429.
+#   # Set to 0 to disable queuing (requests are rejected immediately if rate limited).
+#   default-max-queue-size: 10
+#   # Default maximum time a request can wait in the queue before being rejected.
+#   # If a queued request cannot be processed within this timeout, it returns HTTP 429.
+#   # Examples: "30s", "1m", "10s"
+#   default-queue-timeout: "30s"
 
 # Access Key Auth Routing
 # Restrict which auth JSON files are used for requests authenticated by a client API key.
