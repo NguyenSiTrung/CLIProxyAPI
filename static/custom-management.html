@@ -1501,25 +1501,25 @@
               </div>
             </div>
 
-            <div class="quick-toggle-card" data-setting="ws-auth">
+            <div class="quick-toggle-card" data-setting="rate-limit">
               <div class="quick-toggle-header">
-                <div class="quick-toggle-icon security">
+                <div class="quick-toggle-icon throttle">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <polyline points="12 6 12 12 16 14"></polyline>
                   </svg>
                 </div>
-                <label class="toggle-enhanced" id="toggleWsAuthLabel">
-                  <input type="checkbox" id="toggleWsAuth" onchange="toggleSettingEnhanced('ws-auth', this.checked, this)">
+                <label class="toggle-enhanced" id="toggleRateLimitLabel">
+                  <input type="checkbox" id="toggleRateLimit" onchange="toggleSettingEnhanced('rate-limit-enabled', this.checked, this)">
                   <span class="toggle-enhanced-slider"></span>
                 </label>
               </div>
               <div class="quick-toggle-content">
-                <h4>WebSocket Auth</h4>
-                <p>Require auth for WS connections</p>
+                <h4>Rate Limit</h4>
+                <p>Limit request frequency per key</p>
               </div>
               <div class="quick-toggle-status">
-                <span class="status-indicator" id="statusWsAuth"></span>
+                <span class="status-indicator" id="statusRateLimit"></span>
                 <span class="status-text">Off</span>
               </div>
             </div>

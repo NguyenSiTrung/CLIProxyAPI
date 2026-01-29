@@ -246,26 +246,26 @@ export async function loadConfig() {
     const usageStatsChecked = cfg.usage_statistics_enabled || cfg['usage-statistics-enabled'] || false;
     const loggingChecked = cfg.logging_to_file || cfg['logging-to-file'] || false;
     const requestLogChecked = cfg.request_log || cfg['request-log'] || false;
-    const wsAuthChecked = cfg.websocket_auth || cfg['websocket-auth'] || false;
+    const rateLimitChecked = cfg['rate-limit']?.enabled || false;
 
     const toggleDebug = document.getElementById('toggleDebug');
     const toggleUsageStats = document.getElementById('toggleUsageStats');
     const toggleLogging = document.getElementById('toggleLogging');
     const toggleRequestLog = document.getElementById('toggleRequestLog');
-    const toggleWsAuth = document.getElementById('toggleWsAuth');
+    const toggleRateLimit = document.getElementById('toggleRateLimit');
 
     if (toggleDebug) toggleDebug.checked = debugChecked;
     if (toggleUsageStats) toggleUsageStats.checked = usageStatsChecked;
     if (toggleLogging) toggleLogging.checked = loggingChecked;
     if (toggleRequestLog) toggleRequestLog.checked = requestLogChecked;
-    if (toggleWsAuth) toggleWsAuth.checked = wsAuthChecked;
+    if (toggleRateLimit) toggleRateLimit.checked = rateLimitChecked;
 
     // Update status dots
     updateStatusDot('statusDebug', debugChecked);
     updateStatusDot('statusUsageStats', usageStatsChecked);
     updateStatusDot('statusLogging', loggingChecked);
     updateStatusDot('statusRequestLog', requestLogChecked);
-    updateStatusDot('statusWsAuth', wsAuthChecked);
+    updateStatusDot('statusRateLimit', rateLimitChecked);
 
     // Set YAML editor
     const editor = document.getElementById('configEditor');
@@ -583,7 +583,7 @@ export async function toggleSettingEnhanced(setting, value, inputEl) {
     'usage-statistics-enabled': 'statusUsageStats',
     'logging-to-file': 'statusLogging',
     'request-log': 'statusRequestLog',
-    'ws-auth': 'statusWsAuth'
+    'rate-limit-enabled': 'statusRateLimit'
   }[setting];
 
   // Mark this setting as pending

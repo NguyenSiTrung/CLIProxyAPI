@@ -131,6 +131,11 @@
   color: #f97316;
 }
 
+.quick-toggle-icon.throttle {
+  background: rgba(139, 92, 246, 0.15);
+  color: #8b5cf6;
+}
+
 .quick-toggle-icon.success {
   background: rgba(34, 197, 94, 0.15);
   color: #22c55e;

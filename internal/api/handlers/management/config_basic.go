@@ -241,6 +241,14 @@ func (h *Handler) PutWebsocketAuth(c *gin.Context) {
 	h.updateBoolField(c, func(v bool) { h.cfg.WebsocketAuth = v })
 }
 
+// Rate limit enabled
+func (h *Handler) GetRateLimitEnabled(c *gin.Context) {
+	c.JSON(200, gin.H{"rate-limit-enabled": h.cfg.RateLimit.Enabled})
+}
+func (h *Handler) PutRateLimitEnabled(c *gin.Context) {
+	h.updateBoolField(c, func(v bool) { h.cfg.RateLimit.Enabled = v })
+}
+
 // Request retry
 func (h *Handler) GetRequestRetry(c *gin.Context) {
 	c.JSON(200, gin.H{"request-retry": h.cfg.RequestRetry})
