@@ -5,8 +5,8 @@ package usage
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -90,11 +90,32 @@ type modelStats struct {
 	Details       []RequestDetail
 }
 
+// AuthIndex supports string or numeric JSON values for backward compatibility.
+type AuthIndex string
+
+func (a *AuthIndex) UnmarshalJSON(data []byte) error {
+	if len(data) == 0 || string(data) == "null" {
+		*a = ""
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		*a = AuthIndex(strings.TrimSpace(s))
+		return nil
+	}
+	var n json.Number
+	if err := json.Unmarshal(data, &n); err == nil {
+		*a = AuthIndex(n.String())
+		return nil
+	}
+	return fmt.Errorf("invalid auth_index: %s", string(data))
+}
+
 // RequestDetail stores the timestamp and token usage for a single request.
 type RequestDetail struct {
 	Timestamp  time.Time  `json:"timestamp"`
 	Source     string     `json:"source"`
-	AuthIndex  uint64     `json:"auth_index"`
+	AuthIndex  AuthIndex  `json:"auth_index"`
 	Tokens     TokenStats `json:"tokens"`
 	Failed     bool       `json:"failed"`
 	ErrorCode  string     `json:"error_code,omitempty"`
@@ -216,7 +237,7 @@ func (s *RequestStatistics) Record(ctx context.Context, record coreusage.Record)
 	s.updateAPIStats(stats, modelName, RequestDetail{
 		Timestamp:  timestamp,
 		Source:     record.Source,
-		AuthIndex:  func() uint64 { v, _ := strconv.ParseUint(record.AuthIndex, 10, 64); return v }(),
+		AuthIndex:  AuthIndex(strings.TrimSpace(record.AuthIndex)),
 		Tokens:     detail,
 		Failed:     failed,
 		ErrorCode:  record.ErrorCode,
