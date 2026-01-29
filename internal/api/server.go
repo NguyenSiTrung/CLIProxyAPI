@@ -27,6 +27,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/cost"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/logging"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/ratelimit"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/managementasset"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/misc"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/usage"
@@ -175,6 +176,9 @@ type Server struct {
 
 	// costManager manages cost limits for API keys
 	costManager *cost.Manager
+
+	// rateLimitManager manages request rate limiting per access key
+	rateLimitManager *ratelimit.Manager
 }
 
 // NewServer creates and initializes a new API server instance.
@@ -301,6 +305,21 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 		}
 	}
 
+	// Initialize rate limit manager for request pooling/queuing
+	if cfg.RateLimit.Enabled {
+		keyConfigs := make(map[string]*config.RateLimitKeyConfig)
+		for i := range cfg.AccessKeyLimits.Keys {
+			key := &cfg.AccessKeyLimits.Keys[i]
+			if key.RateLimit != nil {
+				keyConfigs[key.APIKey] = key.RateLimit
+			}
+		}
+		s.rateLimitManager = ratelimit.NewManager(ratelimit.ManagerConfig{
+			GlobalConfig: &cfg.RateLimit,
+			KeyConfigs:   keyConfigs,
+		})
+	}
+
 	// Setup routes
 	s.setupRoutes()
 
@@ -367,6 +386,7 @@ func (s *Server) setupRoutes() {
 	v1 := s.engine.Group("/v1")
 	v1.Use(AuthMiddleware(s.accessManager))
 	v1.Use(middleware.CostLimitMiddleware(s.costManager))
+	v1.Use(middleware.RateLimitMiddleware(s.rateLimitManager))
 	{
 		v1.GET("/models", s.unifiedModelsHandler(openaiHandlers, claudeCodeHandlers))
 		v1.POST("/chat/completions", openaiHandlers.ChatCompletions)
@@ -380,6 +400,7 @@ func (s *Server) setupRoutes() {
 	v1beta := s.engine.Group("/v1beta")
 	v1beta.Use(AuthMiddleware(s.accessManager))
 	v1beta.Use(middleware.CostLimitMiddleware(s.costManager))
+	v1beta.Use(middleware.RateLimitMiddleware(s.rateLimitManager))
 	{
 		v1beta.GET("/models", geminiHandlers.GeminiModels)
 		v1beta.POST("/models/*action", geminiHandlers.GeminiHandler)
@@ -972,6 +993,11 @@ func (s *Server) Stop(ctx context.Context) error {
 		case s.keepAliveStop <- struct{}{}:
 		default:
 		}
+	}
+
+	// Stop the rate limit manager if running
+	if s.rateLimitManager != nil {
+		s.rateLimitManager.Stop()
 	}
 
 	// Shutdown the HTTP server.
