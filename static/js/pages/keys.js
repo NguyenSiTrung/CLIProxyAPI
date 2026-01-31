@@ -848,9 +848,10 @@ function renderCostLimitsList(data) {
 
   const tbody = document.getElementById('costLimitsTableBody');
   keys.forEach((keyInfo, idx) => {
-    const { api_key, max_cost, current_cost, max_requests, current_requests, auto_reset_interval, next_reset_time, quota_rules } = keyInfo;
+    const { api_key, max_cost, current_cost, max_requests, current_requests, auto_reset_interval, next_reset_time, quota_rules, rate_limit } = keyInfo;
     const maskedKey = maskApiKey(api_key);
     const hasMultiTier = quota_rules && quota_rules.length > 0;
+    const hasRateLimit = rate_limit && (rate_limit.min_interval || rate_limit.max_queue_size || rate_limit.queue_timeout);
 
     // For multi-tier keys, check if any tier is blocked
     let isCostBlocked = false;
@@ -932,6 +933,7 @@ function renderCostLimitsList(data) {
           <div class="cost-limit-key">
             <span class="key-masked">${escapeHtml(maskedKey)}</span>
             <span class="badge badge-info badge-sm">Multi-tier</span>
+            ${hasRateLimit ? '<span class="badge badge-secondary badge-sm" title="Has rate limit override">⏱ Rate</span>' : ''}
             ${isBlocked ? `<span class="badge badge-blocked">${blockedTierName}</span>` : ''}
           </div>
         </td>
@@ -985,6 +987,7 @@ function renderCostLimitsList(data) {
         <td>
           <div class="cost-limit-key">
             <span class="key-masked">${escapeHtml(maskedKey)}</span>
+            ${hasRateLimit ? '<span class="badge badge-secondary badge-sm" title="Has rate limit override">⏱ Rate</span>' : ''}
             ${isBlocked ? `<span class="badge badge-blocked">${isCostBlocked ? 'Cost' : 'Requests'}</span>` : ''}
           </div>
         </td>
@@ -1216,6 +1219,36 @@ export function openMultiTierModal(apiKey, quotaRules = []) {
         </button>
       </div>
       <div id="quotaTiersList" class="quota-tiers-list"></div>
+    </div>
+    
+    <div class="rate-limit-section">
+      <div class="section-header" style="margin-top: 16px; margin-bottom: 12px;">
+        <h4 style="margin: 0; font-size: 14px; color: var(--text-secondary);">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;">
+            <circle cx="12" cy="12" r="10"/>
+            <polyline points="12 6 12 12 16 14"/>
+          </svg>
+          Rate Limit Override (Optional)
+        </h4>
+        <span style="font-size: 12px; color: var(--text-muted);">Override global rate-limit settings for this key. Leave empty to use global defaults.</span>
+      </div>
+      <div class="form-row">
+        <div class="form-group form-group-third">
+          <label>Min Interval</label>
+          <input type="text" id="rateLimitMinInterval" class="form-input" placeholder="e.g. 500ms, 1s" autocomplete="off">
+          <small style="color: var(--text-muted);">Time between requests</small>
+        </div>
+        <div class="form-group form-group-third">
+          <label>Max Queue Size</label>
+          <input type="number" id="rateLimitMaxQueueSize" class="form-input" min="0" placeholder="e.g. 50" autocomplete="off">
+          <small style="color: var(--text-muted);">Max queued requests</small>
+        </div>
+        <div class="form-group form-group-third">
+          <label>Queue Timeout</label>
+          <input type="text" id="rateLimitQueueTimeout" class="form-input" placeholder="e.g. 30s, 1m" autocomplete="off">
+          <small style="color: var(--text-muted);">Max wait time in queue</small>
+        </div>
+      </div>
     </div>`;
 
   const footer = `
@@ -1238,6 +1271,40 @@ export function openMultiTierModal(apiKey, quotaRules = []) {
   if (quotaRules.length === 0) {
     document.getElementById('modeSingleTier')?.classList.add('active');
     document.getElementById('modeMultiTier')?.classList.remove('active');
+  }
+  
+  // Populate rate limit fields if we have data
+  populateRateLimitFields(apiKey);
+}
+
+// Cache for rate limit data per key
+let rateLimitCache = {};
+
+/**
+ * Populate rate limit fields from cache or API
+ */
+async function populateRateLimitFields(apiKey) {
+  try {
+    // Fetch current limits to get rate limit data
+    const response = await api('GET', '/access-key-limits').catch(() => ({}));
+    const keys = response.keys || [];
+    const keyData = keys.find(k => k.api_key === apiKey);
+    
+    if (keyData && keyData.rate_limit) {
+      const rl = keyData.rate_limit;
+      const minIntervalEl = document.getElementById('rateLimitMinInterval');
+      const maxQueueSizeEl = document.getElementById('rateLimitMaxQueueSize');
+      const queueTimeoutEl = document.getElementById('rateLimitQueueTimeout');
+      
+      if (minIntervalEl && rl.min_interval) minIntervalEl.value = rl.min_interval;
+      if (maxQueueSizeEl && rl.max_queue_size) maxQueueSizeEl.value = rl.max_queue_size;
+      if (queueTimeoutEl && rl.queue_timeout) queueTimeoutEl.value = rl.queue_timeout;
+      
+      // Cache for later use
+      rateLimitCache[apiKey] = rl;
+    }
+  } catch (e) {
+    console.error('Failed to fetch rate limit data:', e);
   }
 }
 
@@ -1385,11 +1452,39 @@ export function updateTierField(index, field, value) {
 }
 
 /**
+ * Get rate limit values from form fields
+ */
+function getRateLimitValues() {
+  const minInterval = document.getElementById('rateLimitMinInterval')?.value?.trim() || '';
+  const maxQueueSizeVal = document.getElementById('rateLimitMaxQueueSize')?.value;
+  const maxQueueSize = maxQueueSizeVal ? parseInt(maxQueueSizeVal, 10) : 0;
+  const queueTimeout = document.getElementById('rateLimitQueueTimeout')?.value?.trim() || '';
+  
+  // Only return rate_limit object if at least one field is set
+  if (minInterval || maxQueueSize > 0 || queueTimeout) {
+    return {
+      min_interval: minInterval || null,
+      max_queue_size: maxQueueSize || null,
+      queue_timeout: queueTimeout || null
+    };
+  }
+  // Return empty object to clear rate limit (all fields empty)
+  return {
+    min_interval: '',
+    max_queue_size: 0,
+    queue_timeout: ''
+  };
+}
+
+/**
  * Save quota rules (single-tier or multi-tier)
  */
 export async function saveQuotaRules() {
   const singleSection = document.getElementById('singleTierSection');
   const isMultiTier = singleSection?.style.display === 'none';
+  
+  // Get rate limit values
+  const rateLimit = getRateLimitValues();
   
   try {
     if (isMultiTier) {
@@ -1432,7 +1527,8 @@ export async function saveQuotaRules() {
       }
       
       await api('PUT', `/access-key-limits/keys/${encodeURIComponent(editingApiKey)}`, {
-        quota_rules: rules
+        quota_rules: rules,
+        rate_limit: rateLimit
       });
     } else {
       // Single-tier mode: send quota_rules: [] to explicitly clear any multi-tier config
@@ -1440,8 +1536,10 @@ export async function saveQuotaRules() {
       const maxRequests = parseInt(document.getElementById('singleMaxRequests')?.value || '0', 10) || 0;
       const autoResetInterval = normalizeAutoResetInterval(document.getElementById('singleAutoReset')?.value);
       
-      if (maxCost === 0 && maxRequests === 0 && autoResetInterval === 'none') {
-        toast('Please set at least one limit or auto-reset interval', 'error');
+      // Allow saving if rate limit is set, even if quotas are not
+      const hasRateLimit = rateLimit.min_interval || rateLimit.max_queue_size > 0 || rateLimit.queue_timeout;
+      if (maxCost === 0 && maxRequests === 0 && autoResetInterval === 'none' && !hasRateLimit) {
+        toast('Please set at least one limit, auto-reset interval, or rate limit override', 'error');
         return;
       }
       
@@ -1449,7 +1547,8 @@ export async function saveQuotaRules() {
         max_cost: maxCost,
         max_requests: maxRequests,
         auto_reset_interval: autoResetInterval,
-        quota_rules: [] // Explicitly clear multi-tier rules when switching to single-tier
+        quota_rules: [], // Explicitly clear multi-tier rules when switching to single-tier
+        rate_limit: rateLimit
       });
     }
     

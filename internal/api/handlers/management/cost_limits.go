@@ -37,6 +37,12 @@ func (h *Handler) GetAccessKeyLimits(c *gin.Context) {
 		NextResetTime     string  `json:"next_reset_time,omitempty"`
 	}
 
+	type rateLimitInfo struct {
+		MinInterval  string `json:"min_interval,omitempty"`
+		MaxQueueSize int    `json:"max_queue_size,omitempty"`
+		QueueTimeout string `json:"queue_timeout,omitempty"`
+	}
+
 	type keyInfo struct {
 		APIKey            string          `json:"api_key"`
 		MaxCost           float64         `json:"max_cost"`
@@ -47,13 +53,18 @@ func (h *Handler) GetAccessKeyLimits(c *gin.Context) {
 		NextResetTime     string          `json:"next_reset_time,omitempty"`
 		ExpiresAt         string          `json:"expires_at,omitempty"`
 		QuotaRules        []quotaRuleInfo `json:"quota_rules,omitempty"`
+		RateLimit         *rateLimitInfo  `json:"rate_limit,omitempty"`
 	}
 
-	// Build a map of ExpiresAt from config for lookup
+	// Build maps of ExpiresAt and RateLimit from config for lookup
 	expiresAtMap := make(map[string]*time.Time)
+	rateLimitMap := make(map[string]*config.RateLimitKeyConfig)
 	for _, keyLimit := range h.cfg.AccessKeyLimits.Keys {
 		if keyLimit.ExpiresAt != nil {
 			expiresAtMap[keyLimit.APIKey] = keyLimit.ExpiresAt
+		}
+		if keyLimit.RateLimit != nil {
+			rateLimitMap[keyLimit.APIKey] = keyLimit.RateLimit
 		}
 	}
 
@@ -95,6 +106,15 @@ func (h *Handler) GetAccessKeyLimits(c *gin.Context) {
 					AutoResetInterval: rule.AutoResetInterval,
 					NextResetTime:     rule.NextResetTime,
 				}
+			}
+		}
+
+		// Include rate limit overrides if set
+		if rl, ok := rateLimitMap[k.APIKey]; ok && rl != nil {
+			info.RateLimit = &rateLimitInfo{
+				MinInterval:  rl.MinInterval,
+				MaxQueueSize: rl.MaxQueueSize,
+				QueueTimeout: rl.QueueTimeout,
 			}
 		}
 
@@ -179,12 +199,19 @@ func (h *Handler) PutAccessKeyLimit(c *gin.Context) {
 		return
 	}
 
+	type rateLimitInput struct {
+		MinInterval  *string `json:"min_interval"`
+		MaxQueueSize *int    `json:"max_queue_size"`
+		QueueTimeout *string `json:"queue_timeout"`
+	}
+
 	var body struct {
 		MaxCost           *float64          `json:"max_cost"`
 		MaxRequests       *int64            `json:"max_requests"`
 		AutoResetInterval *string           `json:"auto_reset_interval"`
 		QuotaRules        *[]QuotaRuleInput `json:"quota_rules"`
 		ExpiresAt         *string           `json:"expires_at"`
+		RateLimit         *rateLimitInput   `json:"rate_limit"`
 	}
 	if err := c.ShouldBindJSON(&body); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid JSON body"})
@@ -216,6 +243,9 @@ func (h *Handler) PutAccessKeyLimit(c *gin.Context) {
 			if expiresAtProvided {
 				h.updateAccessKeyExpiresAtLocked(apiKey, expiresAt)
 			}
+			if body.RateLimit != nil {
+				h.updateAccessKeyRateLimitLocked(apiKey, body.RateLimit.MinInterval, body.RateLimit.MaxQueueSize, body.RateLimit.QueueTimeout)
+			}
 			h.mu.Unlock()
 			h.persist(c)
 			return
@@ -244,14 +274,18 @@ func (h *Handler) PutAccessKeyLimit(c *gin.Context) {
 		if expiresAtProvided {
 			h.updateAccessKeyExpiresAtLocked(apiKey, expiresAt)
 		}
+		if body.RateLimit != nil {
+			h.updateAccessKeyRateLimitLocked(apiKey, body.RateLimit.MinInterval, body.RateLimit.MaxQueueSize, body.RateLimit.QueueTimeout)
+		}
 		h.mu.Unlock()
 		h.persist(c)
 		return
 	}
 
 	// Legacy single-tier mode
-	if body.MaxCost == nil && body.MaxRequests == nil && body.AutoResetInterval == nil && !expiresAtProvided {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "at least one of max_cost, max_requests, auto_reset_interval, quota_rules, or expires_at is required"})
+	rateLimitProvided := body.RateLimit != nil
+	if body.MaxCost == nil && body.MaxRequests == nil && body.AutoResetInterval == nil && !expiresAtProvided && !rateLimitProvided {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "at least one of max_cost, max_requests, auto_reset_interval, quota_rules, expires_at, or rate_limit is required"})
 		return
 	}
 
@@ -270,6 +304,9 @@ func (h *Handler) PutAccessKeyLimit(c *gin.Context) {
 	h.updateAccessKeyLimitLocked(apiKey, body.MaxCost, body.MaxRequests, body.AutoResetInterval)
 	if expiresAtProvided {
 		h.updateAccessKeyExpiresAtLocked(apiKey, expiresAt)
+	}
+	if rateLimitProvided {
+		h.updateAccessKeyRateLimitLocked(apiKey, body.RateLimit.MinInterval, body.RateLimit.MaxQueueSize, body.RateLimit.QueueTimeout)
 	}
 	h.mu.Unlock()
 	h.persist(c)
@@ -392,6 +429,65 @@ func (h *Handler) updateAccessKeyExpiresAtLocked(apiKey string, expiresAt *time.
 		newEntry := config.AccessKeyLimit{
 			APIKey:    apiKey,
 			ExpiresAt: expiresAt,
+		}
+		h.cfg.AccessKeyLimits.Keys = append(h.cfg.AccessKeyLimits.Keys, newEntry)
+	}
+}
+
+// updateAccessKeyRateLimitLocked updates the rate limit overrides for a specific API key.
+// If all values are nil/empty/zero, the rate limit config is cleared.
+// IMPORTANT: Caller must hold h.mu lock.
+func (h *Handler) updateAccessKeyRateLimitLocked(apiKey string, minInterval *string, maxQueueSize *int, queueTimeout *string) {
+	// Determine if we should clear or set rate limit
+	shouldClear := true
+	if minInterval != nil && *minInterval != "" {
+		shouldClear = false
+	}
+	if maxQueueSize != nil && *maxQueueSize > 0 {
+		shouldClear = false
+	}
+	if queueTimeout != nil && *queueTimeout != "" {
+		shouldClear = false
+	}
+
+	// Find existing key entry
+	for i, keyLimit := range h.cfg.AccessKeyLimits.Keys {
+		if keyLimit.APIKey == apiKey {
+			if shouldClear {
+				h.cfg.AccessKeyLimits.Keys[i].RateLimit = nil
+			} else {
+				if h.cfg.AccessKeyLimits.Keys[i].RateLimit == nil {
+					h.cfg.AccessKeyLimits.Keys[i].RateLimit = &config.RateLimitKeyConfig{}
+				}
+				if minInterval != nil {
+					h.cfg.AccessKeyLimits.Keys[i].RateLimit.MinInterval = *minInterval
+				}
+				if maxQueueSize != nil {
+					h.cfg.AccessKeyLimits.Keys[i].RateLimit.MaxQueueSize = *maxQueueSize
+				}
+				if queueTimeout != nil {
+					h.cfg.AccessKeyLimits.Keys[i].RateLimit.QueueTimeout = *queueTimeout
+				}
+			}
+			return
+		}
+	}
+
+	// Key not found, only create new entry if we have rate limit values
+	if !shouldClear {
+		rl := &config.RateLimitKeyConfig{}
+		if minInterval != nil {
+			rl.MinInterval = *minInterval
+		}
+		if maxQueueSize != nil {
+			rl.MaxQueueSize = *maxQueueSize
+		}
+		if queueTimeout != nil {
+			rl.QueueTimeout = *queueTimeout
+		}
+		newEntry := config.AccessKeyLimit{
+			APIKey:    apiKey,
+			RateLimit: rl,
 		}
 		h.cfg.AccessKeyLimits.Keys = append(h.cfg.AccessKeyLimits.Keys, newEntry)
 	}
