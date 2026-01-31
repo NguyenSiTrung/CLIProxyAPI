@@ -916,11 +916,19 @@
   font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
   font-size: 13px;
   line-height: 1.6;
-  white-space: pre;
+  white-space: normal;
   overflow: hidden;
   pointer-events: none;
   color: #e2e8f0; /* Default text color for unhighlighted text */
   z-index: 1;
+}
+
+/* Each line in the highlight layer */
+.code-editor-highlight-layer .yaml-block-line {
+  height: calc(13px * 1.6);
+  line-height: 1.6;
+  white-space: pre;
+  overflow: hidden;
 }
 
 /* YAML Syntax Colors */
@@ -997,8 +1005,6 @@
 .yaml-block-line {
   display: block;
   border-left: 2px solid transparent;
-  padding-left: 14px;
-  margin-left: -16px;
 }
 
 .yaml-block-line.depth-0 { border-left-color: transparent; }
