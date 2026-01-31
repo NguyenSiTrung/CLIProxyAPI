@@ -865,10 +865,34 @@
     padding: 16px 4px 16px 8px;
     font-size: 11px;
   }
-  
+
   .code-editor-wrapper {
     height: 400px;
     min-height: 400px;
+  }
+}
+
+/* ===================================
+   Mobile Horizontal Scroll Support
+   =================================== */
+
+@media (max-width: 768px) {
+  /* Allow horizontal scroll in config editor section */
+  .config-editor-section {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .code-editor-wrapper {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    min-width: 100%;
+  }
+
+  /* Ensure the editor content can be wider than screen */
+  .code-editor-with-lines {
+    min-width: 600px;
   }
 }
 

@@ -488,6 +488,11 @@
     overflow-x: hidden;
   }
 
+  /* Allow horizontal scroll for config page (YAML editor needs it) */
+  #page-config {
+    overflow-x: visible;
+  }
+
   .toggle {
     width: 52px;
     height: 30px;
