@@ -1441,8 +1441,45 @@ export function updateSyntaxHighlight() {
 }
 
 /**
- * Highlight YAML syntax with indentation depth tracking
+ * Detect the indentation style used in the code
+ * @param {string[]} lines - Array of lines
+ * @returns {number} - Number of spaces per indent level (default: 2)
  */
+function detectIndentSize(lines) {
+  const indentSizes = new Map();
+  
+  for (const line of lines) {
+    const match = line.match(/^(\s+)([^\s])/);
+    if (match) {
+      const indent = match[1].length;
+      // Skip tab-indented lines
+      if (match[1].includes('\t')) continue;
+      // Only consider reasonable indent sizes (2, 3, 4, 6, 8)
+      if ([2, 3, 4, 6, 8].includes(indent)) {
+        indentSizes.set(indent, (indentSizes.get(indent) || 0) + 1);
+      }
+    }
+  }
+  
+  // Return most common indent size, or default to 2
+  let maxCount = 0;
+  let detectedSize = 2;
+  for (const [size, count] of indentSizes) {
+    if (count > maxCount) {
+      maxCount = count;
+      detectedSize = size;
+    }
+  }
+  
+  return detectedSize;
+}
+
+/**
+ * Highlight YAML syntax with indentation depth tracking
+ * Performance: Skips detailed highlighting for very large files (>2000 lines)
+ */
+const MAX_LINES_FOR_FULL_HIGHLIGHT = 2000;
+
 function highlightYaml(code) {
   // Escape HTML first
   let html = code
@@ -1452,13 +1489,20 @@ function highlightYaml(code) {
 
   // Apply syntax highlighting with depth tracking
   const lines = html.split('\n');
-  const SPACE_PER_INDENT = 2;
   
-  const highlightedLines = lines.map((line, lineIndex) => {
+  // Performance: Use simplified highlighting for very large files
+  if (lines.length > MAX_LINES_FOR_FULL_HIGHLIGHT) {
+    return lines.map(line => `<span class="yaml-line">${line}</span>`).join('\n') + '\n';
+  }
+  
+  // Auto-detect indentation size from the file
+  const spacePerIndent = detectIndentSize(lines);
+  
+  const highlightedLines = lines.map((line) => {
     // Calculate indentation depth (0 = root level)
     const indentMatch = line.match(/^(\s*)/);
     const indentSpaces = indentMatch ? indentMatch[1].length : 0;
-    const depth = Math.floor(indentSpaces / SPACE_PER_INDENT);
+    const depth = Math.floor(indentSpaces / spacePerIndent);
     const clampedDepth = Math.min(depth, 6); // Cap at 6 for CSS classes
     
     // Determine line type for special styling
@@ -1475,9 +1519,8 @@ function highlightYaml(code) {
     );
     
     // Build depth and block CSS classes
-    let depthClass = `yaml-line-depth-${clampedDepth}`;
-    let blockClass = '';
-    let blockStartClass = isBlockStart ? 'yaml-block-start' : '';
+    const depthClass = `yaml-line-depth-${clampedDepth}`;
+    const blockStartClass = isBlockStart ? 'yaml-block-start' : '';
     
     // Wrap in block line container with depth indicator
     let processedLine = '';
@@ -1526,7 +1569,6 @@ function highlightYaml(code) {
       const listMatch = line.match(/^(\s*)(-)(\s+.*)$/);
       const [, indent, dash, rest] = listMatch;
       processedLine = `${indent}<span class="yaml-dash">${dash}</span>${rest}`;
-      blockClass = 'yaml-list-item-block';
     }
     // Empty lines - preserve them with depth for visual continuity
     else if (isEmpty) {
@@ -1537,8 +1579,8 @@ function highlightYaml(code) {
       processedLine = line;
     }
     
-    // Wrap in span container with depth classes (use inline-block for proper alignment)
-    const allClasses = [depthClass, blockClass, blockStartClass].filter(Boolean).join(' ');
+    // Wrap in span container with depth classes
+    const allClasses = [depthClass, blockStartClass].filter(Boolean).join(' ');
     return `<span class="yaml-line ${allClasses}">${processedLine}</span>`;
   });
 
