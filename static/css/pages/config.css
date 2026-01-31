@@ -916,19 +916,11 @@
   font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
   font-size: 13px;
   line-height: 1.6;
-  white-space: normal;
+  white-space: pre;
   overflow: hidden;
   pointer-events: none;
   color: #e2e8f0; /* Default text color for unhighlighted text */
   z-index: 1;
-}
-
-/* Each line in the highlight layer */
-.code-editor-highlight-layer .yaml-block-line {
-  height: calc(13px * 1.6);
-  line-height: 1.6;
-  white-space: pre;
-  overflow: hidden;
 }
 
 /* YAML Syntax Colors */
@@ -970,6 +962,11 @@
    Indentation Depth Coloring
    =================================== */
 
+/* Each line in highlight layer - spans behave like blocks with pre whitespace */
+.yaml-line {
+  display: inline;
+}
+
 /* Depth-based background colors for visual block grouping */
 .yaml-line-depth-0 {
   --indent-bg: transparent;
@@ -1001,37 +998,9 @@
   background: linear-gradient(90deg, rgba(244, 114, 182, 0.03) 0px, transparent 80px);
 }
 
-/* Block structure indicators - subtle left border based on depth */
-.yaml-block-line {
-  display: block;
-  border-left: 2px solid transparent;
-}
-
-.yaml-block-line.depth-0 { border-left-color: transparent; }
-.yaml-block-line.depth-1 { border-left-color: rgba(167, 139, 250, 0.25); }
-.yaml-block-line.depth-2 { border-left-color: rgba(0, 229, 255, 0.22); }
-.yaml-block-line.depth-3 { border-left-color: rgba(34, 211, 160, 0.18); }
-.yaml-block-line.depth-4 { border-left-color: rgba(251, 191, 36, 0.15); }
-.yaml-block-line.depth-5 { border-left-color: rgba(244, 114, 182, 0.12); }
-
 /* Block start marker - key that begins a new nested block */
 .yaml-block-start {
   background: linear-gradient(90deg, rgba(167, 139, 250, 0.08) 0px, transparent 120px);
-}
-
-/* List item grouping visual */
-.yaml-list-item-block {
-  position: relative;
-}
-
-.yaml-list-item-block::before {
-  content: '';
-  position: absolute;
-  left: calc(var(--indent-level, 0) * 16px + 6px);
-  top: 0;
-  bottom: 0;
-  width: 1px;
-  background: rgba(244, 114, 182, 0.15);
 }
 
 /* Active block highlight - extends to cover logical block */

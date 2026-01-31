@@ -1537,12 +1537,12 @@ function highlightYaml(code) {
       processedLine = line;
     }
     
-    // Wrap in container with depth classes (use div for proper block display)
+    // Wrap in span container with depth classes (use inline-block for proper alignment)
     const allClasses = [depthClass, blockClass, blockStartClass].filter(Boolean).join(' ');
-    return `<div class="yaml-block-line depth-${clampedDepth} ${allClasses}">${processedLine}</div>`;
+    return `<span class="yaml-line ${allClasses}">${processedLine}</span>`;
   });
 
-  return highlightedLines.join('') + '<div></div>'; // Extra div for scrolling
+  return highlightedLines.join('\n') + '\n'; // Preserve newlines for proper rendering
 }
 
 /**
