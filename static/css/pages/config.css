@@ -782,6 +782,12 @@
   min-height: 520px;
   background: rgba(5, 5, 15, 0.7);
   overflow: hidden;
+  /* Indentation guide lines - vertical lines at each 2-space indent level */
+  background-image:
+    linear-gradient(to right, rgba(120, 120, 180, 0.06) 1px, transparent 1px);
+  background-size: 16px 100%;
+  background-position: 48px 0;
+  background-attachment: local;
 }
 
 .code-editor-line-numbers {
@@ -950,6 +956,88 @@
 
 .yaml-dash {
   color: #f472b6; /* pink-400 */
+}
+
+/* ===================================
+   Indentation Depth Coloring
+   =================================== */
+
+/* Depth-based background colors for visual block grouping */
+.yaml-line-depth-0 {
+  --indent-bg: transparent;
+}
+
+.yaml-line-depth-1 {
+  --indent-bg: rgba(167, 139, 250, 0.04);
+  background: linear-gradient(90deg, rgba(167, 139, 250, 0.06) 0px, transparent 80px);
+}
+
+.yaml-line-depth-2 {
+  --indent-bg: rgba(0, 229, 255, 0.04);
+  background: linear-gradient(90deg, rgba(0, 229, 255, 0.05) 0px, transparent 80px);
+}
+
+.yaml-line-depth-3 {
+  --indent-bg: rgba(34, 211, 160, 0.04);
+  background: linear-gradient(90deg, rgba(34, 211, 160, 0.04) 0px, transparent 80px);
+}
+
+.yaml-line-depth-4 {
+  --indent-bg: rgba(251, 191, 36, 0.03);
+  background: linear-gradient(90deg, rgba(251, 191, 36, 0.03) 0px, transparent 80px);
+}
+
+.yaml-line-depth-5,
+.yaml-line-depth-6 {
+  --indent-bg: rgba(244, 114, 182, 0.03);
+  background: linear-gradient(90deg, rgba(244, 114, 182, 0.03) 0px, transparent 80px);
+}
+
+/* Block structure indicators - subtle left border based on depth */
+.yaml-block-line {
+  display: block;
+  border-left: 2px solid transparent;
+  padding-left: 14px;
+  margin-left: -16px;
+}
+
+.yaml-block-line.depth-0 { border-left-color: transparent; }
+.yaml-block-line.depth-1 { border-left-color: rgba(167, 139, 250, 0.25); }
+.yaml-block-line.depth-2 { border-left-color: rgba(0, 229, 255, 0.22); }
+.yaml-block-line.depth-3 { border-left-color: rgba(34, 211, 160, 0.18); }
+.yaml-block-line.depth-4 { border-left-color: rgba(251, 191, 36, 0.15); }
+.yaml-block-line.depth-5 { border-left-color: rgba(244, 114, 182, 0.12); }
+
+/* Block start marker - key that begins a new nested block */
+.yaml-block-start {
+  background: linear-gradient(90deg, rgba(167, 139, 250, 0.08) 0px, transparent 120px);
+}
+
+/* List item grouping visual */
+.yaml-list-item-block {
+  position: relative;
+}
+
+.yaml-list-item-block::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--indent-level, 0) * 16px + 6px);
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(244, 114, 182, 0.15);
+}
+
+/* Active block highlight - extends to cover logical block */
+.code-editor-active-block {
+  position: absolute;
+  left: 48px;
+  right: 0;
+  background: rgba(100, 150, 255, 0.06);
+  border-left: 2px solid rgba(100, 150, 255, 0.3);
+  pointer-events: none;
+  z-index: 0;
+  display: none;
 }
 
 /* Current Line Highlight */

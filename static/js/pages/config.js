@@ -1441,7 +1441,7 @@ export function updateSyntaxHighlight() {
 }
 
 /**
- * Highlight YAML syntax
+ * Highlight YAML syntax with indentation depth tracking
  */
 function highlightYaml(code) {
   // Escape HTML first
@@ -1450,17 +1450,45 @@ function highlightYaml(code) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
 
-  // Apply syntax highlighting
+  // Apply syntax highlighting with depth tracking
   const lines = html.split('\n');
-  const highlightedLines = lines.map(line => {
-    // Comments
-    if (line.trim().startsWith('#')) {
-      return `<span class="yaml-comment">${line}</span>`;
-    }
+  const SPACE_PER_INDENT = 2;
+  
+  const highlightedLines = lines.map((line, lineIndex) => {
+    // Calculate indentation depth (0 = root level)
+    const indentMatch = line.match(/^(\s*)/);
+    const indentSpaces = indentMatch ? indentMatch[1].length : 0;
+    const depth = Math.floor(indentSpaces / SPACE_PER_INDENT);
+    const clampedDepth = Math.min(depth, 6); // Cap at 6 for CSS classes
     
+    // Determine line type for special styling
+    const trimmedLine = line.trim();
+    const isComment = trimmedLine.startsWith('#');
+    const isKeyValue = /^(\s*)([^:#\n]+?)(:)(.*)$/.test(line);
+    const isListItem = /^(\s*)(-)(\s+.*)$/.test(line);
+    const isEmpty = trimmedLine === '';
+    
+    // Check if this is a block start (key with no value or multiline indicator)
+    const isBlockStart = isKeyValue && (
+      /:\s*$/.test(trimmedLine) || // Ends with colon (no value)
+      /:\s*[|>]/.test(trimmedLine) // Has multiline indicator | or >
+    );
+    
+    // Build depth and block CSS classes
+    let depthClass = `yaml-line-depth-${clampedDepth}`;
+    let blockClass = '';
+    let blockStartClass = isBlockStart ? 'yaml-block-start' : '';
+    
+    // Wrap in block line container with depth indicator
+    let processedLine = '';
+    
+    // Comments
+    if (isComment) {
+      processedLine = `<span class="yaml-comment">${line}</span>`;
+    }
     // Key-value pairs
-    const keyMatch = line.match(/^(\s*)([^:#\n]+?)(:)(.*)$/);
-    if (keyMatch) {
+    else if (isKeyValue) {
+      const keyMatch = line.match(/^(\s*)([^:#\n]+?)(:)(.*)$/);
       const [, indent, key, colon, rest] = keyMatch;
       let highlightedRest = rest;
       
@@ -1491,17 +1519,27 @@ function highlightYaml(code) {
         }
       }
       
-      return `${indent}<span class="yaml-key">${key}</span><span class="yaml-colon">${colon}</span>${highlightedRest}`;
+      processedLine = `${indent}<span class="yaml-key">${key}</span><span class="yaml-colon">${colon}</span>${highlightedRest}`;
     }
-    
     // List items
-    const listMatch = line.match(/^(\s*)(-)(\s+.*)$/);
-    if (listMatch) {
+    else if (isListItem) {
+      const listMatch = line.match(/^(\s*)(-)(\s+.*)$/);
       const [, indent, dash, rest] = listMatch;
-      return `${indent}<span class="yaml-dash">${dash}</span>${rest}`;
+      processedLine = `${indent}<span class="yaml-dash">${dash}</span>${rest}`;
+      blockClass = 'yaml-list-item-block';
+    }
+    // Empty lines - preserve them with depth for visual continuity
+    else if (isEmpty) {
+      processedLine = line;
+    }
+    // Other lines (continuation, etc.)
+    else {
+      processedLine = line;
     }
     
-    return line;
+    // Wrap in container with depth classes
+    const allClasses = [depthClass, blockClass, blockStartClass].filter(Boolean).join(' ');
+    return `<span class="yaml-block-line depth-${clampedDepth} ${allClasses}">${processedLine}</span>`;
   });
 
   return highlightedLines.join('\n') + '\n'; // Extra newline for scrolling
