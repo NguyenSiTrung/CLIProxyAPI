@@ -540,6 +540,7 @@
   padding: 16px 20px;
   background: linear-gradient(135deg, rgba(30, 30, 65, 0.6), rgba(25, 25, 55, 0.4));
   border-bottom: 1px solid var(--border-color);
+  position: relative;
 }
 
 .config-editor-title {
@@ -887,18 +888,70 @@
   .config-editor-section {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
+    margin-bottom: 16px;
   }
 
   .code-editor-wrapper {
     overflow-x: auto;
-    overflow-y: hidden;
+    overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     min-width: 100%;
+    height: 450px;
+    min-height: 450px;
   }
 
   /* Ensure the editor content can be wider than screen */
   .code-editor-with-lines {
-    min-width: 600px;
+    min-width: 500px;
+    font-size: 12px;
+    padding: 14px;
+    line-height: 1.5;
+  }
+
+  .code-editor-highlight-layer {
+    font-size: 12px;
+    padding: 14px;
+    line-height: 1.5;
+  }
+
+  .code-editor-line-numbers {
+    font-size: 11px;
+    padding: 14px 6px 14px 8px;
+    line-height: 1.5;
+  }
+
+  .code-editor-line-numbers .line-number {
+    height: calc(12px * 1.5);
+    line-height: 1.5;
+  }
+}
+
+@media (max-width: 480px) {
+  .code-editor-wrapper {
+    height: 380px;
+    min-height: 380px;
+  }
+
+  .code-editor-with-lines {
+    min-width: 400px;
+    font-size: 11px;
+    padding: 12px;
+  }
+
+  .code-editor-highlight-layer {
+    font-size: 11px;
+    padding: 12px;
+  }
+
+  .code-editor-line-numbers {
+    font-size: 10px;
+    padding: 12px 4px 12px 6px;
+    width: 32px;
+    min-width: 32px;
+  }
+
+  .code-editor-line-numbers .line-number {
+    height: calc(11px * 1.5);
   }
 }
 
@@ -1258,11 +1311,197 @@
   .find-bar-btn span {
     display: none;
   }
+
+  /* Config Editor Header - Stack for mobile */
+  .config-editor-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+
+  .config-editor-title {
+    min-width: unset;
+  }
+
+  .config-editor-title .icon-box {
+    width: 36px;
+    height: 36px;
+  }
+
+  .config-editor-title .icon-box svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .config-editor-title h3 {
+    font-size: 15px;
+  }
+
+  .config-unsaved-indicator {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    padding: 3px 8px;
+    font-size: 10px;
+  }
+
+  .config-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .btn-config-action {
+    justify-content: center;
+    padding: 10px 8px;
+  }
+
+  .btn-save-config {
+    grid-column: 1 / -1;
+    justify-content: center;
+    padding: 12px 16px;
+  }
+
+  /* Find bar improvements for mobile */
+  .editor-find-bar {
+    padding: 8px;
+  }
+
+  .find-bar-row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .find-bar-checkbox {
+    padding: 6px 8px;
+  }
 }
 
 @media (max-width: 480px) {
   .code-editor-highlight-layer,
   .code-editor-current-line {
     left: 36px;
+  }
+
+  /* Config Editor Header - More compact */
+  .config-editor-header {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .config-editor-title {
+    gap: 10px;
+  }
+
+  .config-editor-title .icon-box {
+    width: 32px;
+    height: 32px;
+  }
+
+  .config-editor-title .icon-box svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .config-editor-title h3 {
+    font-size: 14px;
+  }
+
+  .config-editor-title p {
+    font-size: 11px;
+  }
+
+  .config-unsaved-indicator {
+    top: 12px;
+    right: 12px;
+  }
+
+  .config-actions {
+    gap: 6px;
+  }
+
+  .btn-config-action {
+    padding: 8px 6px;
+    font-size: 11px;
+  }
+
+  .btn-config-action svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .btn-save-config {
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .btn-save-config svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* YAML Error Banner */
+  .yaml-error-banner {
+    margin: 8px 12px 0;
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  /* Config Editor Toolbar */
+  .config-editor-toolbar {
+    padding: 6px 10px;
+    gap: 8px;
+  }
+
+  .config-editor-info {
+    gap: 8px;
+  }
+
+  .config-editor-info span {
+    font-size: 10px;
+  }
+
+  /* Find bar on very small screens */
+  .editor-find-bar {
+    padding: 6px;
+  }
+
+  .find-input-wrapper {
+    padding: 5px 8px;
+    gap: 6px;
+  }
+
+  .find-input-wrapper input {
+    font-size: 12px;
+  }
+
+  .find-bar-btn {
+    padding: 5px 8px;
+  }
+
+  .find-match-count {
+    font-size: 10px;
+  }
+
+  /* Go to Line Modal */
+  .editor-goto-modal {
+    padding-top: 60px;
+  }
+
+  .goto-modal-content {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 16px;
+    margin: 0 12px;
+  }
+
+  .goto-modal-content input {
+    width: 100px;
+    padding: 6px 10px;
+    font-size: 13px;
   }
 }
