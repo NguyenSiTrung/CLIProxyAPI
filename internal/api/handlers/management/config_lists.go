@@ -194,7 +194,6 @@ func (h *Handler) GetAPIKeys(c *gin.Context) { c.JSON(200, gin.H{"api-keys": h.c
 func (h *Handler) PutAPIKeys(c *gin.Context) {
 	h.putStringList(c, func(v []string) {
 		h.cfg.APIKeys = append([]string(nil), v...)
-		h.cfg.Access.Providers = nil
 	}, nil)
 }
 func (h *Handler) PatchAPIKeys(c *gin.Context) {
@@ -224,7 +223,6 @@ func (h *Handler) PatchAPIKeys(c *gin.Context) {
 	// Handle update by index
 	if body.Index != nil && body.Value != nil && *body.Index >= 0 && *body.Index < len(h.cfg.APIKeys) {
 		h.cfg.APIKeys[*body.Index] = *body.Value
-		h.cfg.Access.Providers = nil
 		h.persist(c)
 		return
 	}
@@ -243,7 +241,6 @@ func (h *Handler) PatchAPIKeys(c *gin.Context) {
 		if isNewKey {
 			h.cfg.APIKeys = append(h.cfg.APIKeys, newKey)
 		}
-		h.cfg.Access.Providers = nil
 
 		// If expires_in was provided, set the expiration in AccessKeyLimits
 		if expiresAt != nil {
@@ -275,7 +272,7 @@ func (h *Handler) setAccessKeyExpiration(apiKey string, expiresAt *time.Time) {
 }
 
 func (h *Handler) DeleteAPIKeys(c *gin.Context) {
-	h.deleteFromStringList(c, &h.cfg.APIKeys, func() { h.cfg.Access.Providers = nil })
+	h.deleteFromStringList(c, &h.cfg.APIKeys, func() {})
 }
 
 // gemini-api-key: []GeminiKey
