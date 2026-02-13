@@ -813,35 +813,79 @@ export function toggleNotifications() {
 /**
  * Update system health metrics
  */
-export function updateSystemHealth(usage) {
-  const total = usage?.total_requests || 0;
-  const failed = usage?.failed_requests || 0;
-  const errorRate = total > 0 ? (failed / total * 100) : 0;
-  
-  // Update error rate
-  const errorRateEl = document.getElementById('metricErrorRate');
-  const errorRateFill = document.getElementById('metricErrorRateFill');
-  if (errorRateEl) errorRateEl.textContent = errorRate.toFixed(1) + '%';
-  if (errorRateFill) errorRateFill.style.width = Math.min(errorRate * 5, 100) + '%';
-  
-  // Simulate response time (based on success rate)
-  const responseTime = Math.max(50, 200 - (100 - errorRate) * 1.5);
-  const responseTimeEl = document.getElementById('metricResponseTime');
-  const responseTimeFill = document.getElementById('metricResponseTimeFill');
-  if (responseTimeEl) responseTimeEl.textContent = Math.round(responseTime) + ' ms';
-  if (responseTimeFill) responseTimeFill.style.width = Math.min(responseTime / 5, 100) + '%';
-  
-  // Update connections (placeholder)
-  const connectionsEl = document.getElementById('metricConnections');
-  const connectionsFill = document.getElementById('metricConnectionsFill');
-  if (connectionsEl) connectionsEl.textContent = '1';
-  if (connectionsFill) connectionsFill.style.width = '10%';
-  
-  // Cache hit rate (placeholder)
-  const cacheHitEl = document.getElementById('metricCacheHit');
-  const cacheHitFill = document.getElementById('metricCacheHitFill');
-  if (cacheHitEl) cacheHitEl.textContent = '--';
-  if (cacheHitFill) cacheHitFill.style.width = '0%';
+export async function updateSystemHealth(usage) {
+  // First, try to fetch real system metrics from API
+  let systemMetrics = null;
+  try {
+    const response = await api('GET', '/system');
+    if (response) {
+      systemMetrics = response;
+    }
+  } catch (e) {
+    console.warn('Failed to fetch system metrics:', e);
+  }
+
+  if (systemMetrics) {
+    // CPU
+    const cpuEl = document.getElementById('metricCPU');
+    const cpuFill = document.getElementById('metricCPUFill');
+    if (cpuEl) cpuEl.textContent = systemMetrics.cpu_percent?.toFixed(1) + '%' || '--%';
+    if (cpuFill) cpuFill.style.width = Math.min(systemMetrics.cpu_percent || 0, 100) + '%';
+
+    // Memory
+    const memEl = document.getElementById('metricMemory');
+    const memFill = document.getElementById('metricMemoryFill');
+    if (memEl) {
+      const memUsed = systemMetrics.memory_used_bytes || 0;
+      const memTotal = systemMetrics.memory_total_bytes || 1;
+      memEl.textContent = formatBytes(memUsed) + ' / ' + formatBytes(memTotal);
+    }
+    if (memFill) memFill.style.width = Math.min(systemMetrics.memory_percent || 0, 100) + '%';
+
+    // Disk
+    const diskEl = document.getElementById('metricDisk');
+    const diskFill = document.getElementById('metricDiskFill');
+    if (diskEl) diskEl.textContent = systemMetrics.disk_percent?.toFixed(1) + '%' || '--%';
+    if (diskFill) diskFill.style.width = Math.min(systemMetrics.disk_percent || 0, 100) + '%';
+
+    // Uptime
+    const uptimeEl = document.getElementById('metricUptime');
+    const uptimeFill = document.getElementById('metricUptimeFill');
+    if (uptimeEl) uptimeEl.textContent = systemMetrics.uptime || '--';
+    if (uptimeFill) uptimeFill.style.width = '100%';
+  } else {
+    // Fallback: show placeholders if API fails
+    const cpuEl = document.getElementById('metricCPU');
+    const cpuFill = document.getElementById('metricCPUFill');
+    if (cpuEl) cpuEl.textContent = '--%';
+    if (cpuFill) cpuFill.style.width = '0%';
+
+    const memEl = document.getElementById('metricMemory');
+    const memFill = document.getElementById('metricMemoryFill');
+    if (memEl) memEl.textContent = '--';
+    if (memFill) memFill.style.width = '0%';
+
+    const diskEl = document.getElementById('metricDisk');
+    const diskFill = document.getElementById('metricDiskFill');
+    if (diskEl) diskEl.textContent = '--%';
+    if (diskFill) diskFill.style.width = '0%';
+
+    const uptimeEl = document.getElementById('metricUptime');
+    const uptimeFill = document.getElementById('metricUptimeFill');
+    if (uptimeEl) uptimeEl.textContent = '--';
+    if (uptimeFill) uptimeFill.style.width = '0%';
+  }
+}
+
+/**
+ * Format bytes to human readable string
+ */
+function formatBytes(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
 // Expose functions to window for HTML onclick handlers
