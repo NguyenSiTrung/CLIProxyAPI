@@ -552,7 +552,6 @@ func (s *Server) registerManagementRoutes() {
 		mgmt.GET("/usage/backups", s.mgmt.ListBackupFiles)
 		mgmt.POST("/usage/backups/import", s.mgmt.ImportBackupFile)
 		mgmt.POST("/usage/backups/trigger", s.mgmt.TriggerManualBackup)
-		mgmt.GET("/system", s.mgmt.GetSystemMetrics)
 		mgmt.GET("/config", s.mgmt.GetConfig)
 		mgmt.GET("/config.yaml", s.mgmt.GetConfigYAML)
 		mgmt.PUT("/config.yaml", s.mgmt.PutConfigYAML)
