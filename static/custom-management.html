@@ -540,20 +540,20 @@
 
         <!-- Models Tabs -->
         <div class="models-tabs" role="tablist">
-          <button class="models-tab active" id="models-tab-btn" data-tab="models-list" role="tab" aria-selected="true" aria-controls="models-list">
+          <button class="models-tab active" id="models-tab-btn" data-tab="models-list" role="tab" aria-selected="true" aria-controls="models-list" tabindex="0">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
             </svg>
             Available Models
           </button>
-          <button class="models-tab" id="pricing-tab-btn" data-tab="models-pricing" role="tab" aria-selected="false" aria-controls="models-pricing">
+          <button class="models-tab" id="pricing-tab-btn" data-tab="models-pricing" role="tab" aria-selected="false" aria-controls="models-pricing" tabindex="-1">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <line x1="12" y1="1" x2="12" y2="23"/>
               <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
             </svg>
             Model Pricing
           </button>
-          <button class="models-tab" id="calculator-tab-btn" data-tab="models-calculator" role="tab" aria-selected="false" aria-controls="models-calculator">
+          <button class="models-tab" id="calculator-tab-btn" data-tab="models-calculator" role="tab" aria-selected="false" aria-controls="models-calculator" tabindex="-1">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <rect x="4" y="2" width="16" height="20" rx="2"/>
               <line x1="8" y1="6" x2="16" y2="6"/>
@@ -567,7 +567,7 @@
             </svg>
             Cost Calculator
           </button>
-          <button class="models-tab" id="examples-tab-btn" data-tab="models-examples" role="tab" aria-selected="false" aria-controls="models-examples">
+          <button class="models-tab" id="examples-tab-btn" data-tab="models-examples" role="tab" aria-selected="false" aria-controls="models-examples" tabindex="-1">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="16 18 22 12 16 6"/>
               <polyline points="8 6 2 12 8 18"/>
@@ -722,7 +722,7 @@
         </div>
 
         <!-- Model Pricing Tab Content -->
-        <div id="models-pricing" class="models-tab-content" role="tabpanel" aria-labelledby="pricing-tab-btn">
+        <div id="models-pricing" class="models-tab-content" role="tabpanel" aria-labelledby="pricing-tab-btn" hidden>
           <div class="pricing-search-container">
             <svg class="pricing-search-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
@@ -755,7 +755,7 @@
         </div>
 
         <!-- Cost Calculator Tab Content -->
-        <div id="models-calculator" class="models-tab-content" role="tabpanel" aria-labelledby="calculator-tab-btn">
+        <div id="models-calculator" class="models-tab-content" role="tabpanel" aria-labelledby="calculator-tab-btn" hidden>
           <div class="calculator-container">
             <div class="calculator-intro">
               <div class="calculator-intro-icon">
@@ -893,7 +893,7 @@
         </div>
 
         <!-- API Examples Tab Content -->
-        <div id="models-examples" class="models-tab-content" role="tabpanel" aria-labelledby="examples-tab-btn">
+        <div id="models-examples" class="models-tab-content" role="tabpanel" aria-labelledby="examples-tab-btn" hidden>
           <div class="api-examples-container">
             <div class="api-examples-header">
               <h3>
@@ -1273,36 +1273,36 @@
             <p class="page-subtitle">Manage your access and provider API keys</p>
           </div>
         </div>
-        <div class="keys-tabs">
-          <div class="keys-tab active" data-keytab="access"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+        <div class="keys-tabs" role="tablist" aria-label="API keys tabs">
+          <div class="keys-tab active" id="keys-tab-access" data-keytab="access" role="tab" aria-selected="true" aria-controls="keytab-access" tabindex="0"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
               fill="none" stroke="currentColor" stroke-width="2">
               <path
                 d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
             </svg>Access Keys <span class="tab-badge" id="accessTabBadge">0</span></div>
-          <div class="keys-tab" data-keytab="gemini"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+          <div class="keys-tab" id="keys-tab-gemini" data-keytab="gemini" role="tab" aria-selected="false" aria-controls="keytab-gemini" tabindex="-1"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
               fill="none" stroke="currentColor" stroke-width="2">
               <polygon
                 points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
             </svg>Gemini <span class="tab-badge" id="geminiTabBadge">0</span></div>
-          <div class="keys-tab" data-keytab="claude"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+          <div class="keys-tab" id="keys-tab-claude" data-keytab="claude" role="tab" aria-selected="false" aria-controls="keytab-claude" tabindex="-1"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
               fill="none" stroke="currentColor" stroke-width="2">
               <circle cx="12" cy="12" r="10" />
               <path d="M8 14s1.5 2 4 2 4-2 4-2" />
               <line x1="9" y1="9" x2="9.01" y2="9" />
               <line x1="15" y1="9" x2="15.01" y2="9" />
             </svg>Claude <span class="tab-badge" id="claudeTabBadge">0</span></div>
-          <div class="keys-tab" data-keytab="codex"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+          <div class="keys-tab" id="keys-tab-codex" data-keytab="codex" role="tab" aria-selected="false" aria-controls="keytab-codex" tabindex="-1"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
               fill="none" stroke="currentColor" stroke-width="2">
               <polyline points="16 18 22 12 16 6" />
               <polyline points="8 6 2 12 8 18" />
             </svg>Codex <span class="tab-badge" id="codexTabBadge">0</span></div>
-          <div class="keys-tab" data-keytab="costlimits"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
+          <div class="keys-tab" id="keys-tab-costlimits" data-keytab="costlimits" role="tab" aria-selected="false" aria-controls="keytab-costlimits" tabindex="-1"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"
               fill="none" stroke="currentColor" stroke-width="2">
               <line x1="12" y1="1" x2="12" y2="23" />
               <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
             </svg>Cost Limits</div>
         </div>
-        <div id="keytab-access" class="keys-content active">
+        <div id="keytab-access" class="keys-content active" role="tabpanel" aria-labelledby="keys-tab-access">
           <div class="card">
             <div class="keys-section-header">
               <div class="keys-section-title">
@@ -1317,7 +1317,7 @@
             <div id="accessKeysList" class="keys-grid"></div>
           </div>
         </div>
-        <div id="keytab-gemini" class="keys-content">
+        <div id="keytab-gemini" class="keys-content" role="tabpanel" aria-labelledby="keys-tab-gemini" hidden>
           <div class="card">
             <div class="keys-section-header">
               <div class="keys-section-title">
@@ -1332,7 +1332,7 @@
             <div id="geminiKeysList" class="keys-grid"></div>
           </div>
         </div>
-        <div id="keytab-claude" class="keys-content">
+        <div id="keytab-claude" class="keys-content" role="tabpanel" aria-labelledby="keys-tab-claude" hidden>
           <div class="card">
             <div class="keys-section-header">
               <div class="keys-section-title">
@@ -1347,7 +1347,7 @@
             <div id="claudeKeysList" class="keys-grid"></div>
           </div>
         </div>
-        <div id="keytab-codex" class="keys-content">
+        <div id="keytab-codex" class="keys-content" role="tabpanel" aria-labelledby="keys-tab-codex" hidden>
           <div class="card">
             <div class="keys-section-header">
               <div class="keys-section-title">
@@ -1362,7 +1362,7 @@
             <div id="codexKeysList" class="keys-grid"></div>
           </div>
         </div>
-        <div id="keytab-costlimits" class="keys-content">
+        <div id="keytab-costlimits" class="keys-content" role="tabpanel" aria-labelledby="keys-tab-costlimits" hidden>
           <div class="card">
             <div class="keys-section-header">
               <div class="keys-section-title">

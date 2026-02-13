@@ -652,6 +652,7 @@
   gap: 8px;
   border: 1px solid transparent;
   background: transparent;
+  white-space: nowrap;
 }
 
 .models-tab svg {
@@ -1267,9 +1268,14 @@
   .models-tabs {
     width: 100%;
     overflow-x: auto;
+    overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    scroll-snap-type: x proximity;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x;
+    scroll-padding-inline: 6px;
   }
 
   .models-tabs::-webkit-scrollbar {
@@ -1280,6 +1286,8 @@
     flex-shrink: 0;
     padding: 8px 14px;
     font-size: 13px;
+    min-height: 42px;
+    scroll-snap-align: start;
   }
   
   .models-toolbar {
@@ -1373,6 +1381,7 @@
     padding: 8px 10px;
     font-size: 12px;
     gap: 5px;
+    min-height: 40px;
   }
 
   .models-tab svg {

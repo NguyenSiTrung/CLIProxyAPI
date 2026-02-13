@@ -572,22 +572,112 @@ export async function deleteApiKey(type, idx) {
 /**
  * Setup keys tab switching handlers
  */
-export function setupKeysTabHandlers() {
+function scrollKeysTabIntoView(tab) {
+  if (!tab || !window.matchMedia('(max-width: 768px)').matches) {
+    return;
+  }
+  tab.scrollIntoView({
+    behavior: 'smooth',
+    block: 'nearest',
+    inline: 'center'
+  });
+}
+
+function activateKeysTab(tabId, options = {}) {
+  const { focus = false } = options;
+  let activeTab = null;
+
   document.querySelectorAll('.keys-tab').forEach(tab => {
+    const isActive = tab.dataset.keytab === tabId;
+    tab.classList.toggle('active', isActive);
+    tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    tab.setAttribute('tabindex', isActive ? '0' : '-1');
+    if (isActive) {
+      activeTab = tab;
+    }
+  });
+
+  document.querySelectorAll('.keys-content').forEach(content => {
+    const isActive = content.id === `keytab-${tabId}`;
+    content.classList.toggle('active', isActive);
+    content.toggleAttribute('hidden', !isActive);
+  });
+
+  if (activeTab && focus) {
+    activeTab.focus();
+  }
+  scrollKeysTabIntoView(activeTab);
+
+  if (tabId === 'costlimits') {
+    loadCostLimits();
+  }
+}
+
+export function setupKeysTabHandlers() {
+  const tabsContainer = document.querySelector('.keys-tabs');
+  if (!tabsContainer || tabsContainer.dataset.handlersBound === 'true') {
+    return;
+  }
+  tabsContainer.dataset.handlersBound = 'true';
+
+  const tabs = Array.from(tabsContainer.querySelectorAll('.keys-tab'));
+  tabs.forEach(tab => {
     tab.addEventListener('click', () => {
-      document.querySelectorAll('.keys-tab').forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      document.querySelectorAll('.keys-content').forEach(c => c.classList.remove('active'));
       const tabId = tab.dataset.keytab;
-      const content = document.getElementById(`keytab-${tabId}`);
-      if (content) content.classList.add('active');
-      
-      // Load cost limits when switching to cost limits tab
-      if (tabId === 'costlimits') {
-        loadCostLimits();
+      if (tabId) {
+        activateKeysTab(tabId);
+      }
+    });
+
+    tab.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        const tabId = tab.dataset.keytab;
+        if (tabId) {
+          activateKeysTab(tabId, { focus: true });
+        }
       }
     });
   });
+
+  tabsContainer.addEventListener('keydown', (event) => {
+    const currentTab = event.target.closest('.keys-tab');
+    if (!currentTab) return;
+
+    const currentIndex = tabs.indexOf(currentTab);
+    if (currentIndex === -1) return;
+
+    let nextIndex = currentIndex;
+    switch (event.key) {
+      case 'ArrowRight':
+        nextIndex = (currentIndex + 1) % tabs.length;
+        break;
+      case 'ArrowLeft':
+        nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+        break;
+      case 'Home':
+        nextIndex = 0;
+        break;
+      case 'End':
+        nextIndex = tabs.length - 1;
+        break;
+      default:
+        return;
+    }
+
+    event.preventDefault();
+    const nextTab = tabs[nextIndex];
+    const nextTabId = nextTab?.dataset.keytab;
+    if (nextTabId) {
+      activateKeysTab(nextTabId, { focus: true });
+    }
+  });
+
+  const initialTab = tabsContainer.querySelector('.keys-tab.active') || tabs[0];
+  const initialTabId = initialTab?.dataset.keytab;
+  if (initialTabId) {
+    activateKeysTab(initialTabId);
+  }
 }
 
 /**

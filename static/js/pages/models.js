@@ -1367,20 +1367,38 @@ export async function savePricingConfig() {
   }
 }
 
+function scrollModelsTabIntoView(tab) {
+  if (!tab || !window.matchMedia('(max-width: 768px)').matches) {
+    return;
+  }
+  tab.scrollIntoView({
+    behavior: 'smooth',
+    block: 'nearest',
+    inline: 'center'
+  });
+}
+
 /**
  * Switch between models tabs
  * @param {string} tabId - Tab ID to switch to
  */
 export async function switchModelsTab(tabId) {
+  let activeTab = null;
   document.querySelectorAll('.models-tab').forEach(tab => {
     const isActive = tab.dataset.tab === tabId;
     tab.classList.toggle('active', isActive);
-    // Update aria-selected attribute for accessibility
     tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+    tab.setAttribute('tabindex', isActive ? '0' : '-1');
+    if (isActive) {
+      activeTab = tab;
+    }
   });
   document.querySelectorAll('.models-tab-content').forEach(content => {
-    content.classList.toggle('active', content.id === tabId);
+    const isActive = content.id === tabId;
+    content.classList.toggle('active', isActive);
+    content.toggleAttribute('hidden', !isActive);
   });
+  scrollModelsTabIntoView(activeTab);
 
   if (tabId === 'models-pricing') {
     await loadPricingConfig();
@@ -1959,6 +1977,50 @@ window.initCalculator = initCalculator;
 window.updateCalculatorPreview = updateCalculatorPreview;
 window.setCalcPreset = setCalcPreset;
 
+function setupModelsTabKeyboardNavigation() {
+  const tablist = document.querySelector('.models-tabs');
+  if (!tablist || tablist.dataset.keyboardBound === 'true') {
+    return;
+  }
+  tablist.dataset.keyboardBound = 'true';
+
+  tablist.addEventListener('keydown', (event) => {
+    const currentTab = event.target.closest('.models-tab');
+    if (!currentTab) return;
+
+    const tabs = Array.from(tablist.querySelectorAll('.models-tab'));
+    const currentIndex = tabs.indexOf(currentTab);
+    if (currentIndex === -1) return;
+
+    let nextIndex = currentIndex;
+    switch (event.key) {
+      case 'ArrowRight':
+        nextIndex = (currentIndex + 1) % tabs.length;
+        break;
+      case 'ArrowLeft':
+        nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+        break;
+      case 'Home':
+        nextIndex = 0;
+        break;
+      case 'End':
+        nextIndex = tabs.length - 1;
+        break;
+      default:
+        return;
+    }
+
+    event.preventDefault();
+    const nextTab = tabs[nextIndex];
+    if (!nextTab) return;
+    nextTab.focus();
+    const nextTabId = nextTab.dataset.tab;
+    if (nextTabId) {
+      switchModelsTab(nextTabId);
+    }
+  });
+}
+
 /**
  * Initialize event listeners for the Models tab section
  * This replaces inline onclick handlers for better accessibility and code quality
@@ -1981,6 +2043,11 @@ export function initModelsTabEventListeners() {
   }
   if (examplesTabBtn) {
     examplesTabBtn.addEventListener('click', () => switchModelsTab('models-examples'));
+  }
+  setupModelsTabKeyboardNavigation();
+  const initialActiveTab = document.querySelector('.models-tab.active');
+  if (initialActiveTab?.dataset.tab) {
+    switchModelsTab(initialActiveTab.dataset.tab);
   }
   
   // Search inputs
