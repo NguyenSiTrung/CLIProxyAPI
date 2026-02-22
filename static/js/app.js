@@ -26,8 +26,7 @@ import { loadConfig, setupConfigKeyboardShortcuts } from './pages/config.js';
 import { loadUsageStats, initAutoBackup, destroyUsageCharts } from './pages/usage.js';
 import { loadAnalytics } from './pages/analytics.js';
 import { loadAmpSettings } from './pages/amp.js';
-import { loadLogs, setupLogScrollTracking, setupLogEventDelegation, initLogKeyboardShortcuts } from './pages/logs.js';
-import { stopLogAutoRefresh } from './pages/logs.js';
+import { loadLogs, setupLogScrollTracking, setupLogEventDelegation, initLogKeyboardShortcuts, cleanupLogs } from './pages/logs.js';
 import { loadQuotaPage, stopAutoRefresh as stopQuotaAutoRefresh } from './pages/quota.js';
 
 // Wire up dashboard's fetchModels dependency
@@ -39,9 +38,9 @@ setFetchModelsFunc(fetchModels);
  * @param {string} page - The page being navigated TO
  */
 function onBeforeNavigate(page) {
-  // Stop log auto-refresh when leaving logs page
+  // Clean up log event listeners and auto-refresh when leaving logs page
   if (page !== 'logs') {
-    stopLogAutoRefresh();
+    cleanupLogs();
   }
   // Stop quota auto-refresh when leaving quota page
   if (page !== 'quota') {
@@ -77,7 +76,12 @@ function init() {
   registerPageHandler('usage', loadUsageStats);
   registerPageHandler('analytics', loadAnalytics);
   registerPageHandler('amp', loadAmpSettings);
-  registerPageHandler('logs', loadLogs);
+  registerPageHandler('logs', () => {
+    setupLogScrollTracking();
+    setupLogEventDelegation();
+    initLogKeyboardShortcuts();
+    loadLogs();
+  });
   registerPageHandler('quota', loadQuotaPage);
 
   // Setup navigation
@@ -88,11 +92,6 @@ function init() {
   
   // Setup config keyboard shortcuts (Ctrl+S to save)
   setupConfigKeyboardShortcuts();
-
-  // Setup log page features
-  setupLogScrollTracking();
-  setupLogEventDelegation();
-  initLogKeyboardShortcuts();
 
   // Initialize modal system
   initModal();

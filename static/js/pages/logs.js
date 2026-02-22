@@ -113,6 +113,7 @@ function updateNewLogsBadge() {
 function updateLogStatusUI() {
   const logState = getLogState();
   const statusText = document.getElementById('liveStatusText');
+  if (!statusText) return;
   if (logState.autoRefreshInterval) {
     statusText.innerText = 'Live';
     statusText.style.color = 'var(--accent-green)';
@@ -142,13 +143,36 @@ function getFilteredLogs() {
         regexError = true;
         errorMessage = 'Pattern too long (max 200 chars)';
       } else {
-        // Check for potentially dangerous regex patterns (nested quantifiers, excessive backtracking)
-        const dangerousPatterns = /(\+|\*|\{[0-9]+,?\})\s*(\+|\*|\?|\{)/;
-        if (dangerousPatterns.test(searchRaw)) {
+        // Check for potentially dangerous regex patterns that cause catastrophic backtracking
+        // 1. Adjacent quantifiers: a++, a*+, a+?, a*{2}
+        const adjacentQuantifiers = /(\+|\*|\{[0-9]+,?\})\s*(\+|\*|\?|\{)/;
+        // 2. Group with quantifier followed by another quantifier: (a+)+, (x*)+
+        const groupQuantifierRepeat = /\([^)]*[+*][^)]*\)[+*]/;
+        // 3. Nested groups with quantifiers: ((a+)b)+
+        const nestedGroupQuantifiers = /\([^)]*\([^)]*[+*][^)]*\)[^)]*\)[+*]/;
+        // 4. Alternation with overlap inside quantified group: (a|a)+
+        const overlappingAlternation = /\(([^|)]+)\|\1[^)]*\)[+*]/;
+        
+        if (adjacentQuantifiers.test(searchRaw) || 
+            groupQuantifierRepeat.test(searchRaw) || 
+            nestedGroupQuantifiers.test(searchRaw) ||
+            overlappingAlternation.test(searchRaw)) {
           regexError = true;
-          errorMessage = 'Pattern too complex (nested quantifiers not allowed)';
+          errorMessage = 'Pattern too complex (potential catastrophic backtracking)';
         } else {
-          searchRegex = new RegExp(searchRaw, 'i');
+          const candidate = new RegExp(searchRaw, 'i');
+          // Safety net: test against a probe string to detect slow regexes
+          const probeString = 'a'.repeat(50);
+          const probeStart = performance.now();
+          candidate.test(probeString);
+          const probeTime = performance.now() - probeStart;
+          if (probeTime > 10) {
+            // Regex took >10ms on a 50-char string — likely dangerous on real log lines
+            regexError = true;
+            errorMessage = 'Pattern too slow (may cause performance issues)';
+          } else {
+            searchRegex = candidate;
+          }
         }
       }
     } catch (e) {
@@ -227,14 +251,81 @@ function renderLogs() {
   }
 
   const linesToRender = filtered.slice(-500);
+  
+  // Check if we can do an incremental append instead of full rebuild.
+  // This avoids destroying the entire DOM subtree during auto-refresh.
+  const logState = getLogState();
+  const prevRendered = logState.renderedLogs || [];
+  const canAppend = prevRendered.length > 0 && 
+    linesToRender.length > prevRendered.length &&
+    linesToRender.length - prevRendered.length <= 50 &&
+    v.children.length > 0 && 
+    !v.querySelector('.empty-logs') &&
+    prevRendered[0].raw === linesToRender[linesToRender.length - prevRendered.length]?.raw;
+  
   updateLogState({ renderedLogs: linesToRender });
 
-  const html = linesToRender.map((l, idx) => {
-    const lvlClass = l.level.toLowerCase();
-    const displayTime = l.time ? (l.time.length > 15 ? l.time.substring(11, 19) : l.time) : '--:--:--';
-    const isLongMessage = l.message && l.message.length > 200;
+  if (canAppend) {
+    // Incremental append — only add new entries to the DOM
+    const newEntries = linesToRender.slice(prevRendered.length);
+    const startIdx = prevRendered.length;
+    const fragment = document.createDocumentFragment();
+    
+    newEntries.forEach((l, i) => {
+      const idx = startIdx + i;
+      const lvlClass = l.level.toLowerCase();
+      const displayTime = l.time ? (l.time.length > 15 ? l.time.substring(11, 19) : l.time) : '--:--:--';
+      const isLongMessage = l.message && l.message.length > 200;
+      
+      const div = document.createElement('div');
+      div.className = `log-entry ${lvlClass}${isLongMessage ? ' long-message' : ''}`;
+      div.dataset.logIdx = idx;
+      div.tabIndex = 0;
+      div.setAttribute('role', 'listitem');
+      div.setAttribute('aria-label', `${l.level} log at ${escapeHtml(l.time || 'unknown time')}`);
+      div.innerHTML = `
+        <div class="log-time" title="${escapeHtml(l.time)}">${escapeHtml(displayTime)}</div>
+        <div class="log-lvl ${lvlClass}">${l.level}</div>
+        <div class="log-msg">${escapeHtml(l.message)}</div>
+        <div class="log-actions">
+          <button class="log-action-btn copy-btn" title="Copy log" aria-label="Copy log entry">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+          </button>
+          <button class="log-action-btn details-btn" title="View details" aria-label="View log details">
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+          </button>
+        </div>`;
+      fragment.appendChild(div);
+    });
+    
+    // Remove excess entries from the top if over 500
+    const excess = v.children.length + newEntries.length - 500;
+    for (let i = 0; i < excess; i++) {
+      v.removeChild(v.firstChild);
+    }
+    
+    const wasAtBottom = v.scrollTop + v.clientHeight >= v.scrollHeight - 50;
+    v.appendChild(fragment);
+    
+    // Re-index data-log-idx attributes after removal
+    if (excess > 0) {
+      Array.from(v.children).forEach((child, i) => {
+        child.dataset.logIdx = i;
+      });
+    }
+    
+    if (wasAtBottom) {
+      v.scrollTop = v.scrollHeight;
+      updateLogState({ isAtBottom: true });
+    }
+  } else {
+    // Full rebuild — filter changed, search changed, or first load
+    const html = linesToRender.map((l, idx) => {
+      const lvlClass = l.level.toLowerCase();
+      const displayTime = l.time ? (l.time.length > 15 ? l.time.substring(11, 19) : l.time) : '--:--:--';
+      const isLongMessage = l.message && l.message.length > 200;
 
-    return `
+      return `
        <div class="log-entry ${lvlClass}${isLongMessage ? ' long-message' : ''}" data-log-idx="${idx}" tabindex="0" role="listitem" aria-label="${l.level} log at ${escapeHtml(l.time || 'unknown time')}">
          <div class="log-time" title="${escapeHtml(l.time)}">${escapeHtml(displayTime)}</div>
          <div class="log-lvl ${lvlClass}">${l.level}</div>
@@ -249,19 +340,20 @@ function renderLogs() {
          </div>
        </div>
      `;
-  }).join('');
+    }).join('');
 
-  const wasAtBottom = v.scrollTop + v.clientHeight >= v.scrollHeight - 50;
-  v.innerHTML = html;
+    const wasAtBottom = v.scrollTop + v.clientHeight >= v.scrollHeight - 50;
+    v.innerHTML = html;
 
-if (wasAtBottom || !v.getAttribute('data-loaded')) {
-v.scrollTop = v.scrollHeight;
-v.setAttribute('data-loaded', 'true');
-updateLogState({ isAtBottom: true });
-}
+    if (wasAtBottom || !v.getAttribute('data-loaded')) {
+      v.scrollTop = v.scrollHeight;
+      v.setAttribute('data-loaded', 'true');
+      updateLogState({ isAtBottom: true });
+    }
+  }
 
-// Update stats and counts
-updateStatsAndCounts();
+  // Update stats and counts
+  updateStatsAndCounts();
 }
 
 /**
@@ -570,9 +662,18 @@ export function toggleAutoRefresh(enabled) {
   if (dot) dot.classList.toggle('active', enabled);
 
   if (enabled) {
-    loadLogs(true);
-    const interval = setInterval(() => loadLogs(true), 2000);
-    updateLogState({ autoRefreshInterval: interval });
+    // If no logs loaded yet, do a full load first; otherwise start polling for new entries
+    if (logState.allLogs.length === 0 || logState.latestTimestamp === 0) {
+      loadLogs(false).then(() => {
+        // Re-read state after load to get updated latestTimestamp
+        const interval = setInterval(() => loadLogs(true), 2000);
+        updateLogState({ autoRefreshInterval: interval });
+      });
+    } else {
+      // Already have logs with a valid timestamp — start incremental polling immediately
+      const interval = setInterval(() => loadLogs(true), 2000);
+      updateLogState({ autoRefreshInterval: interval });
+    }
   } else {
     updateLogStatusUI();
   }
@@ -836,6 +937,9 @@ export function clearLogs(confirmed = false) {
     .then(() => {
       toast('Logs cleared successfully', 'success');
       resetLogState();
+      // Reset data-loaded so first load auto-scrolls to bottom
+      const v = document.getElementById('logViewer');
+      if (v) v.removeAttribute('data-loaded');
       loadLogs();
     })
     .catch(e => {
@@ -883,6 +987,15 @@ export async function loadLogs(isAuto = false) {
 
     // Re-check after processing to ensure we're still the latest request
     if (thisRequestId !== loadRequestId) {
+      return;
+    }
+
+    if (isAuto && logState.latestTimestamp > 0 && newLogs.length === 0) {
+      // No new logs — skip the expensive render cycle
+      if (d['latest-timestamp']) {
+        updateLogState({ latestTimestamp: d['latest-timestamp'] });
+      }
+      updateLogStatusUI();
       return;
     }
 
