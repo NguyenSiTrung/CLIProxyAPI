@@ -141,9 +141,37 @@ func convertOpenAIStreamingChunkToAnthropic(rawJSON []byte, param *ConvertOpenAI
 			// Don't send content_block_start for text here - wait for actual content
 		}
 
-		// Handle reasoning content delta
-		if reasoning := delta.Get("reasoning_content"); reasoning.Exists() {
-			for _, reasoningText := range collectOpenAIReasoningTexts(reasoning) {
+		// Handle reasoning/thinking content delta.
+		for _, reasoningText := range collectOpenAIReasoningNodes(
+			delta.Get("reasoning_content"),
+			delta.Get("reasoning"),
+			delta.Get("reasoning_text"),
+		) {
+			if reasoningText == "" {
+				continue
+			}
+			stopTextContentBlock(param, &results)
+			if !param.ThinkingContentBlockStarted {
+				if param.ThinkingContentBlockIndex == -1 {
+					param.ThinkingContentBlockIndex = param.NextContentBlockIndex
+					param.NextContentBlockIndex++
+				}
+				contentBlockStartJSON := `{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}`
+				contentBlockStartJSON, _ = sjson.Set(contentBlockStartJSON, "index", param.ThinkingContentBlockIndex)
+				results = append(results, "event: content_block_start\ndata: "+contentBlockStartJSON+"\n\n")
+				param.ThinkingContentBlockStarted = true
+			}
+
+			thinkingDeltaJSON := `{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":""}}`
+			thinkingDeltaJSON, _ = sjson.Set(thinkingDeltaJSON, "index", param.ThinkingContentBlockIndex)
+			thinkingDeltaJSON, _ = sjson.Set(thinkingDeltaJSON, "delta.thinking", reasoningText)
+			results = append(results, "event: content_block_delta\ndata: "+thinkingDeltaJSON+"\n\n")
+		}
+
+		// Handle content delta.
+		content := delta.Get("content")
+		if content.Exists() {
+			for _, reasoningText := range extractReasoningTextsFromOpenAIContent(content) {
 				if reasoningText == "" {
 					continue
 				}
@@ -158,36 +186,34 @@ func convertOpenAIStreamingChunkToAnthropic(rawJSON []byte, param *ConvertOpenAI
 					results = append(results, "event: content_block_start\ndata: "+contentBlockStartJSON+"\n\n")
 					param.ThinkingContentBlockStarted = true
 				}
-
 				thinkingDeltaJSON := `{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":""}}`
 				thinkingDeltaJSON, _ = sjson.Set(thinkingDeltaJSON, "index", param.ThinkingContentBlockIndex)
 				thinkingDeltaJSON, _ = sjson.Set(thinkingDeltaJSON, "delta.thinking", reasoningText)
 				results = append(results, "event: content_block_delta\ndata: "+thinkingDeltaJSON+"\n\n")
 			}
-		}
 
-		// Handle content delta
-		if content := delta.Get("content"); content.Exists() && content.String() != "" {
-			// Send content_block_start for text if not already sent
-			if !param.TextContentBlockStarted {
-				stopThinkingContentBlock(param, &results)
-				if param.TextContentBlockIndex == -1 {
-					param.TextContentBlockIndex = param.NextContentBlockIndex
-					param.NextContentBlockIndex++
+			for _, text := range extractTextFromOpenAIContent(content) {
+				if text == "" {
+					continue
 				}
-				contentBlockStartJSON := `{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`
-				contentBlockStartJSON, _ = sjson.Set(contentBlockStartJSON, "index", param.TextContentBlockIndex)
-				results = append(results, "event: content_block_start\ndata: "+contentBlockStartJSON+"\n\n")
-				param.TextContentBlockStarted = true
+				if !param.TextContentBlockStarted {
+					stopThinkingContentBlock(param, &results)
+					if param.TextContentBlockIndex == -1 {
+						param.TextContentBlockIndex = param.NextContentBlockIndex
+						param.NextContentBlockIndex++
+					}
+					contentBlockStartJSON := `{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`
+					contentBlockStartJSON, _ = sjson.Set(contentBlockStartJSON, "index", param.TextContentBlockIndex)
+					results = append(results, "event: content_block_start\ndata: "+contentBlockStartJSON+"\n\n")
+					param.TextContentBlockStarted = true
+				}
+
+				contentDeltaJSON := `{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":""}}`
+				contentDeltaJSON, _ = sjson.Set(contentDeltaJSON, "index", param.TextContentBlockIndex)
+				contentDeltaJSON, _ = sjson.Set(contentDeltaJSON, "delta.text", text)
+				results = append(results, "event: content_block_delta\ndata: "+contentDeltaJSON+"\n\n")
+				param.ContentAccumulator.WriteString(text)
 			}
-
-			contentDeltaJSON := `{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":""}}`
-			contentDeltaJSON, _ = sjson.Set(contentDeltaJSON, "index", param.TextContentBlockIndex)
-			contentDeltaJSON, _ = sjson.Set(contentDeltaJSON, "delta.text", content.String())
-			results = append(results, "event: content_block_delta\ndata: "+contentDeltaJSON+"\n\n")
-
-			// Accumulate content
-			param.ContentAccumulator.WriteString(content.String())
 		}
 
 		// Handle tool calls
@@ -289,9 +315,9 @@ func convertOpenAIStreamingChunkToAnthropic(rawJSON []byte, param *ConvertOpenAI
 	// Only process if usage has actual values (not null)
 	if param.FinishReason != "" {
 		usage := root.Get("usage")
-		var inputTokens, outputTokens, cachedTokens int64
+		var inputTokens, outputTokens, cachedTokens, reasoningTokens int64
 		if usage.Exists() && usage.Type != gjson.Null {
-			inputTokens, outputTokens, cachedTokens = extractOpenAIUsage(usage)
+			inputTokens, outputTokens, cachedTokens, reasoningTokens = extractOpenAIUsage(usage)
 			// Send message_delta with usage
 			messageDeltaJSON := `{"type":"message_delta","delta":{"stop_reason":"","stop_sequence":null},"usage":{"input_tokens":0,"output_tokens":0}}`
 			messageDeltaJSON, _ = sjson.Set(messageDeltaJSON, "delta.stop_reason", mapOpenAIFinishReasonToAnthropic(param.FinishReason))
@@ -299,6 +325,9 @@ func convertOpenAIStreamingChunkToAnthropic(rawJSON []byte, param *ConvertOpenAI
 			messageDeltaJSON, _ = sjson.Set(messageDeltaJSON, "usage.output_tokens", outputTokens)
 			if cachedTokens > 0 {
 				messageDeltaJSON, _ = sjson.Set(messageDeltaJSON, "usage.cache_read_input_tokens", cachedTokens)
+			}
+			if reasoningTokens > 0 {
+				messageDeltaJSON, _ = sjson.Set(messageDeltaJSON, "usage.output_tokens_details.reasoning_tokens", reasoningTokens)
 			}
 			results = append(results, "event: message_delta\ndata: "+messageDeltaJSON+"\n\n")
 			param.MessageDeltaSent = true
@@ -370,8 +399,11 @@ func convertOpenAINonStreamingToAnthropic(rawJSON []byte) []string {
 	if choices := root.Get("choices"); choices.Exists() && choices.IsArray() && len(choices.Array()) > 0 {
 		choice := choices.Array()[0] // Take first choice
 
-		reasoningNode := choice.Get("message.reasoning_content")
-		for _, reasoningText := range collectOpenAIReasoningTexts(reasoningNode) {
+		for _, reasoningText := range collectOpenAIReasoningNodes(
+			choice.Get("message.reasoning_content"),
+			choice.Get("message.reasoning"),
+			choice.Get("reasoning"),
+		) {
 			if reasoningText == "" {
 				continue
 			}
@@ -381,10 +413,23 @@ func convertOpenAINonStreamingToAnthropic(rawJSON []byte) []string {
 		}
 
 		// Handle text content
-		if content := choice.Get("message.content"); content.Exists() && content.String() != "" {
-			block := `{"type":"text","text":""}`
-			block, _ = sjson.Set(block, "text", content.String())
-			out, _ = sjson.SetRaw(out, "content.-1", block)
+		if content := choice.Get("message.content"); content.Exists() {
+			for _, text := range extractTextFromOpenAIContent(content) {
+				if text == "" {
+					continue
+				}
+				block := `{"type":"text","text":""}`
+				block, _ = sjson.Set(block, "text", text)
+				out, _ = sjson.SetRaw(out, "content.-1", block)
+			}
+			for _, reasoningText := range extractReasoningTextsFromOpenAIContent(content) {
+				if reasoningText == "" {
+					continue
+				}
+				block := `{"type":"thinking","thinking":""}`
+				block, _ = sjson.Set(block, "thinking", reasoningText)
+				out, _ = sjson.SetRaw(out, "content.-1", block)
+			}
 		}
 
 		// Handle tool calls
@@ -419,11 +464,14 @@ func convertOpenAINonStreamingToAnthropic(rawJSON []byte) []string {
 
 	// Set usage information
 	if usage := root.Get("usage"); usage.Exists() {
-		inputTokens, outputTokens, cachedTokens := extractOpenAIUsage(usage)
+		inputTokens, outputTokens, cachedTokens, reasoningTokens := extractOpenAIUsage(usage)
 		out, _ = sjson.Set(out, "usage.input_tokens", inputTokens)
 		out, _ = sjson.Set(out, "usage.output_tokens", outputTokens)
 		if cachedTokens > 0 {
 			out, _ = sjson.Set(out, "usage.cache_read_input_tokens", cachedTokens)
+		}
+		if reasoningTokens > 0 {
+			out, _ = sjson.Set(out, "usage.output_tokens_details.reasoning_tokens", reasoningTokens)
 		}
 	}
 
@@ -478,6 +526,12 @@ func collectOpenAIReasoningTexts(node gjson.Result) []string {
 			texts = append(texts, text)
 		}
 	case gjson.JSON:
+		if node.IsObject() {
+			texts = append(texts, collectOpenAIReasoningTexts(node.Get("summary"))...)
+			texts = append(texts, collectOpenAIReasoningTexts(node.Get("content"))...)
+			texts = append(texts, collectOpenAIReasoningTexts(node.Get("reasoning"))...)
+			texts = append(texts, collectOpenAIReasoningTexts(node.Get("delta"))...)
+		}
 		if text := node.Get("text"); text.Exists() {
 			if textStr := text.String(); textStr != "" {
 				texts = append(texts, textStr)
@@ -488,6 +542,84 @@ func collectOpenAIReasoningTexts(node gjson.Result) []string {
 	}
 
 	return texts
+}
+
+func collectOpenAIReasoningNodes(nodes ...gjson.Result) []string {
+	if len(nodes) == 0 {
+		return nil
+	}
+	combined := make([]string, 0, len(nodes))
+	seen := make(map[string]struct{}, len(nodes))
+	for _, node := range nodes {
+		for _, text := range collectOpenAIReasoningTexts(node) {
+			if text == "" {
+				continue
+			}
+			if _, ok := seen[text]; ok {
+				continue
+			}
+			seen[text] = struct{}{}
+			combined = append(combined, text)
+		}
+	}
+	return combined
+}
+
+func extractTextFromOpenAIContent(content gjson.Result) []string {
+	if !content.Exists() {
+		return nil
+	}
+	var texts []string
+	switch {
+	case content.Type == gjson.String:
+		if t := content.String(); t != "" {
+			texts = append(texts, t)
+		}
+	case content.IsArray():
+		for _, item := range content.Array() {
+			switch item.Get("type").String() {
+			case "text", "output_text", "input_text":
+				if t := item.Get("text").String(); t != "" {
+					texts = append(texts, t)
+				}
+			}
+		}
+	case content.Type == gjson.JSON:
+		switch content.Get("type").String() {
+		case "text", "output_text", "input_text":
+			if t := content.Get("text").String(); t != "" {
+				texts = append(texts, t)
+			}
+		}
+	}
+	return texts
+}
+
+func extractReasoningTextsFromOpenAIContent(content gjson.Result) []string {
+	if !content.Exists() {
+		return nil
+	}
+	var nodes []gjson.Result
+	switch {
+	case content.IsArray():
+		for _, item := range content.Array() {
+			if item.Get("type").String() != "reasoning" {
+				continue
+			}
+			nodes = append(nodes, item.Get("text"))
+			nodes = append(nodes, item.Get("summary"))
+			nodes = append(nodes, item.Get("content"))
+			nodes = append(nodes, item.Get("reasoning"))
+		}
+	case content.Type == gjson.JSON:
+		if content.Get("type").String() == "reasoning" {
+			nodes = append(nodes, content.Get("text"))
+			nodes = append(nodes, content.Get("summary"))
+			nodes = append(nodes, content.Get("content"))
+			nodes = append(nodes, content.Get("reasoning"))
+		}
+	}
+	return collectOpenAIReasoningNodes(nodes...)
 }
 
 func stopThinkingContentBlock(param *ConvertOpenAIResponseToAnthropicParams, results *[]string) {
@@ -578,7 +710,7 @@ func ConvertOpenAIResponseToClaudeNonStream(_ context.Context, _ string, origina
 
 					for _, item := range contentResult.Array() {
 						switch item.Get("type").String() {
-						case "text":
+						case "text", "output_text":
 							flushThinking()
 							textBuilder.WriteString(item.Get("text").String())
 						case "tool_calls":
@@ -610,8 +742,13 @@ func ConvertOpenAIResponseToClaudeNonStream(_ context.Context, _ string, origina
 							}
 						case "reasoning":
 							flushText()
-							if thinking := item.Get("text"); thinking.Exists() {
-								thinkingBuilder.WriteString(thinking.String())
+							for _, reasoningText := range collectOpenAIReasoningNodes(
+								item.Get("text"),
+								item.Get("summary"),
+								item.Get("content"),
+								item.Get("reasoning"),
+							) {
+								thinkingBuilder.WriteString(reasoningText)
 							}
 						default:
 							flushThinking()
@@ -631,15 +768,17 @@ func ConvertOpenAIResponseToClaudeNonStream(_ context.Context, _ string, origina
 				}
 			}
 
-			if reasoning := message.Get("reasoning_content"); reasoning.Exists() {
-				for _, reasoningText := range collectOpenAIReasoningTexts(reasoning) {
-					if reasoningText == "" {
-						continue
-					}
-					block := `{"type":"thinking","thinking":""}`
-					block, _ = sjson.Set(block, "thinking", reasoningText)
-					out, _ = sjson.SetRaw(out, "content.-1", block)
+			for _, reasoningText := range collectOpenAIReasoningNodes(
+				message.Get("reasoning_content"),
+				message.Get("reasoning"),
+				choice.Get("reasoning"),
+			) {
+				if reasoningText == "" {
+					continue
 				}
+				block := `{"type":"thinking","thinking":""}`
+				block, _ = sjson.Set(block, "thinking", reasoningText)
+				out, _ = sjson.SetRaw(out, "content.-1", block)
 			}
 
 			if toolCalls := message.Get("tool_calls"); toolCalls.Exists() && toolCalls.IsArray() {
@@ -669,11 +808,14 @@ func ConvertOpenAIResponseToClaudeNonStream(_ context.Context, _ string, origina
 	}
 
 	if respUsage := root.Get("usage"); respUsage.Exists() {
-		inputTokens, outputTokens, cachedTokens := extractOpenAIUsage(respUsage)
+		inputTokens, outputTokens, cachedTokens, reasoningTokens := extractOpenAIUsage(respUsage)
 		out, _ = sjson.Set(out, "usage.input_tokens", inputTokens)
 		out, _ = sjson.Set(out, "usage.output_tokens", outputTokens)
 		if cachedTokens > 0 {
 			out, _ = sjson.Set(out, "usage.cache_read_input_tokens", cachedTokens)
+		}
+		if reasoningTokens > 0 {
+			out, _ = sjson.Set(out, "usage.output_tokens_details.reasoning_tokens", reasoningTokens)
 		}
 	}
 
@@ -692,14 +834,27 @@ func ClaudeTokenCount(ctx context.Context, count int64) string {
 	return fmt.Sprintf(`{"input_tokens":%d}`, count)
 }
 
-func extractOpenAIUsage(usage gjson.Result) (int64, int64, int64) {
+func extractOpenAIUsage(usage gjson.Result) (int64, int64, int64, int64) {
 	if !usage.Exists() || usage.Type == gjson.Null {
-		return 0, 0, 0
+		return 0, 0, 0, 0
 	}
 
 	inputTokens := usage.Get("prompt_tokens").Int()
+	if inputTokens == 0 {
+		inputTokens = usage.Get("input_tokens").Int()
+	}
 	outputTokens := usage.Get("completion_tokens").Int()
+	if outputTokens == 0 {
+		outputTokens = usage.Get("output_tokens").Int()
+	}
 	cachedTokens := usage.Get("prompt_tokens_details.cached_tokens").Int()
+	if cachedTokens == 0 {
+		cachedTokens = usage.Get("input_tokens_details.cached_tokens").Int()
+	}
+	reasoningTokens := usage.Get("completion_tokens_details.reasoning_tokens").Int()
+	if reasoningTokens == 0 {
+		reasoningTokens = usage.Get("output_tokens_details.reasoning_tokens").Int()
+	}
 
 	if cachedTokens > 0 {
 		if inputTokens >= cachedTokens {
@@ -709,5 +864,5 @@ func extractOpenAIUsage(usage gjson.Result) (int64, int64, int64) {
 		}
 	}
 
-	return inputTokens, outputTokens, cachedTokens
+	return inputTokens, outputTokens, cachedTokens, reasoningTokens
 }

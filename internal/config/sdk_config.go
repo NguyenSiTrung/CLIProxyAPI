@@ -30,6 +30,13 @@ type SDKConfig struct {
 	// NonStreamKeepAliveInterval controls how often blank lines are emitted for non-streaming responses.
 	// <= 0 disables keep-alives. Value is in seconds.
 	NonStreamKeepAliveInterval int `yaml:"nonstream-keepalive-interval,omitempty" json:"nonstream-keepalive-interval,omitempty"`
+
+	// ForceGitHubCopilotAgentInitiator forces the X-Initiator header to "agent" for all GitHub
+	// Copilot requests, regardless of the actual message roles. By default the header is set to
+	// "user" for first-turn conversations and "agent" when the request contains assistant or tool
+	// messages. Enabling this option may help in cases where the Copilot backend behaves better
+	// in agentic mode even for simple single-turn requests.
+	ForceGitHubCopilotAgentInitiator bool `yaml:"force-github-copilot-agent-initiator,omitempty" json:"force-github-copilot-agent-initiator,omitempty"`
 }
 
 // StreamingConfig holds server streaming behavior configuration.

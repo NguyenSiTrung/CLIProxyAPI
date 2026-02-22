@@ -41,3 +41,14 @@ func TestParseOpenAIUsageResponses(t *testing.T) {
 		t.Fatalf("reasoning tokens = %d, want %d", detail.ReasoningTokens, 9)
 	}
 }
+
+func TestParseOpenAIStreamUsage_FallbackOutputReasoningTokens(t *testing.T) {
+	line := []byte(`data: {"usage":{"prompt_tokens":1,"completion_tokens":2,"total_tokens":3,"output_tokens_details":{"reasoning_tokens":6}}}`)
+	detail, ok := parseOpenAIStreamUsage(line)
+	if !ok {
+		t.Fatal("parseOpenAIStreamUsage() expected usage metadata")
+	}
+	if detail.ReasoningTokens != 6 {
+		t.Fatalf("reasoning tokens = %d, want %d", detail.ReasoningTokens, 6)
+	}
+}
