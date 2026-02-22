@@ -559,12 +559,17 @@ export async function startOAuth(provider) {
     'codex': '/codex-auth-url',
     'antigravity': '/antigravity-auth-url',
     'qwen': '/qwen-auth-url',
-    'iflow': '/iflow-auth-url'
+    'iflow': '/iflow-auth-url',
+    'github': '/github-auth-url',
+    'kiro': '/kiro-auth-url'
   };
   const ep = endpoints[provider];
 
-  // Show the manual callback section when OAuth is started
-  showManualCallback();
+  // Device flow providers don't use redirect callbacks
+  const deviceFlowProviders = ['github', 'kiro'];
+  if (!deviceFlowProviders.includes(provider)) {
+    showManualCallback();
+  }
 
   try {
     toast(`Starting ${provider} OAuth...`, 'info');
@@ -572,7 +577,11 @@ export async function startOAuth(provider) {
 
     if (d.url || d.auth_url) {
       window.open(d.url || d.auth_url, '_blank');
-      toast('Complete login in new window', 'info');
+      if (d.user_code) {
+        toast(`Enter code: ${d.user_code}`, 'info', 30000);
+      } else {
+        toast('Complete login in new window', 'info');
+      }
     } else if (d.message) {
       toast(d.message, 'info');
     }
