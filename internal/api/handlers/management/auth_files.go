@@ -2642,35 +2642,37 @@ func (h *Handler) RequestKiroToken(c *gin.Context) {
 
 	switch method {
 	case "aws", "builder-id":
+		// AWS Builder ID uses device code flow (no callback needed)
+		// Perform client registration and device authorization synchronously
+		// so we can return the verification URL and user code in the response.
+		ssoClient := kiroauth.NewSSOOIDCClient(h.cfg)
+
+		// Step 1: Register client
+		fmt.Println("Registering client...")
+		regResp, errRegister := ssoClient.RegisterClient(ctx)
+		if errRegister != nil {
+			log.Errorf("Failed to register client: %v", errRegister)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register client"})
+			return
+		}
+
+		// Step 2: Start device authorization
+		fmt.Println("Starting device authorization...")
+		authResp, errAuth := ssoClient.StartDeviceAuthorization(ctx, regResp.ClientID, regResp.ClientSecret)
+		if errAuth != nil {
+			log.Errorf("Failed to start device auth: %v", errAuth)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to start device authorization"})
+			return
+		}
+
+		authURL := authResp.VerificationURIComplete
+		userCode := authResp.UserCode
+
 		RegisterOAuthSession(state, "kiro")
 
-		// AWS Builder ID uses device code flow (no callback needed)
+		// Step 3: Poll for token in background goroutine
 		go func() {
-			ssoClient := kiroauth.NewSSOOIDCClient(h.cfg)
-
-			// Step 1: Register client
-			fmt.Println("Registering client...")
-			regResp, errRegister := ssoClient.RegisterClient(ctx)
-			if errRegister != nil {
-				log.Errorf("Failed to register client: %v", errRegister)
-				SetOAuthSessionError(state, "Failed to register client")
-				return
-			}
-
-			// Step 2: Start device authorization
-			fmt.Println("Starting device authorization...")
-			authResp, errAuth := ssoClient.StartDeviceAuthorization(ctx, regResp.ClientID, regResp.ClientSecret)
-			if errAuth != nil {
-				log.Errorf("Failed to start device auth: %v", errAuth)
-				SetOAuthSessionError(state, "Failed to start device authorization")
-				return
-			}
-
-			// Store the verification URL for the frontend to display.
-			// Using "|" as separator because URLs contain ":".
-			SetOAuthSessionError(state, "device_code|"+authResp.VerificationURIComplete+"|"+authResp.UserCode)
-
-			// Step 3: Poll for token
+			fmt.Printf("Please visit %s and enter code: %s\n", authURL, userCode)
 			fmt.Println("Waiting for authorization...")
 			interval := 5 * time.Second
 			if authResp.Interval > 0 {
@@ -2748,12 +2750,17 @@ func (h *Handler) RequestKiroToken(c *gin.Context) {
 			SetOAuthSessionError(state, "Authorization timed out")
 		}()
 
-		// Return immediately with the state for polling
-		c.JSON(http.StatusOK, gin.H{"status": "ok", "state": state, "method": "device_code"})
+		// Return verification URL and user code synchronously (like GitHub flow)
+		c.JSON(http.StatusOK, gin.H{
+			"status":           "ok",
+			"url":              authURL,
+			"state":            state,
+			"user_code":        userCode,
+			"verification_uri": authURL,
+			"method":           "device_code",
+		})
 
 	case "google", "github":
-		RegisterOAuthSession(state, "kiro")
-
 		// Social auth uses protocol handler - for WEB UI we use a callback forwarder
 		provider := "Google"
 		if method == "github" {
@@ -2775,33 +2782,31 @@ func (h *Handler) RequestKiroToken(c *gin.Context) {
 			}
 		}
 
+		// Generate PKCE codes synchronously so we can build the auth URL
+		codeVerifier, codeChallenge, errPKCE := generateKiroPKCE()
+		if errPKCE != nil {
+			log.Errorf("Failed to generate PKCE: %v", errPKCE)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate PKCE"})
+			return
+		}
+
+		// Build login URL synchronously
+		authURL := fmt.Sprintf("%s/login?idp=%s&redirect_uri=%s&code_challenge=%s&code_challenge_method=S256&state=%s&prompt=select_account",
+			"https://prod.us-east-1.auth.desktop.kiro.dev",
+			provider,
+			url.QueryEscape(kiroauth.KiroRedirectURI),
+			codeChallenge,
+			state,
+		)
+
+		RegisterOAuthSession(state, "kiro")
+
+		socialClient := kiroauth.NewSocialAuthClient(h.cfg)
+
 		go func() {
 			if isWebUI {
 				defer stopCallbackForwarder(kiroCallbackPort)
 			}
-
-			socialClient := kiroauth.NewSocialAuthClient(h.cfg)
-
-			// Generate PKCE codes
-			codeVerifier, codeChallenge, errPKCE := generateKiroPKCE()
-			if errPKCE != nil {
-				log.Errorf("Failed to generate PKCE: %v", errPKCE)
-				SetOAuthSessionError(state, "Failed to generate PKCE")
-				return
-			}
-
-			// Build login URL
-			authURL := fmt.Sprintf("%s/login?idp=%s&redirect_uri=%s&code_challenge=%s&code_challenge_method=S256&state=%s&prompt=select_account",
-				"https://prod.us-east-1.auth.desktop.kiro.dev",
-				provider,
-				url.QueryEscape(kiroauth.KiroRedirectURI),
-				codeChallenge,
-				state,
-			)
-
-			// Store auth URL for frontend.
-			// Using "|" as separator because URLs contain ":".
-			SetOAuthSessionError(state, "auth_url|"+authURL)
 
 			// Wait for callback file
 			waitFile := filepath.Join(h.cfg.AuthDir, fmt.Sprintf(".oauth-kiro-%s.oauth", state))
@@ -2899,7 +2904,7 @@ func (h *Handler) RequestKiroToken(c *gin.Context) {
 			}
 		}()
 
-		c.JSON(http.StatusOK, gin.H{"status": "ok", "state": state, "method": "social"})
+		c.JSON(http.StatusOK, gin.H{"status": "ok", "state": state, "method": "social", "auth_url": authURL})
 
 	default:
 		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid method, use 'aws', 'google', or 'github'"})
