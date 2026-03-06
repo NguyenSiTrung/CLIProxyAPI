@@ -10,6 +10,8 @@ The Plus release stays in lockstep with the mainline features.
 
 ## Differences from the Mainline
 
+[![z.ai](https://assets.router-for.me/english-5-0.jpg)](https://z.ai/subscribe?ic=8JVLJQFSKB)
+
 - Added GitHub Copilot support (OAuth login), provided by [em4go](https://github.com/em4go/CLIProxyAPI/tree/feature/github-copilot-auth)
 - Added Kiro (AWS CodeWhisperer) support (OAuth login), provided by [fuko2935](https://github.com/fuko2935/CLIProxyAPI/tree/feature/kiro-integration), [Ravens2121](https://github.com/Ravens2121/CLIProxyAPIPlus/)
 
@@ -24,6 +26,8 @@ The Plus release stays in lockstep with the mainline features.
 - **Usage Checker**: Real-time usage monitoring and quota management
 - **Model Converter**: Unified model name conversion across providers
 - **UTF-8 Stream Processing**: Improved streaming response handling
+
+GLM CODING PLAN is a subscription service designed for AI coding, starting at just $10/month. It provides access to their flagship GLM-4.7 & （GLM-5 Only Available  for Pro Users）model across 10+ popular AI coding tools (Claude Code, Cline, Roo Code, etc.), offering developers top-tier, fast, and stable coding experiences.
 
 ## Kiro Authentication
 

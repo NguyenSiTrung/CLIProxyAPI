@@ -355,6 +355,9 @@ codex-instructions-enabled: false
 #         alias: "vertex-flash"                   # client-visible alias
 #       - name: "gemini-2.5-pro"
 #         alias: "vertex-pro"
+#     excluded-models:                            # optional: models to exclude from listing
+#       - "imagen-3.0-generate-002"
+#       - "imagen-*"
 
 # Amp Integration
 # ampcode:
