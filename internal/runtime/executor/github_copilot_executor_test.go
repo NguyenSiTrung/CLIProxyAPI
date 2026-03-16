@@ -229,6 +229,24 @@ func TestNormalizeGitHubCopilotResponsesTools_InvalidToolChoiceDowngradeToAuto(t
 	}
 }
 
+func TestStripGitHubCopilotChatUnsupportedFields_RemovesTopK(t *testing.T) {
+	t.Parallel()
+	body := []byte(`{"model":"gemini-3-flash-preview","messages":[],"tools":[{"type":"function","function":{"name":"ok"}}],"top_k":40,"service_tier":"default"}`)
+	got := stripGitHubCopilotChatUnsupportedFields(body)
+	if gjson.GetBytes(got, "top_k").Exists() {
+		t.Fatal("top_k should be removed")
+	}
+	if gjson.GetBytes(got, "service_tier").Exists() {
+		t.Fatal("service_tier should be removed")
+	}
+	if gjson.GetBytes(got, "model").String() != "gemini-3-flash-preview" {
+		t.Fatalf("model = %q, want gemini-3-flash-preview", gjson.GetBytes(got, "model").String())
+	}
+	if !gjson.GetBytes(got, "tools").Exists() {
+		t.Fatal("tools should be preserved")
+	}
+}
+
 func TestTranslateGitHubCopilotResponsesNonStreamToClaude_TextMapping(t *testing.T) {
 	t.Parallel()
 	resp := []byte(`{"id":"resp_1","model":"gpt-5-codex","output":[{"type":"message","content":[{"type":"output_text","text":"hello"}]}],"usage":{"input_tokens":3,"output_tokens":5}}`)

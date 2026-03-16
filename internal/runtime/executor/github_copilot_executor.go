@@ -143,6 +143,7 @@ func (e *GitHubCopilotExecutor) Execute(ctx context.Context, auth *cliproxyauth.
 		body = normalizeGitHubCopilotResponsesInput(body)
 		body = normalizeGitHubCopilotResponsesTools(body)
 	} else {
+		body = stripGitHubCopilotChatUnsupportedFields(body)
 		body = normalizeGitHubCopilotChatTools(body)
 	}
 	requestedModel := payloadRequestedModel(opts, req.Model)
@@ -273,6 +274,7 @@ func (e *GitHubCopilotExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 		body = normalizeGitHubCopilotResponsesInput(body)
 		body = normalizeGitHubCopilotResponsesTools(body)
 	} else {
+		body = stripGitHubCopilotChatUnsupportedFields(body)
 		body = normalizeGitHubCopilotChatTools(body)
 	}
 	requestedModel := payloadRequestedModel(opts, req.Model)
@@ -828,6 +830,14 @@ func normalizeGitHubCopilotResponsesInput(body []byte) []byte {
 
 func stripGitHubCopilotResponsesUnsupportedFields(body []byte) []byte {
 	// GitHub Copilot /responses rejects service_tier, so always remove it.
+	body, _ = sjson.DeleteBytes(body, "service_tier")
+	return body
+}
+
+func stripGitHubCopilotChatUnsupportedFields(body []byte) []byte {
+	// GitHub Copilot /chat/completions rejects non-standard OpenAI fields.
+	// top_k is added by the Gemini→OpenAI request translator but is not valid for Copilot.
+	body, _ = sjson.DeleteBytes(body, "top_k")
 	body, _ = sjson.DeleteBytes(body, "service_tier")
 	return body
 }
