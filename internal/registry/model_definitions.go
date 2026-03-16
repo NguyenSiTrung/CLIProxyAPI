@@ -464,6 +464,7 @@ func GetGitHubCopilotModels() []*ModelInfo {
 			Description:         "Google Gemini 2.5 Pro via GitHub Copilot",
 			ContextLength:       1048576,
 			MaxCompletionTokens: 65536,
+			Thinking:            &ThinkingSupport{Levels: []string{"none", "low", "medium", "high"}},
 		},
 		{
 			ID:                  "gemini-3-pro-preview",
@@ -475,6 +476,7 @@ func GetGitHubCopilotModels() []*ModelInfo {
 			Description:         "Google Gemini 3 Pro Preview via GitHub Copilot",
 			ContextLength:       1048576,
 			MaxCompletionTokens: 65536,
+			Thinking:            &ThinkingSupport{Levels: []string{"low", "high"}},
 		},
 		{
 			ID:                  "gemini-3.1-pro-preview",
@@ -486,6 +488,7 @@ func GetGitHubCopilotModels() []*ModelInfo {
 			Description:         "Google Gemini 3.1 Pro Preview via GitHub Copilot",
 			ContextLength:       1048576,
 			MaxCompletionTokens: 65536,
+			Thinking:            &ThinkingSupport{Levels: []string{"low", "high"}},
 		},
 		{
 			ID:                  "gemini-3-flash-preview",
@@ -497,6 +500,7 @@ func GetGitHubCopilotModels() []*ModelInfo {
 			Description:         "Google Gemini 3 Flash Preview via GitHub Copilot",
 			ContextLength:       1048576,
 			MaxCompletionTokens: 65536,
+			Thinking:            &ThinkingSupport{Levels: []string{"low", "medium", "high"}},
 		},
 		{
 			ID:                  "grok-code-fast-1",
