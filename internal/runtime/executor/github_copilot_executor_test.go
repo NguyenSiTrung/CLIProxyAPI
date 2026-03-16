@@ -151,6 +151,19 @@ func TestNormalizeGitHubCopilotResponsesInput_NonStringInputStringified(t *testi
 	}
 }
 
+func TestNormalizeGitHubCopilotResponsesInput_StripsServiceTier(t *testing.T) {
+	t.Parallel()
+	body := []byte(`{"input":"user text","service_tier":"default"}`)
+	got := normalizeGitHubCopilotResponsesInput(body)
+
+	if gjson.GetBytes(got, "service_tier").Exists() {
+		t.Fatalf("service_tier should be removed, got %s", gjson.GetBytes(got, "service_tier").Raw)
+	}
+	if gjson.GetBytes(got, "input").String() != "user text" {
+		t.Fatalf("input = %q, want %q", gjson.GetBytes(got, "input").String(), "user text")
+	}
+}
+
 func TestNormalizeGitHubCopilotResponsesTools_FlattenFunctionTools(t *testing.T) {
 	t.Parallel()
 	body := []byte(`{"tools":[{"type":"function","function":{"name":"sum","description":"d","parameters":{"type":"object"}}},{"type":"web_search"}]}`)
@@ -302,15 +315,15 @@ func TestApplyHeaders_XInitiator_UserOnly(t *testing.T) {
 	}
 }
 
-func TestApplyHeaders_XInitiator_AgentWithAssistantAndUserToolResult(t *testing.T) {
+func TestApplyHeaders_XInitiator_UserWhenLastRoleIsUser(t *testing.T) {
 	t.Parallel()
 	e := &GitHubCopilotExecutor{}
 	req, _ := http.NewRequest(http.MethodPost, "https://example.com", nil)
-	// Claude Code typical flow: last message is user (tool result), but has assistant in history
+	// Last role governs the initiator decision.
 	body := []byte(`{"messages":[{"role":"user","content":"hello"},{"role":"assistant","content":"I will read the file"},{"role":"user","content":"tool result here"}]}`)
 	e.applyHeaders(req, "token", body)
-	if got := req.Header.Get("X-Initiator"); got != "agent" {
-		t.Fatalf("X-Initiator = %q, want agent (assistant exists in messages)", got)
+	if got := req.Header.Get("X-Initiator"); got != "user" {
+		t.Fatalf("X-Initiator = %q, want user (last role is user)", got)
 	}
 }
 
@@ -322,6 +335,39 @@ func TestApplyHeaders_XInitiator_AgentWithToolRole(t *testing.T) {
 	e.applyHeaders(req, "token", body)
 	if got := req.Header.Get("X-Initiator"); got != "agent" {
 		t.Fatalf("X-Initiator = %q, want agent (tool role exists)", got)
+	}
+}
+
+func TestApplyHeaders_XInitiator_InputArrayLastAssistantMessage(t *testing.T) {
+	t.Parallel()
+	e := &GitHubCopilotExecutor{}
+	req, _ := http.NewRequest(http.MethodPost, "https://example.com", nil)
+	body := []byte(`{"input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"Hi"}]},{"type":"message","role":"assistant","content":[{"type":"output_text","text":"Hello"}]}]}`)
+	e.applyHeaders(req, "token", body)
+	if got := req.Header.Get("X-Initiator"); got != "agent" {
+		t.Fatalf("X-Initiator = %q, want agent (last role is assistant)", got)
+	}
+}
+
+func TestApplyHeaders_XInitiator_InputArrayLastUserMessage(t *testing.T) {
+	t.Parallel()
+	e := &GitHubCopilotExecutor{}
+	req, _ := http.NewRequest(http.MethodPost, "https://example.com", nil)
+	body := []byte(`{"input":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"I can help"}]},{"type":"message","role":"user","content":[{"type":"input_text","text":"Do X"}]}]}`)
+	e.applyHeaders(req, "token", body)
+	if got := req.Header.Get("X-Initiator"); got != "user" {
+		t.Fatalf("X-Initiator = %q, want user (last role is user)", got)
+	}
+}
+
+func TestApplyHeaders_XInitiator_InputArrayLastFunctionCallOutput(t *testing.T) {
+	t.Parallel()
+	e := &GitHubCopilotExecutor{}
+	req, _ := http.NewRequest(http.MethodPost, "https://example.com", nil)
+	body := []byte(`{"input":[{"type":"message","role":"user","content":[{"type":"input_text","text":"Use tool"}]},{"type":"function_call","call_id":"c1","name":"Read","arguments":"{}"},{"type":"function_call_output","call_id":"c1","output":"ok"}]}`)
+	e.applyHeaders(req, "token", body)
+	if got := req.Header.Get("X-Initiator"); got != "agent" {
+		t.Fatalf("X-Initiator = %q, want agent (last item maps to tool role)", got)
 	}
 }
 

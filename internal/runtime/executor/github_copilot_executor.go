@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	copilotauth "github.com/router-for-me/CLIProxyAPI/v6/internal/auth/copilot"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/thinking"
 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/executor"
@@ -35,14 +36,12 @@ const (
 	maxScannerBufferSize = 20_971_520
 
 	// Copilot API header values.
-	copilotAcceptJSON        = "application/json"
-	copilotAcceptEventStream = "text/event-stream"
-	copilotUserAgent         = "GitHubCopilotChat/0.35.0"
-	copilotEditorVersion     = "vscode/1.107.0"
-	copilotPluginVersion     = "copilot-chat/0.35.0"
-	copilotIntegrationID     = "vscode-chat"
-	copilotOpenAIIntent      = "conversation-panel"
-	copilotGitHubAPIVer      = "2025-04-01"
+	copilotUserAgent     = "GitHubCopilotChat/0.35.0"
+	copilotEditorVersion = "vscode/1.107.0"
+	copilotPluginVersion = "copilot-chat/0.35.0"
+	copilotIntegrationID = "vscode-chat"
+	copilotOpenAIIntent  = "conversation-panel"
+	copilotGitHubAPIVer  = "2025-04-01"
 )
 
 // GitHubCopilotExecutor handles requests to the GitHub Copilot API.
@@ -75,7 +74,6 @@ func (e *GitHubCopilotExecutor) PrepareRequest(req *http.Request, auth *cliproxy
 	if req == nil {
 		return nil
 	}
-	body := requestBodySnapshot(req)
 	ctx := req.Context()
 	if ctx == nil {
 		ctx = context.Background()
@@ -84,7 +82,7 @@ func (e *GitHubCopilotExecutor) PrepareRequest(req *http.Request, auth *cliproxy
 	if errToken != nil {
 		return errToken
 	}
-	e.applyHeaders(req, apiToken, body)
+	e.applyHeaders(req, apiToken, nil)
 	return nil
 }
 
@@ -483,15 +481,7 @@ func (e *GitHubCopilotExecutor) ensureAPIToken(ctx context.Context, auth *clipro
 func (e *GitHubCopilotExecutor) applyHeaders(r *http.Request, apiToken string, body []byte) {
 	r.Header.Set("Content-Type", "application/json")
 	r.Header.Set("Authorization", "Bearer "+apiToken)
-	acceptHeader := copilotAcceptJSON
-	streamRequested := gjson.GetBytes(body, "stream").Type == gjson.True
-	if !streamRequested {
-		streamRequested = strings.Contains(strings.ToLower(r.Header.Get("Accept")), copilotAcceptEventStream)
-	}
-	if streamRequested {
-		acceptHeader = copilotAcceptEventStream
-	}
-	r.Header.Set("Accept", acceptHeader)
+	r.Header.Set("Accept", "application/json")
 	r.Header.Set("User-Agent", copilotUserAgent)
 	r.Header.Set("Editor-Version", copilotEditorVersion)
 	r.Header.Set("Editor-Plugin-Version", copilotPluginVersion)
@@ -501,81 +491,46 @@ func (e *GitHubCopilotExecutor) applyHeaders(r *http.Request, apiToken string, b
 	r.Header.Set("X-Request-Id", uuid.NewString())
 
 	initiator := "user"
-	var roleCounts map[string]int
-	var totalMessages int
-	model := gjson.GetBytes(body, "model").String()
-	if len(body) > 0 {
-		if messages := gjson.GetBytes(body, "messages"); messages.Exists() && messages.IsArray() {
-			roleCounts = make(map[string]int)
-			totalMessages = len(messages.Array())
-			for _, msg := range messages.Array() {
-				role := msg.Get("role").String()
-				roleCounts[role]++
-				if role == "assistant" || role == "tool" {
-					initiator = "agent"
-				}
-			}
-		}
-	}
-	forced := e.cfg != nil && e.cfg.ForceGitHubCopilotAgentInitiator && initiator != "agent"
-	if forced {
+	if role := detectLastConversationRole(body); role == "assistant" || role == "tool" {
 		initiator = "agent"
 	}
 	r.Header.Set("X-Initiator", initiator)
-	if log.IsLevelEnabled(log.DebugLevel) && totalMessages > 0 {
-		logGitHubCopilotRequestDebug(r.URL.Path, model, totalMessages, roleCounts, initiator, forced)
-	}
 }
 
-// logGitHubCopilotRequestDebug logs a concise summary of the outgoing request when debug is enabled.
-func logGitHubCopilotRequestDebug(path, model string, totalMessages int, roleCounts map[string]int, initiator string, forced bool) {
-	// Build role summary string: e.g. "system=1 user=3 assistant=2 tool=1"
-	roleOrder := []string{"system", "developer", "user", "assistant", "tool"}
-	var roleParts []string
-	for _, role := range roleOrder {
-		if count, ok := roleCounts[role]; ok {
-			roleParts = append(roleParts, fmt.Sprintf("%s=%d", role, count))
-		}
+func detectLastConversationRole(body []byte) string {
+	if len(body) == 0 {
+		return ""
 	}
-	// Append any unexpected roles not in the predefined order
-	for role, count := range roleCounts {
-		known := false
-		for _, r := range roleOrder {
-			if r == role {
-				known = true
-				break
+
+	if messages := gjson.GetBytes(body, "messages"); messages.Exists() && messages.IsArray() {
+		arr := messages.Array()
+		for i := len(arr) - 1; i >= 0; i-- {
+			if role := arr[i].Get("role").String(); role != "" {
+				return role
 			}
 		}
-		if !known {
-			roleParts = append(roleParts, fmt.Sprintf("%s=%d", role, count))
-		}
 	}
-	initiatorLabel := initiator
-	if forced {
-		initiatorLabel = initiator + " (forced)"
-	}
-	log.Debugf("github-copilot executor: outgoing request | endpoint=%s model=%s messages=%d roles=[%s] initiator=%s",
-		path, model, totalMessages, strings.Join(roleParts, " "), initiatorLabel)
-}
 
-func requestBodySnapshot(req *http.Request) []byte {
-	if req == nil || req.GetBody == nil {
-		return nil
-	}
-	bodyReader, err := req.GetBody()
-	if err != nil || bodyReader == nil {
-		return nil
-	}
-	defer func() {
-		if errClose := bodyReader.Close(); errClose != nil {
-			log.Debugf("github-copilot executor: close request body snapshot reader error: %v", errClose)
+	if inputs := gjson.GetBytes(body, "input"); inputs.Exists() && inputs.IsArray() {
+		arr := inputs.Array()
+		for i := len(arr) - 1; i >= 0; i-- {
+			item := arr[i]
+
+			// Most Responses input items carry a top-level role.
+			if role := item.Get("role").String(); role != "" {
+				return role
+			}
+
+			switch item.Get("type").String() {
+			case "function_call", "function_call_arguments", "computer_call":
+				return "assistant"
+			case "function_call_output", "function_call_response", "tool_result", "computer_call_output":
+				return "tool"
+			}
 		}
-	}()
-	body, err := io.ReadAll(bodyReader)
-	if err != nil {
-		return nil
 	}
-	return body
+
+	return ""
 }
 
 // detectVisionContent checks if the request body contains vision/image content.
@@ -698,6 +653,7 @@ func normalizeGitHubCopilotChatTools(body []byte) []byte {
 }
 
 func normalizeGitHubCopilotResponsesInput(body []byte) []byte {
+	body = stripGitHubCopilotResponsesUnsupportedFields(body)
 	input := gjson.GetBytes(body, "input")
 	if input.Exists() {
 		// If input is already a string or array, keep it as-is.
@@ -870,6 +826,12 @@ func normalizeGitHubCopilotResponsesInput(body []byte) []byte {
 	return body
 }
 
+func stripGitHubCopilotResponsesUnsupportedFields(body []byte) []byte {
+	// GitHub Copilot /responses rejects service_tier, so always remove it.
+	body, _ = sjson.DeleteBytes(body, "service_tier")
+	return body
+}
+
 func normalizeGitHubCopilotResponsesTools(body []byte) []byte {
 	tools := gjson.GetBytes(body, "tools")
 	if tools.Exists() {
@@ -877,6 +839,10 @@ func normalizeGitHubCopilotResponsesTools(body []byte) []byte {
 		if tools.IsArray() {
 			for _, tool := range tools.Array() {
 				toolType := tool.Get("type").String()
+				if isGitHubCopilotResponsesBuiltinTool(toolType) {
+					filtered, _ = sjson.SetRaw(filtered, "-1", tool.Raw)
+					continue
+				}
 				// Accept OpenAI format (type="function") and Claude format
 				// (no type field, but has top-level name + input_schema).
 				if toolType != "" && toolType != "function" {
@@ -924,6 +890,10 @@ func normalizeGitHubCopilotResponsesTools(body []byte) []byte {
 	}
 	if toolChoice.Type == gjson.JSON {
 		choiceType := toolChoice.Get("type").String()
+		if isGitHubCopilotResponsesBuiltinTool(choiceType) {
+			body, _ = sjson.SetRawBytes(body, "tool_choice", []byte(toolChoice.Raw))
+			return body
+		}
 		if choiceType == "function" {
 			name := toolChoice.Get("name").String()
 			if name == "" {
@@ -939,6 +909,15 @@ func normalizeGitHubCopilotResponsesTools(body []byte) []byte {
 	}
 	body, _ = sjson.SetBytes(body, "tool_choice", "auto")
 	return body
+}
+
+func isGitHubCopilotResponsesBuiltinTool(toolType string) bool {
+	switch strings.TrimSpace(toolType) {
+	case "computer", "computer_use_preview":
+		return true
+	default:
+		return false
+	}
 }
 
 func collectTextFromNode(node gjson.Result) string {
@@ -1073,7 +1052,6 @@ func translateGitHubCopilotResponsesNonStreamToClaude(data []byte) string {
 	inputTokens := root.Get("usage.input_tokens").Int()
 	outputTokens := root.Get("usage.output_tokens").Int()
 	cachedTokens := root.Get("usage.input_tokens_details.cached_tokens").Int()
-	reasoningTokens := root.Get("usage.output_tokens_details.reasoning_tokens").Int()
 	if cachedTokens > 0 && inputTokens >= cachedTokens {
 		inputTokens -= cachedTokens
 	}
@@ -1081,9 +1059,6 @@ func translateGitHubCopilotResponsesNonStreamToClaude(data []byte) string {
 	out, _ = sjson.Set(out, "usage.output_tokens", outputTokens)
 	if cachedTokens > 0 {
 		out, _ = sjson.Set(out, "usage.cache_read_input_tokens", cachedTokens)
-	}
-	if reasoningTokens > 0 {
-		out, _ = sjson.Set(out, "usage.output_tokens_details.reasoning_tokens", reasoningTokens)
 	}
 	if hasToolUse {
 		out, _ = sjson.Set(out, "stop_reason", "tool_use")
@@ -1291,7 +1266,6 @@ func translateGitHubCopilotResponsesStreamToClaude(line []byte, param *any) []st
 			inputTokens := gjson.GetBytes(payload, "response.usage.input_tokens").Int()
 			outputTokens := gjson.GetBytes(payload, "response.usage.output_tokens").Int()
 			cachedTokens := gjson.GetBytes(payload, "response.usage.input_tokens_details.cached_tokens").Int()
-			reasoningTokens := gjson.GetBytes(payload, "response.usage.output_tokens_details.reasoning_tokens").Int()
 			if cachedTokens > 0 && inputTokens >= cachedTokens {
 				inputTokens -= cachedTokens
 			}
@@ -1301,9 +1275,6 @@ func translateGitHubCopilotResponsesStreamToClaude(line []byte, param *any) []st
 			messageDelta, _ = sjson.Set(messageDelta, "usage.output_tokens", outputTokens)
 			if cachedTokens > 0 {
 				messageDelta, _ = sjson.Set(messageDelta, "usage.cache_read_input_tokens", cachedTokens)
-			}
-			if reasoningTokens > 0 {
-				messageDelta, _ = sjson.Set(messageDelta, "usage.output_tokens_details.reasoning_tokens", reasoningTokens)
 			}
 			results = append(results, "event: message_delta\ndata: "+messageDelta+"\n\n")
 			results = append(results, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
@@ -1317,4 +1288,100 @@ func translateGitHubCopilotResponsesStreamToClaude(line []byte, param *any) []st
 // isHTTPSuccess checks if the status code indicates success (2xx).
 func isHTTPSuccess(statusCode int) bool {
 	return statusCode >= 200 && statusCode < 300
+}
+
+const (
+	// defaultCopilotContextLength is the default context window for unknown Copilot models.
+	defaultCopilotContextLength = 128000
+	// defaultCopilotMaxCompletionTokens is the default max output tokens for unknown Copilot models.
+	defaultCopilotMaxCompletionTokens = 16384
+)
+
+// FetchGitHubCopilotModels dynamically fetches available models from the GitHub Copilot API.
+// It exchanges the GitHub access token stored in auth.Metadata for a Copilot API token,
+// then queries the /models endpoint. Falls back to the static registry on any failure.
+func FetchGitHubCopilotModels(ctx context.Context, auth *cliproxyauth.Auth, cfg *config.Config) []*registry.ModelInfo {
+	if auth == nil {
+		log.Debug("github-copilot: auth is nil, using static models")
+		return registry.GetGitHubCopilotModels()
+	}
+
+	accessToken := metaStringValue(auth.Metadata, "access_token")
+	if accessToken == "" {
+		log.Debug("github-copilot: no access_token in auth metadata, using static models")
+		return registry.GetGitHubCopilotModels()
+	}
+
+	copilotAuth := copilotauth.NewCopilotAuth(cfg)
+
+	entries, err := copilotAuth.ListModelsWithGitHubToken(ctx, accessToken)
+	if err != nil {
+		log.Warnf("github-copilot: failed to fetch dynamic models: %v, using static models", err)
+		return registry.GetGitHubCopilotModels()
+	}
+
+	if len(entries) == 0 {
+		log.Debug("github-copilot: API returned no models, using static models")
+		return registry.GetGitHubCopilotModels()
+	}
+
+	// Build a lookup from the static definitions so we can enrich dynamic entries
+	// with known context lengths, thinking support, etc.
+	staticMap := make(map[string]*registry.ModelInfo)
+	for _, m := range registry.GetGitHubCopilotModels() {
+		staticMap[m.ID] = m
+	}
+
+	now := time.Now().Unix()
+	models := make([]*registry.ModelInfo, 0, len(entries))
+	seen := make(map[string]struct{}, len(entries))
+	for _, entry := range entries {
+		if entry.ID == "" {
+			continue
+		}
+		// Deduplicate model IDs to avoid incorrect reference counting.
+		if _, dup := seen[entry.ID]; dup {
+			continue
+		}
+		seen[entry.ID] = struct{}{}
+
+		m := &registry.ModelInfo{
+			ID:      entry.ID,
+			Object:  "model",
+			Created: now,
+			OwnedBy: "github-copilot",
+			Type:    "github-copilot",
+		}
+
+		if entry.Created > 0 {
+			m.Created = entry.Created
+		}
+		if entry.Name != "" {
+			m.DisplayName = entry.Name
+		} else {
+			m.DisplayName = entry.ID
+		}
+
+		// Merge known metadata from the static fallback list
+		if static, ok := staticMap[entry.ID]; ok {
+			if m.DisplayName == entry.ID && static.DisplayName != "" {
+				m.DisplayName = static.DisplayName
+			}
+			m.Description = static.Description
+			m.ContextLength = static.ContextLength
+			m.MaxCompletionTokens = static.MaxCompletionTokens
+			m.SupportedEndpoints = static.SupportedEndpoints
+			m.Thinking = static.Thinking
+		} else {
+			// Sensible defaults for models not in the static list
+			m.Description = entry.ID + " via GitHub Copilot"
+			m.ContextLength = defaultCopilotContextLength
+			m.MaxCompletionTokens = defaultCopilotMaxCompletionTokens
+		}
+
+		models = append(models, m)
+	}
+
+	log.Infof("github-copilot: fetched %d models from API", len(models))
+	return models
 }

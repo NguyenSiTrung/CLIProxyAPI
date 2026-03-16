@@ -304,6 +304,14 @@ codex-instructions-enabled: false
 #   runtime-version: "v24.3.0"
 #   timeout: "600"
 
+# Default headers for Codex OAuth model requests.
+# These are used only for file-backed/OAuth Codex requests when the client
+# does not send the header. `user-agent` applies to HTTP and websocket requests;
+# `beta-features` only applies to websocket requests. They do not apply to codex-api-key entries.
+# codex-header-defaults:
+#   user-agent: "codex_cli_rs/0.114.0 (Mac OS 14.2.0; x86_64) vscode/1.111.0"
+#   beta-features: "multi_agent"
+
 # Kiro (AWS CodeWhisperer) configuration
 # Note: Kiro API currently only operates in us-east-1 region
 #kiro:
@@ -330,14 +338,6 @@ codex-instructions-enabled: false
 #   kilo:
 #     - "kilo-claude-opus-4-6"  # exclude specific models (exact match)
 #     - "*:free"                # wildcard matching suffix (e.g. all free models)
-
-# Default headers for Codex OAuth model requests.
-# These are used only for file-backed/OAuth Codex requests when the client
-# does not send the header. `user-agent` applies to HTTP and websocket requests;
-# `beta-features` only applies to websocket requests. They do not apply to codex-api-key entries.
-# codex-header-defaults:
-#   user-agent: "codex_cli_rs/0.114.0 (Mac OS 14.2.0; x86_64) vscode/1.111.0"
-#   beta-features: "multi_agent"
 
 # OpenAI compatibility providers
 # openai-compatibility:
