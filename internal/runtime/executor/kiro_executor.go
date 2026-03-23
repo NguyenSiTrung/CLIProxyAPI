@@ -1012,7 +1012,7 @@ func (e *KiroExecutor) executeWithRetry(ctx context.Context, auth *cliproxyauth.
 			requestedModel := payloadRequestedModel(opts, req.Model)
 			kiroResponse := kiroclaude.BuildClaudeResponse(content, toolUses, requestedModel, usageInfo, stopReason)
 			out := sdktranslator.TranslateNonStream(ctx, to, from, requestedModel, bytes.Clone(opts.OriginalRequest), body, kiroResponse, nil)
-			resp = cliproxyexecutor.Response{Payload: []byte(out)}
+			resp = cliproxyexecutor.Response{Payload: out}
 			return resp, nil
 		}
 		// Inner retry loop exhausted for this endpoint, try next endpoint
@@ -2573,27 +2573,27 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 				blockStart := kiroclaude.BuildClaudeContentBlockStartEvent(contentBlockIndex, "tool_use", currentToolUse.ToolUseID, currentToolUse.Name)
 				sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, blockStart, &translatorParam)
 				for _, chunk := range sseData {
-					if chunk != "" {
-						out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+					if len(chunk) != 0 {
+							out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
+						}
 					}
-				}
 
-				// Send tool input as delta
-				inputBytes, _ := json.Marshal(finalInput)
-				inputDelta := kiroclaude.BuildClaudeInputJsonDeltaEvent(string(inputBytes), contentBlockIndex)
-				sseData = sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, inputDelta, &translatorParam)
-				for _, chunk := range sseData {
-					if chunk != "" {
-						out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+					// Send tool input as delta
+					inputBytes, _ := json.Marshal(finalInput)
+					inputDelta := kiroclaude.BuildClaudeInputJsonDeltaEvent(string(inputBytes), contentBlockIndex)
+					sseData = sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, inputDelta, &translatorParam)
+					for _, chunk := range sseData {
+						if len(chunk) != 0 {
+							out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
+						}
 					}
-				}
 
-				// Close block
-				blockStop := kiroclaude.BuildClaudeContentBlockStopEvent(contentBlockIndex)
-				sseData = sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, blockStop, &translatorParam)
-				for _, chunk := range sseData {
-					if chunk != "" {
-						out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+					// Close block
+					blockStop := kiroclaude.BuildClaudeContentBlockStopEvent(contentBlockIndex)
+					sseData = sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, blockStop, &translatorParam)
+					for _, chunk := range sseData {
+						if len(chunk) != 0 {
+							out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 					}
 				}
 
@@ -2664,8 +2664,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 			msgStart := kiroclaude.BuildClaudeMessageStartEvent(model, totalUsage.InputTokens)
 			sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, msgStart, &translatorParam)
 			for _, chunk := range sseData {
-				if chunk != "" {
-					out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+				if len(chunk) != 0 {
+					out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 				}
 			}
 			messageStartSent = true
@@ -2916,8 +2916,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 						pingEvent := kiroclaude.BuildClaudePingEventWithUsage(totalUsage.InputTokens, currentOutputTokens)
 						sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, pingEvent, &translatorParam)
 						for _, chunk := range sseData {
-							if chunk != "" {
-								out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+							if len(chunk) > 0 {
+								out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 							}
 						}
 
@@ -2939,16 +2939,16 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 							blockStart := kiroclaude.BuildClaudeContentBlockStartEvent(contentBlockIndex, "text", "", "")
 							sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, blockStart, &translatorParam)
 							for _, chunk := range sseData {
-								if chunk != "" {
-									out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+								if len(chunk) > 0 {
+									out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 								}
 							}
 						}
 						claudeEvent := kiroclaude.BuildClaudeStreamEvent(processText, contentBlockIndex)
 						sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, claudeEvent, &translatorParam)
 						for _, chunk := range sseData {
-							if chunk != "" {
-								out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+							if len(chunk) > 0 {
+								out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 							}
 						}
 					}
@@ -2978,8 +2978,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 									blockStart := kiroclaude.BuildClaudeContentBlockStartEvent(thinkingBlockIndex, "thinking", "", "")
 									sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, blockStart, &translatorParam)
 									for _, chunk := range sseData {
-										if chunk != "" {
-											out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+										if len(chunk) > 0 {
+											out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 										}
 									}
 								}
@@ -2987,8 +2987,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 								thinkingEvent := kiroclaude.BuildClaudeThinkingDeltaEvent(thinkingText, thinkingBlockIndex)
 								sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, thinkingEvent, &translatorParam)
 								for _, chunk := range sseData {
-									if chunk != "" {
-										out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+									if len(chunk) > 0 {
+										out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 									}
 								}
 								accumulatedThinkingContent.WriteString(thinkingText)
@@ -2998,8 +2998,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 								blockStop := kiroclaude.BuildClaudeThinkingBlockStopEvent(thinkingBlockIndex)
 								sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, blockStop, &translatorParam)
 								for _, chunk := range sseData {
-									if chunk != "" {
-										out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+									if len(chunk) > 0 {
+										out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 									}
 								}
 								isThinkingBlockOpen = false
@@ -3029,16 +3029,16 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 										blockStart := kiroclaude.BuildClaudeContentBlockStartEvent(thinkingBlockIndex, "thinking", "", "")
 										sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, blockStart, &translatorParam)
 										for _, chunk := range sseData {
-											if chunk != "" {
-												out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+											if len(chunk) > 0 {
+												out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 											}
 										}
 									}
 									thinkingEvent := kiroclaude.BuildClaudeThinkingDeltaEvent(processContent, thinkingBlockIndex)
 									sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, thinkingEvent, &translatorParam)
 									for _, chunk := range sseData {
-										if chunk != "" {
-											out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+										if len(chunk) > 0 {
+											out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 										}
 									}
 									accumulatedThinkingContent.WriteString(processContent)
@@ -3058,8 +3058,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 									blockStop := kiroclaude.BuildClaudeThinkingBlockStopEvent(thinkingBlockIndex)
 									sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, blockStop, &translatorParam)
 									for _, chunk := range sseData {
-										if chunk != "" {
-											out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+										if len(chunk) > 0 {
+											out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 										}
 									}
 									isThinkingBlockOpen = false
@@ -3071,8 +3071,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 									blockStart := kiroclaude.BuildClaudeContentBlockStartEvent(contentBlockIndex, "text", "", "")
 									sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, blockStart, &translatorParam)
 									for _, chunk := range sseData {
-										if chunk != "" {
-											out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+										if len(chunk) > 0 {
+											out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 										}
 									}
 								}
@@ -3080,8 +3080,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 								claudeEvent := kiroclaude.BuildClaudeStreamEvent(textBefore, contentBlockIndex)
 								sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, claudeEvent, &translatorParam)
 								for _, chunk := range sseData {
-									if chunk != "" {
-										out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+									if len(chunk) > 0 {
+										out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 									}
 								}
 							}
@@ -3090,8 +3090,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 								blockStop := kiroclaude.BuildClaudeContentBlockStopEvent(contentBlockIndex)
 								sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, blockStop, &translatorParam)
 								for _, chunk := range sseData {
-									if chunk != "" {
-										out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+									if len(chunk) > 0 {
+										out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 									}
 								}
 								isTextBlockOpen = false
@@ -3120,16 +3120,16 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 										blockStart := kiroclaude.BuildClaudeContentBlockStartEvent(contentBlockIndex, "text", "", "")
 										sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, blockStart, &translatorParam)
 										for _, chunk := range sseData {
-											if chunk != "" {
-												out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+											if len(chunk) > 0 {
+												out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 											}
 										}
 									}
 									claudeEvent := kiroclaude.BuildClaudeStreamEvent(processContent, contentBlockIndex)
 									sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, claudeEvent, &translatorParam)
 									for _, chunk := range sseData {
-										if chunk != "" {
-											out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+										if len(chunk) > 0 {
+											out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 										}
 									}
 								}
@@ -3158,8 +3158,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 					blockStop := kiroclaude.BuildClaudeContentBlockStopEvent(contentBlockIndex)
 					sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, blockStop, &translatorParam)
 					for _, chunk := range sseData {
-						if chunk != "" {
-							out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+						if len(chunk) > 0 {
+							out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 						}
 					}
 					isTextBlockOpen = false
@@ -3171,8 +3171,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 				blockStart := kiroclaude.BuildClaudeContentBlockStartEvent(contentBlockIndex, "tool_use", toolUseID, toolName)
 				sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, blockStart, &translatorParam)
 				for _, chunk := range sseData {
-					if chunk != "" {
-						out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+					if len(chunk) > 0 {
+						out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 					}
 				}
 
@@ -3186,8 +3186,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 						inputDelta := kiroclaude.BuildClaudeInputJsonDeltaEvent(string(inputJSON), contentBlockIndex)
 						sseData = sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, inputDelta, &translatorParam)
 						for _, chunk := range sseData {
-							if chunk != "" {
-								out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+							if len(chunk) > 0 {
+								out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 							}
 						}
 					}
@@ -3197,8 +3197,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 				blockStop := kiroclaude.BuildClaudeContentBlockStopEvent(contentBlockIndex)
 				sseData = sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, blockStop, &translatorParam)
 				for _, chunk := range sseData {
-					if chunk != "" {
-						out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+					if len(chunk) > 0 {
+						out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 					}
 				}
 			}
@@ -3239,8 +3239,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 					blockStop := kiroclaude.BuildClaudeContentBlockStopEvent(contentBlockIndex)
 					sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, blockStop, &translatorParam)
 					for _, chunk := range sseData {
-						if chunk != "" {
-							out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+						if len(chunk) > 0 {
+							out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 						}
 					}
 					isTextBlockOpen = false
@@ -3254,8 +3254,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 					blockStart := kiroclaude.BuildClaudeContentBlockStartEvent(thinkingBlockIndex, "thinking", "", "")
 					sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, blockStart, &translatorParam)
 					for _, chunk := range sseData {
-						if chunk != "" {
-							out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+						if len(chunk) > 0 {
+							out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 						}
 					}
 				}
@@ -3264,8 +3264,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 				thinkingEvent := kiroclaude.BuildClaudeThinkingDeltaEvent(thinkingText, thinkingBlockIndex)
 				sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, thinkingEvent, &translatorParam)
 				for _, chunk := range sseData {
-					if chunk != "" {
-						out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+					if len(chunk) > 0 {
+						out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 					}
 				}
 
@@ -3298,8 +3298,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 					blockStop := kiroclaude.BuildClaudeContentBlockStopEvent(contentBlockIndex)
 					sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, blockStop, &translatorParam)
 					for _, chunk := range sseData {
-						if chunk != "" {
-							out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+						if len(chunk) > 0 {
+							out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 						}
 					}
 					isTextBlockOpen = false
@@ -3310,8 +3310,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 				blockStart := kiroclaude.BuildClaudeContentBlockStartEvent(contentBlockIndex, "tool_use", tu.ToolUseID, tu.Name)
 				sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, blockStart, &translatorParam)
 				for _, chunk := range sseData {
-					if chunk != "" {
-						out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+					if len(chunk) > 0 {
+						out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 					}
 				}
 
@@ -3323,8 +3323,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 						inputDelta := kiroclaude.BuildClaudeInputJsonDeltaEvent(string(inputJSON), contentBlockIndex)
 						sseData = sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, inputDelta, &translatorParam)
 						for _, chunk := range sseData {
-							if chunk != "" {
-								out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+							if len(chunk) > 0 {
+								out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 							}
 						}
 					}
@@ -3333,8 +3333,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 				blockStop := kiroclaude.BuildClaudeContentBlockStopEvent(contentBlockIndex)
 				sseData = sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, blockStop, &translatorParam)
 				for _, chunk := range sseData {
-					if chunk != "" {
-						out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+					if len(chunk) > 0 {
+						out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 					}
 				}
 			}
@@ -3522,8 +3522,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 		blockStop := kiroclaude.BuildClaudeContentBlockStopEvent(contentBlockIndex)
 		sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, blockStop, &translatorParam)
 		for _, chunk := range sseData {
-			if chunk != "" {
-				out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+			if len(chunk) > 0 {
+				out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 			}
 		}
 	}
@@ -3609,8 +3609,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 	msgDelta := kiroclaude.BuildClaudeMessageDeltaEvent(stopReason, totalUsage)
 	sseData := sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, msgDelta, &translatorParam)
 	for _, chunk := range sseData {
-		if chunk != "" {
-			out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+		if len(chunk) > 0 {
+			out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 		}
 	}
 
@@ -3618,8 +3618,8 @@ func (e *KiroExecutor) streamToChannel(ctx context.Context, body io.Reader, out 
 	msgStop := kiroclaude.BuildClaudeMessageStopOnlyEvent()
 	sseData = sdktranslator.TranslateStream(ctx, sdktranslator.FromString("kiro"), targetFormat, model, originalReq, claudeBody, msgStop, &translatorParam)
 	for _, chunk := range sseData {
-		if chunk != "" {
-			out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunk + "\n\n")}
+		if len(chunk) > 0 {
+			out <- cliproxyexecutor.StreamChunk{Payload: append(chunk, []byte("\n\n")...)}
 		}
 	}
 	// reporter.publish is called via defer

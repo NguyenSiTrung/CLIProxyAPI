@@ -21,7 +21,7 @@ func TestConvertOpenAIResponseToClaude_StreamReasoningFallbackField(t *testing.T
 		[]byte(`data: {"id":"chatcmpl_1","model":"claude-opus-4.6","choices":[{"delta":{"reasoning":"reasoning from fallback field"}}]}`),
 		&param,
 	)
-	joined := strings.Join(chunks, "")
+	joined := joinBytes(chunks)
 	if !strings.Contains(joined, `"type":"thinking_delta"`) {
 		t.Fatalf("stream output missing thinking_delta: %s", joined)
 	}
@@ -43,7 +43,7 @@ func TestConvertOpenAIResponseToClaude_StreamContentArrayReasoning(t *testing.T)
 		[]byte(`data: {"id":"chatcmpl_3","model":"claude-opus-4.6","choices":[{"delta":{"content":[{"type":"reasoning","summary":[{"type":"summary_text","text":"reasoning from summary"}]},{"type":"output_text","text":"final answer"}]}}]}`),
 		&param,
 	)
-	joined := strings.Join(chunks, "")
+	joined := joinBytes(chunks)
 	if !strings.Contains(joined, `"type":"thinking_delta"`) {
 		t.Fatalf("stream output missing thinking_delta: %s", joined)
 	}
@@ -70,7 +70,7 @@ func TestConvertOpenAIResponseToClaudeNonStream_ReasoningAndUsage(t *testing.T) 
 	  }
 	}`)
 	out := ConvertOpenAIResponseToClaudeNonStream(context.Background(), "", nil, nil, raw, nil)
-	parsed := gjson.Parse(out)
+	parsed := gjson.ParseBytes(out)
 
 	if thinking := parsed.Get(`content.#(type=="thinking").thinking`).Array(); len(thinking) == 0 || thinking[0].String() != "model reasoning" {
 		t.Fatalf("missing thinking block from message.reasoning: %s", out)
@@ -93,7 +93,7 @@ func TestConvertOpenAIResponseToClaudeNonStream_TopLevelReasoningSummary(t *test
 	  }]
 	}`)
 	out := ConvertOpenAIResponseToClaudeNonStream(context.Background(), "", nil, nil, raw, nil)
-	parsed := gjson.Parse(out)
+	parsed := gjson.ParseBytes(out)
 
 	if parsed.Get(`content.#(type=="thinking").thinking`).String() != "top level reasoning" {
 		t.Fatalf("expected thinking from choices[0].reasoning.summary, got: %s", out)
@@ -101,4 +101,12 @@ func TestConvertOpenAIResponseToClaudeNonStream_TopLevelReasoningSummary(t *test
 	if parsed.Get(`content.#(type=="text").text`).String() != "ok" {
 		t.Fatalf("expected text from output_text block, got: %s", out)
 	}
+}
+
+func joinBytes(chunks [][]byte) string {
+	var b strings.Builder
+	for _, c := range chunks {
+		b.Write(c)
+	}
+	return b.String()
 }

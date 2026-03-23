@@ -222,13 +222,13 @@ func (e *GitHubCopilotExecutor) Execute(ctx context.Context, auth *cliproxyauth.
 	}
 
 	var param any
-	converted := ""
+	var converted []byte
 	if useResponses && from.String() == "claude" {
-		converted = translateGitHubCopilotResponsesNonStreamToClaude(data)
+		converted = []byte(translateGitHubCopilotResponsesNonStreamToClaude(data))
 	} else {
 		converted = sdktranslator.TranslateNonStream(ctx, to, from, req.Model, bytes.Clone(opts.OriginalRequest), body, data, &param)
 	}
-	resp = cliproxyexecutor.Response{Payload: []byte(converted)}
+	resp = cliproxyexecutor.Response{Payload: converted}
 	reporter.ensurePublished(ctx)
 	return resp, nil
 }
@@ -376,14 +376,17 @@ func (e *GitHubCopilotExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 				}
 			}
 
-			var chunks []string
+			var chunks [][]byte
 			if useResponses && from.String() == "claude" {
-				chunks = translateGitHubCopilotResponsesStreamToClaude(bytes.Clone(line), &param)
+				strChunks := translateGitHubCopilotResponsesStreamToClaude(bytes.Clone(line), &param)
+				for _, s := range strChunks {
+					chunks = append(chunks, []byte(s))
+				}
 			} else {
 				chunks = sdktranslator.TranslateStream(ctx, to, from, req.Model, bytes.Clone(opts.OriginalRequest), body, bytes.Clone(line), &param)
 			}
 			for i := range chunks {
-				out <- cliproxyexecutor.StreamChunk{Payload: []byte(chunks[i])}
+				out <- cliproxyexecutor.StreamChunk{Payload: chunks[i]}
 			}
 		}
 

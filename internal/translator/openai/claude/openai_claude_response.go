@@ -74,7 +74,7 @@ type ToolCallAccumulator struct {
 //
 // Returns:
 //   - []string: A slice of strings, each containing an Anthropic-compatible JSON response.
-func ConvertOpenAIResponseToClaude(_ context.Context, _ string, originalRequestRawJSON, requestRawJSON, rawJSON []byte, param *any) []string {
+func ConvertOpenAIResponseToClaude(_ context.Context, _ string, originalRequestRawJSON, requestRawJSON, rawJSON []byte, param *any) [][]byte {
 	if *param == nil {
 		*param = &ConvertOpenAIResponseToAnthropicParams{
 			MessageID:                   "",
@@ -97,7 +97,7 @@ func ConvertOpenAIResponseToClaude(_ context.Context, _ string, originalRequestR
 	}
 
 	if !bytes.HasPrefix(rawJSON, dataTag) {
-		return []string{}
+		return [][]byte{}
 	}
 	rawJSON = bytes.TrimSpace(rawJSON[5:])
 
@@ -130,9 +130,9 @@ func effectiveOpenAIFinishReason(param *ConvertOpenAIResponseToAnthropicParams) 
 }
 
 // convertOpenAIStreamingChunkToAnthropic converts OpenAI streaming chunk to Anthropic streaming events
-func convertOpenAIStreamingChunkToAnthropic(rawJSON []byte, param *ConvertOpenAIResponseToAnthropicParams) []string {
+func convertOpenAIStreamingChunkToAnthropic(rawJSON []byte, param *ConvertOpenAIResponseToAnthropicParams) [][]byte {
 	root := gjson.ParseBytes(rawJSON)
-	var results []string
+	var results [][]byte
 
 	// Initialize parameters if needed
 	if param.MessageID == "" {
@@ -153,7 +153,7 @@ func convertOpenAIStreamingChunkToAnthropic(rawJSON []byte, param *ConvertOpenAI
 			messageStartJSON := `{"type":"message_start","message":{"id":"","type":"message","role":"assistant","model":"","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0}}}`
 			messageStartJSON, _ = sjson.Set(messageStartJSON, "message.id", param.MessageID)
 			messageStartJSON, _ = sjson.Set(messageStartJSON, "message.model", param.Model)
-			results = append(results, "event: message_start\ndata: "+messageStartJSON+"\n\n")
+			results = append(results, []byte("event: message_start\ndata: "+messageStartJSON+"\n\n"))
 			param.MessageStarted = true
 
 			// Don't send content_block_start for text here - wait for actual content
@@ -176,14 +176,14 @@ func convertOpenAIStreamingChunkToAnthropic(rawJSON []byte, param *ConvertOpenAI
 				}
 				contentBlockStartJSON := `{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}`
 				contentBlockStartJSON, _ = sjson.Set(contentBlockStartJSON, "index", param.ThinkingContentBlockIndex)
-				results = append(results, "event: content_block_start\ndata: "+contentBlockStartJSON+"\n\n")
+				results = append(results, []byte("event: content_block_start\ndata: "+contentBlockStartJSON+"\n\n"))
 				param.ThinkingContentBlockStarted = true
 			}
 
 			thinkingDeltaJSON := `{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":""}}`
 			thinkingDeltaJSON, _ = sjson.Set(thinkingDeltaJSON, "index", param.ThinkingContentBlockIndex)
 			thinkingDeltaJSON, _ = sjson.Set(thinkingDeltaJSON, "delta.thinking", reasoningText)
-			results = append(results, "event: content_block_delta\ndata: "+thinkingDeltaJSON+"\n\n")
+			results = append(results, []byte("event: content_block_delta\ndata: "+thinkingDeltaJSON+"\n\n"))
 		}
 
 		// Handle content delta.
@@ -201,13 +201,13 @@ func convertOpenAIStreamingChunkToAnthropic(rawJSON []byte, param *ConvertOpenAI
 					}
 					contentBlockStartJSON := `{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}`
 					contentBlockStartJSON, _ = sjson.Set(contentBlockStartJSON, "index", param.ThinkingContentBlockIndex)
-					results = append(results, "event: content_block_start\ndata: "+contentBlockStartJSON+"\n\n")
+					results = append(results, []byte("event: content_block_start\ndata: "+contentBlockStartJSON+"\n\n"))
 					param.ThinkingContentBlockStarted = true
 				}
 				thinkingDeltaJSON := `{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":""}}`
 				thinkingDeltaJSON, _ = sjson.Set(thinkingDeltaJSON, "index", param.ThinkingContentBlockIndex)
 				thinkingDeltaJSON, _ = sjson.Set(thinkingDeltaJSON, "delta.thinking", reasoningText)
-				results = append(results, "event: content_block_delta\ndata: "+thinkingDeltaJSON+"\n\n")
+				results = append(results, []byte("event: content_block_delta\ndata: "+thinkingDeltaJSON+"\n\n"))
 			}
 
 			for _, text := range extractTextFromOpenAIContent(content) {
@@ -222,14 +222,14 @@ func convertOpenAIStreamingChunkToAnthropic(rawJSON []byte, param *ConvertOpenAI
 					}
 					contentBlockStartJSON := `{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`
 					contentBlockStartJSON, _ = sjson.Set(contentBlockStartJSON, "index", param.TextContentBlockIndex)
-					results = append(results, "event: content_block_start\ndata: "+contentBlockStartJSON+"\n\n")
+					results = append(results, []byte("event: content_block_start\ndata: "+contentBlockStartJSON+"\n\n"))
 					param.TextContentBlockStarted = true
 				}
 
 				contentDeltaJSON := `{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":""}}`
 				contentDeltaJSON, _ = sjson.Set(contentDeltaJSON, "index", param.TextContentBlockIndex)
 				contentDeltaJSON, _ = sjson.Set(contentDeltaJSON, "delta.text", text)
-				results = append(results, "event: content_block_delta\ndata: "+contentDeltaJSON+"\n\n")
+				results = append(results, []byte("event: content_block_delta\ndata: "+contentDeltaJSON+"\n\n"))
 				param.ContentAccumulator.WriteString(text)
 			}
 		}
@@ -271,7 +271,7 @@ func convertOpenAIStreamingChunkToAnthropic(rawJSON []byte, param *ConvertOpenAI
 						contentBlockStartJSON, _ = sjson.Set(contentBlockStartJSON, "index", blockIndex)
 						contentBlockStartJSON, _ = sjson.Set(contentBlockStartJSON, "content_block.id", util.SanitizeClaudeToolID(accumulator.ID))
 						contentBlockStartJSON, _ = sjson.Set(contentBlockStartJSON, "content_block.name", accumulator.Name)
-						results = append(results, "event: content_block_start\ndata: "+contentBlockStartJSON+"\n\n")
+						results = append(results, []byte("event: content_block_start\ndata: "+contentBlockStartJSON+"\n\n"))
 					}
 
 					// Handle function arguments
@@ -301,7 +301,7 @@ func convertOpenAIStreamingChunkToAnthropic(rawJSON []byte, param *ConvertOpenAI
 		if param.ThinkingContentBlockStarted {
 			contentBlockStopJSON := `{"type":"content_block_stop","index":0}`
 			contentBlockStopJSON, _ = sjson.Set(contentBlockStopJSON, "index", param.ThinkingContentBlockIndex)
-			results = append(results, "event: content_block_stop\ndata: "+contentBlockStopJSON+"\n\n")
+			results = append(results, []byte("event: content_block_stop\ndata: "+contentBlockStopJSON+"\n\n"))
 			param.ThinkingContentBlockStarted = false
 			param.ThinkingContentBlockIndex = -1
 		}
@@ -320,12 +320,12 @@ func convertOpenAIStreamingChunkToAnthropic(rawJSON []byte, param *ConvertOpenAI
 					inputDeltaJSON := `{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":""}}`
 					inputDeltaJSON, _ = sjson.Set(inputDeltaJSON, "index", blockIndex)
 					inputDeltaJSON, _ = sjson.Set(inputDeltaJSON, "delta.partial_json", util.FixJSON(accumulator.Arguments.String()))
-					results = append(results, "event: content_block_delta\ndata: "+inputDeltaJSON+"\n\n")
+					results = append(results, []byte("event: content_block_delta\ndata: "+inputDeltaJSON+"\n\n"))
 				}
 
 				contentBlockStopJSON := `{"type":"content_block_stop","index":0}`
 				contentBlockStopJSON, _ = sjson.Set(contentBlockStopJSON, "index", blockIndex)
-				results = append(results, "event: content_block_stop\ndata: "+contentBlockStopJSON+"\n\n")
+				results = append(results, []byte("event: content_block_stop\ndata: "+contentBlockStopJSON+"\n\n"))
 				delete(param.ToolCallBlockIndexes, index)
 			}
 			param.ContentBlocksStopped = true
@@ -352,7 +352,7 @@ func convertOpenAIStreamingChunkToAnthropic(rawJSON []byte, param *ConvertOpenAI
 			if reasoningTokens > 0 {
 				messageDeltaJSON, _ = sjson.Set(messageDeltaJSON, "usage.output_tokens_details.reasoning_tokens", reasoningTokens)
 			}
-			results = append(results, "event: message_delta\ndata: "+messageDeltaJSON+"\n\n")
+			results = append(results, []byte("event: message_delta\ndata: "+messageDeltaJSON+"\n\n"))
 			param.MessageDeltaSent = true
 
 			emitMessageStopIfNeeded(param, &results)
@@ -363,14 +363,14 @@ func convertOpenAIStreamingChunkToAnthropic(rawJSON []byte, param *ConvertOpenAI
 }
 
 // convertOpenAIDoneToAnthropic handles the [DONE] marker and sends final events
-func convertOpenAIDoneToAnthropic(param *ConvertOpenAIResponseToAnthropicParams) []string {
-	var results []string
+func convertOpenAIDoneToAnthropic(param *ConvertOpenAIResponseToAnthropicParams) [][]byte {
+	var results [][]byte
 
 	// Ensure all content blocks are stopped before final events
 	if param.ThinkingContentBlockStarted {
 		contentBlockStopJSON := `{"type":"content_block_stop","index":0}`
 		contentBlockStopJSON, _ = sjson.Set(contentBlockStopJSON, "index", param.ThinkingContentBlockIndex)
-		results = append(results, "event: content_block_stop\ndata: "+contentBlockStopJSON+"\n\n")
+		results = append(results, []byte("event: content_block_stop\ndata: "+contentBlockStopJSON+"\n\n"))
 		param.ThinkingContentBlockStarted = false
 		param.ThinkingContentBlockIndex = -1
 	}
@@ -386,22 +386,22 @@ func convertOpenAIDoneToAnthropic(param *ConvertOpenAIResponseToAnthropicParams)
 				inputDeltaJSON := `{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":""}}`
 				inputDeltaJSON, _ = sjson.Set(inputDeltaJSON, "index", blockIndex)
 				inputDeltaJSON, _ = sjson.Set(inputDeltaJSON, "delta.partial_json", util.FixJSON(accumulator.Arguments.String()))
-				results = append(results, "event: content_block_delta\ndata: "+inputDeltaJSON+"\n\n")
-			}
+				results = append(results, []byte("event: content_block_delta\ndata: "+inputDeltaJSON+"\n\n"))
+				}
 
-			contentBlockStopJSON := `{"type":"content_block_stop","index":0}`
-			contentBlockStopJSON, _ = sjson.Set(contentBlockStopJSON, "index", blockIndex)
-			results = append(results, "event: content_block_stop\ndata: "+contentBlockStopJSON+"\n\n")
-			delete(param.ToolCallBlockIndexes, index)
-		}
-		param.ContentBlocksStopped = true
-	}
+				contentBlockStopJSON := `{"type":"content_block_stop","index":0}`
+				contentBlockStopJSON, _ = sjson.Set(contentBlockStopJSON, "index", blockIndex)
+				results = append(results, []byte("event: content_block_stop\ndata: "+contentBlockStopJSON+"\n\n"))
+				delete(param.ToolCallBlockIndexes, index)
+				}
+				param.ContentBlocksStopped = true
+				}
 
-	// If we haven't sent message_delta yet (no usage info was received), send it now
-	if param.FinishReason != "" && !param.MessageDeltaSent {
-		messageDeltaJSON := `{"type":"message_delta","delta":{"stop_reason":"","stop_sequence":null},"usage":{"input_tokens":0,"output_tokens":0}}`
-		messageDeltaJSON, _ = sjson.Set(messageDeltaJSON, "delta.stop_reason", mapOpenAIFinishReasonToAnthropic(effectiveOpenAIFinishReason(param)))
-		results = append(results, "event: message_delta\ndata: "+messageDeltaJSON+"\n\n")
+				// If we haven't sent message_delta yet (no usage info was received), send it now
+				if param.FinishReason != "" && !param.MessageDeltaSent {
+				messageDeltaJSON := `{"type":"message_delta","delta":{"stop_reason":"","stop_sequence":null},"usage":{"input_tokens":0,"output_tokens":0}}`
+				messageDeltaJSON, _ = sjson.Set(messageDeltaJSON, "delta.stop_reason", mapOpenAIFinishReasonToAnthropic(effectiveOpenAIFinishReason(param)))
+				results = append(results, []byte("event: message_delta\ndata: "+messageDeltaJSON+"\n\n"))
 		param.MessageDeltaSent = true
 	}
 
@@ -411,7 +411,7 @@ func convertOpenAIDoneToAnthropic(param *ConvertOpenAIResponseToAnthropicParams)
 }
 
 // convertOpenAINonStreamingToAnthropic converts OpenAI non-streaming response to Anthropic format
-func convertOpenAINonStreamingToAnthropic(rawJSON []byte) []string {
+func convertOpenAINonStreamingToAnthropic(rawJSON []byte) [][]byte {
 	root := gjson.ParseBytes(rawJSON)
 
 	out := `{"id":"","type":"message","role":"assistant","model":"","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0}}`
@@ -498,7 +498,7 @@ func convertOpenAINonStreamingToAnthropic(rawJSON []byte) []string {
 		}
 	}
 
-	return []string{out}
+	return [][]byte{[]byte(out)}
 }
 
 // mapOpenAIFinishReasonToAnthropic maps OpenAI finish reasons to Anthropic equivalents
@@ -645,32 +645,32 @@ func extractReasoningTextsFromOpenAIContent(content gjson.Result) []string {
 	return collectOpenAIReasoningNodes(nodes...)
 }
 
-func stopThinkingContentBlock(param *ConvertOpenAIResponseToAnthropicParams, results *[]string) {
+func stopThinkingContentBlock(param *ConvertOpenAIResponseToAnthropicParams, results *[][]byte) {
 	if !param.ThinkingContentBlockStarted {
 		return
 	}
 	contentBlockStopJSON := `{"type":"content_block_stop","index":0}`
 	contentBlockStopJSON, _ = sjson.Set(contentBlockStopJSON, "index", param.ThinkingContentBlockIndex)
-	*results = append(*results, "event: content_block_stop\ndata: "+contentBlockStopJSON+"\n\n")
+	*results = append(*results, []byte("event: content_block_stop\ndata: "+contentBlockStopJSON+"\n\n"))
 	param.ThinkingContentBlockStarted = false
 	param.ThinkingContentBlockIndex = -1
 }
 
-func emitMessageStopIfNeeded(param *ConvertOpenAIResponseToAnthropicParams, results *[]string) {
+func emitMessageStopIfNeeded(param *ConvertOpenAIResponseToAnthropicParams, results *[][]byte) {
 	if param.MessageStopSent {
 		return
 	}
-	*results = append(*results, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
+	*results = append(*results, []byte("event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"))
 	param.MessageStopSent = true
 }
 
-func stopTextContentBlock(param *ConvertOpenAIResponseToAnthropicParams, results *[]string) {
+func stopTextContentBlock(param *ConvertOpenAIResponseToAnthropicParams, results *[][]byte) {
 	if !param.TextContentBlockStarted {
 		return
 	}
 	contentBlockStopJSON := `{"type":"content_block_stop","index":0}`
 	contentBlockStopJSON, _ = sjson.Set(contentBlockStopJSON, "index", param.TextContentBlockIndex)
-	*results = append(*results, "event: content_block_stop\ndata: "+contentBlockStopJSON+"\n\n")
+	*results = append(*results, []byte("event: content_block_stop\ndata: "+contentBlockStopJSON+"\n\n"))
 	param.TextContentBlockStarted = false
 	param.TextContentBlockIndex = -1
 }
@@ -685,7 +685,7 @@ func stopTextContentBlock(param *ConvertOpenAIResponseToAnthropicParams, results
 //
 // Returns:
 //   - string: An Anthropic-compatible JSON response.
-func ConvertOpenAIResponseToClaudeNonStream(_ context.Context, _ string, originalRequestRawJSON, requestRawJSON, rawJSON []byte, _ *any) string {
+func ConvertOpenAIResponseToClaudeNonStream(_ context.Context, _ string, originalRequestRawJSON, requestRawJSON, rawJSON []byte, _ *any) []byte {
 	_ = requestRawJSON
 
 	root := gjson.ParseBytes(rawJSON)
@@ -850,11 +850,11 @@ func ConvertOpenAIResponseToClaudeNonStream(_ context.Context, _ string, origina
 		}
 	}
 
-	return out
+	return []byte(out)
 }
 
-func ClaudeTokenCount(ctx context.Context, count int64) string {
-	return fmt.Sprintf(`{"input_tokens":%d}`, count)
+func ClaudeTokenCount(ctx context.Context, count int64) []byte {
+	return []byte(fmt.Sprintf(`{"input_tokens":%d}`, count))
 }
 
 func extractOpenAIUsage(usage gjson.Result) (int64, int64, int64, int64) {
