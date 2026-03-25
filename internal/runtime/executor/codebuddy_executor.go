@@ -50,6 +50,14 @@ func codeBuddyCredentials(auth *cliproxyauth.Auth) (accessToken, userID, domain 
 	return
 }
 
+// codeBuddyBaseURL returns the API base URL for the given domain.
+func codeBuddyBaseURL(domain string) string {
+	if domain == codebuddy.GlobalDomain {
+		return codebuddy.GlobalBaseURL
+	}
+	return codebuddy.BaseURL
+}
+
 // PrepareRequest prepares the HTTP request before execution.
 func (e *CodeBuddyExecutor) PrepareRequest(req *http.Request, auth *cliproxyauth.Auth) error {
 	if req == nil {
@@ -108,7 +116,8 @@ func (e *CodeBuddyExecutor) Execute(ctx context.Context, auth *cliproxyauth.Auth
 		return resp, err
 	}
 
-	url := codebuddy.BaseURL + codeBuddyChatPath
+	apiBaseURL := codeBuddyBaseURL(domain)
+	url := apiBaseURL + codeBuddyChatPath
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(translated))
 	if err != nil {
 		return resp, err
@@ -198,7 +207,8 @@ func (e *CodeBuddyExecutor) ExecuteStream(ctx context.Context, auth *cliproxyaut
 		return nil, err
 	}
 
-	url := codebuddy.BaseURL + codeBuddyChatPath
+	apiBaseURL := codeBuddyBaseURL(domain)
+	url := apiBaseURL + codeBuddyChatPath
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(translated))
 	if err != nil {
 		return nil, err
@@ -299,7 +309,7 @@ func (e *CodeBuddyExecutor) Refresh(ctx context.Context, auth *cliproxyauth.Auth
 
 	accessToken, userID, domain := codeBuddyCredentials(auth)
 
-	authSvc := codebuddy.NewCodeBuddyAuth(e.cfg)
+	authSvc := codebuddy.NewCodeBuddyAuthWithBaseURL(e.cfg, codeBuddyBaseURL(domain))
 	storage, err := authSvc.RefreshToken(ctx, accessToken, refreshToken, userID, domain)
 	if err != nil {
 		return nil, fmt.Errorf("codebuddy: token refresh failed: %w", err)
