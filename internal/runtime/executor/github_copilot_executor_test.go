@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/thinking"
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v6/sdk/translator"
 	"github.com/tidwall/gjson"
@@ -68,6 +69,29 @@ func TestUseGitHubCopilotResponsesEndpoint_CodexModel(t *testing.T) {
 	t.Parallel()
 	if !useGitHubCopilotResponsesEndpoint(sdktranslator.FromString("openai"), "gpt-5-codex") {
 		t.Fatal("expected codex model to use /responses")
+	}
+}
+
+func TestUseGitHubCopilotResponsesEndpoint_RegistryResponsesOnlyModel(t *testing.T) {
+	t.Parallel()
+	if !useGitHubCopilotResponsesEndpoint(sdktranslator.FromString("openai"), "gpt-5.4") {
+		t.Fatal("expected responses-only registry model to use /responses")
+	}
+}
+
+func TestUseGitHubCopilotResponsesEndpoint_DynamicRegistryWinsOverStatic(t *testing.T) {
+	t.Parallel()
+
+	reg := registry.GetGlobalRegistry()
+	clientID := "github-copilot-test-client"
+	reg.RegisterClient(clientID, "github-copilot", []*registry.ModelInfo{{
+		ID:                 "gpt-5.4",
+		SupportedEndpoints: []string{"/chat/completions", "/responses"},
+	}})
+	defer reg.UnregisterClient(clientID)
+
+	if useGitHubCopilotResponsesEndpoint(sdktranslator.FromString("openai"), "gpt-5.4") {
+		t.Fatal("expected dynamic registry definition to take precedence over static fallback")
 	}
 }
 
@@ -229,36 +253,18 @@ func TestNormalizeGitHubCopilotResponsesTools_InvalidToolChoiceDowngradeToAuto(t
 	}
 }
 
-func TestStripGitHubCopilotChatUnsupportedFields_RemovesTopK(t *testing.T) {
-	t.Parallel()
-	body := []byte(`{"model":"gemini-3-flash-preview","messages":[],"tools":[{"type":"function","function":{"name":"ok"}}],"top_k":40,"service_tier":"default"}`)
-	got := stripGitHubCopilotChatUnsupportedFields(body)
-	if gjson.GetBytes(got, "top_k").Exists() {
-		t.Fatal("top_k should be removed")
-	}
-	if gjson.GetBytes(got, "service_tier").Exists() {
-		t.Fatal("service_tier should be removed")
-	}
-	if gjson.GetBytes(got, "model").String() != "gemini-3-flash-preview" {
-		t.Fatalf("model = %q, want gemini-3-flash-preview", gjson.GetBytes(got, "model").String())
-	}
-	if !gjson.GetBytes(got, "tools").Exists() {
-		t.Fatal("tools should be preserved")
-	}
-}
-
 func TestTranslateGitHubCopilotResponsesNonStreamToClaude_TextMapping(t *testing.T) {
 	t.Parallel()
 	resp := []byte(`{"id":"resp_1","model":"gpt-5-codex","output":[{"type":"message","content":[{"type":"output_text","text":"hello"}]}],"usage":{"input_tokens":3,"output_tokens":5}}`)
 	out := translateGitHubCopilotResponsesNonStreamToClaude(resp)
-	if gjson.Get(out, "type").String() != "message" {
-		t.Fatalf("type = %q, want message", gjson.Get(out, "type").String())
+	if gjson.GetBytes(out, "type").String() != "message" {
+		t.Fatalf("type = %q, want message", gjson.GetBytes(out, "type").String())
 	}
-	if gjson.Get(out, "content.0.type").String() != "text" {
-		t.Fatalf("content.0.type = %q, want text", gjson.Get(out, "content.0.type").String())
+	if gjson.GetBytes(out, "content.0.type").String() != "text" {
+		t.Fatalf("content.0.type = %q, want text", gjson.GetBytes(out, "content.0.type").String())
 	}
-	if gjson.Get(out, "content.0.text").String() != "hello" {
-		t.Fatalf("content.0.text = %q, want hello", gjson.Get(out, "content.0.text").String())
+	if gjson.GetBytes(out, "content.0.text").String() != "hello" {
+		t.Fatalf("content.0.text = %q, want hello", gjson.GetBytes(out, "content.0.text").String())
 	}
 }
 
@@ -266,23 +272,14 @@ func TestTranslateGitHubCopilotResponsesNonStreamToClaude_ToolUseMapping(t *test
 	t.Parallel()
 	resp := []byte(`{"id":"resp_2","model":"gpt-5-codex","output":[{"type":"function_call","id":"fc_1","call_id":"call_1","name":"sum","arguments":"{\"a\":1}"}],"usage":{"input_tokens":1,"output_tokens":2}}`)
 	out := translateGitHubCopilotResponsesNonStreamToClaude(resp)
-	if gjson.Get(out, "content.0.type").String() != "tool_use" {
-		t.Fatalf("content.0.type = %q, want tool_use", gjson.Get(out, "content.0.type").String())
+	if gjson.GetBytes(out, "content.0.type").String() != "tool_use" {
+		t.Fatalf("content.0.type = %q, want tool_use", gjson.GetBytes(out, "content.0.type").String())
 	}
-	if gjson.Get(out, "content.0.name").String() != "sum" {
-		t.Fatalf("content.0.name = %q, want sum", gjson.Get(out, "content.0.name").String())
+	if gjson.GetBytes(out, "content.0.name").String() != "sum" {
+		t.Fatalf("content.0.name = %q, want sum", gjson.GetBytes(out, "content.0.name").String())
 	}
-	if gjson.Get(out, "stop_reason").String() != "tool_use" {
-		t.Fatalf("stop_reason = %q, want tool_use", gjson.Get(out, "stop_reason").String())
-	}
-}
-
-func TestTranslateGitHubCopilotResponsesNonStreamToClaude_ReasoningUsageMapping(t *testing.T) {
-	t.Parallel()
-	resp := []byte(`{"id":"resp_3","model":"gpt-5-codex","output":[{"type":"message","content":[{"type":"output_text","text":"hello"}]}],"usage":{"input_tokens":10,"output_tokens":20,"output_tokens_details":{"reasoning_tokens":7}}}`)
-	out := translateGitHubCopilotResponsesNonStreamToClaude(resp)
-	if got := gjson.Get(out, "usage.output_tokens_details.reasoning_tokens").Int(); got != 7 {
-		t.Fatalf("usage.output_tokens_details.reasoning_tokens = %d, want 7", got)
+	if gjson.GetBytes(out, "stop_reason").String() != "tool_use" {
+		t.Fatalf("stop_reason = %q, want tool_use", gjson.GetBytes(out, "stop_reason").String())
 	}
 }
 
@@ -291,33 +288,29 @@ func TestTranslateGitHubCopilotResponsesStreamToClaude_TextLifecycle(t *testing.
 	var param any
 
 	created := translateGitHubCopilotResponsesStreamToClaude([]byte(`data: {"type":"response.created","response":{"id":"resp_1","model":"gpt-5-codex"}}`), &param)
-	if len(created) == 0 || !strings.Contains(created[0], "message_start") {
-		t.Fatalf("created events = %#v, want message_start", created)
+	if len(created) == 0 || !strings.Contains(string(joinBytesSlice(created)), "message_start") {
+		t.Fatalf("created events missing message_start")
 	}
 
 	delta := translateGitHubCopilotResponsesStreamToClaude([]byte(`data: {"type":"response.output_text.delta","delta":"he"}`), &param)
-	joinedDelta := strings.Join(delta, "")
+	joinedDelta := string(joinBytesSlice(delta))
 	if !strings.Contains(joinedDelta, "content_block_start") || !strings.Contains(joinedDelta, "text_delta") {
-		t.Fatalf("delta events = %#v, want content_block_start + text_delta", delta)
+		t.Fatalf("delta events missing content_block_start or text_delta")
 	}
 
 	completed := translateGitHubCopilotResponsesStreamToClaude([]byte(`data: {"type":"response.completed","response":{"usage":{"input_tokens":7,"output_tokens":9}}}`), &param)
-	joinedCompleted := strings.Join(completed, "")
+	joinedCompleted := string(joinBytesSlice(completed))
 	if !strings.Contains(joinedCompleted, "message_delta") || !strings.Contains(joinedCompleted, "message_stop") {
-		t.Fatalf("completed events = %#v, want message_delta + message_stop", completed)
+		t.Fatalf("completed events missing message_delta or message_stop")
 	}
 }
 
-func TestTranslateGitHubCopilotResponsesStreamToClaude_ReasoningUsageMapping(t *testing.T) {
-	t.Parallel()
-	var param any
-
-	_ = translateGitHubCopilotResponsesStreamToClaude([]byte(`data: {"type":"response.created","response":{"id":"resp_9","model":"gpt-5-codex"}}`), &param)
-	completed := translateGitHubCopilotResponsesStreamToClaude([]byte(`data: {"type":"response.completed","response":{"usage":{"input_tokens":7,"output_tokens":9,"output_tokens_details":{"reasoning_tokens":5}}}}`), &param)
-	joined := strings.Join(completed, "")
-	if !strings.Contains(joined, `"reasoning_tokens":5`) {
-		t.Fatalf("completed events missing reasoning tokens: %#v", completed)
+func joinBytesSlice(chunks [][]byte) []byte {
+	var result []byte
+	for _, c := range chunks {
+		result = append(result, c...)
 	}
+	return result
 }
 
 // --- Tests for X-Initiator detection logic (Problem L) ---
@@ -412,25 +405,14 @@ func TestApplyHeaders_AcceptJSONForNonStreaming(t *testing.T) {
 	}
 }
 
-func TestApplyHeaders_AcceptEventStreamForStreaming(t *testing.T) {
+func TestApplyHeaders_AcceptJSONAlwaysSet(t *testing.T) {
 	t.Parallel()
 	e := &GitHubCopilotExecutor{}
 	req, _ := http.NewRequest(http.MethodPost, "https://example.com", nil)
 	body := []byte(`{"messages":[{"role":"user","content":"hello"}],"stream":true}`)
 	e.applyHeaders(req, "token", body)
-	if got := req.Header.Get("Accept"); got != "text/event-stream" {
-		t.Fatalf("Accept = %q, want text/event-stream", got)
-	}
-}
-
-func TestApplyHeaders_AcceptEventStreamWhenClientAlreadyRequestsStream(t *testing.T) {
-	t.Parallel()
-	e := &GitHubCopilotExecutor{}
-	req, _ := http.NewRequest(http.MethodPost, "https://example.com", nil)
-	req.Header.Set("Accept", "text/event-stream")
-	e.applyHeaders(req, "token", nil)
-	if got := req.Header.Get("Accept"); got != "text/event-stream" {
-		t.Fatalf("Accept = %q, want text/event-stream", got)
+	if got := req.Header.Get("Accept"); got != "application/json" {
+		t.Fatalf("Accept = %q, want application/json", got)
 	}
 }
 

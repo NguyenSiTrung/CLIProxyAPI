@@ -111,9 +111,10 @@ func (a *AuthIndex) UnmarshalJSON(data []byte) error {
 	return fmt.Errorf("invalid auth_index: %s", string(data))
 }
 
-// RequestDetail stores the timestamp and token usage for a single request.
+// RequestDetail stores the timestamp, latency, and token usage for a single request.
 type RequestDetail struct {
 	Timestamp  time.Time  `json:"timestamp"`
+	LatencyMs  int64      `json:"latency_ms"`
 	Source     string     `json:"source"`
 	AuthIndex  AuthIndex  `json:"auth_index"`
 	Tokens     TokenStats `json:"tokens"`
@@ -236,6 +237,7 @@ func (s *RequestStatistics) Record(ctx context.Context, record coreusage.Record)
 	}
 	s.updateAPIStats(stats, modelName, RequestDetail{
 		Timestamp:  timestamp,
+		LatencyMs:  normaliseLatency(record.Latency),
 		Source:     record.Source,
 		AuthIndex:  AuthIndex(strings.TrimSpace(record.AuthIndex)),
 		Tokens:     detail,
@@ -410,6 +412,9 @@ func (s *RequestStatistics) MergeSnapshot(snapshot StatisticsSnapshot) MergeResu
 			}
 			for _, detail := range modelSnapshot.Details {
 				detail.Tokens = normaliseTokenStats(detail.Tokens)
+				if detail.LatencyMs < 0 {
+					detail.LatencyMs = 0
+				}
 				if detail.Timestamp.IsZero() {
 					detail.Timestamp = time.Now()
 				}
@@ -539,6 +544,13 @@ func normaliseTokenStats(tokens TokenStats) TokenStats {
 		tokens.TotalTokens = tokens.InputTokens + tokens.OutputTokens + tokens.ReasoningTokens + tokens.CachedTokens
 	}
 	return tokens
+}
+
+func normaliseLatency(latency time.Duration) int64 {
+	if latency <= 0 {
+		return 0
+	}
+	return latency.Milliseconds()
 }
 
 func formatHour(hour int) string {

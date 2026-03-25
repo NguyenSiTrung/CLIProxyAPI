@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -33,6 +34,7 @@ func mkResp(status int, hdr http.Header, body []byte) *http.Response {
 		Header:        hdr,
 		Body:          io.NopCloser(bytes.NewReader(body)),
 		ContentLength: int64(len(body)),
+		Request:       &http.Request{Method: http.MethodGet, URL: &url.URL{Path: "/test"}},
 	}
 }
 

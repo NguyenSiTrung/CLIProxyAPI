@@ -143,7 +143,6 @@ func (e *GitHubCopilotExecutor) Execute(ctx context.Context, auth *cliproxyauth.
 		body = normalizeGitHubCopilotResponsesInput(body)
 		body = normalizeGitHubCopilotResponsesTools(body)
 	} else {
-		body = stripGitHubCopilotChatUnsupportedFields(body)
 		body = normalizeGitHubCopilotChatTools(body)
 	}
 	requestedModel := payloadRequestedModel(opts, req.Model)
@@ -224,7 +223,7 @@ func (e *GitHubCopilotExecutor) Execute(ctx context.Context, auth *cliproxyauth.
 	var param any
 	var converted []byte
 	if useResponses && from.String() == "claude" {
-		converted = []byte(translateGitHubCopilotResponsesNonStreamToClaude(data))
+		converted = translateGitHubCopilotResponsesNonStreamToClaude(data)
 	} else {
 		converted = sdktranslator.TranslateNonStream(ctx, to, from, req.Model, bytes.Clone(opts.OriginalRequest), body, data, &param)
 	}
@@ -274,7 +273,6 @@ func (e *GitHubCopilotExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 		body = normalizeGitHubCopilotResponsesInput(body)
 		body = normalizeGitHubCopilotResponsesTools(body)
 	} else {
-		body = stripGitHubCopilotChatUnsupportedFields(body)
 		body = normalizeGitHubCopilotChatTools(body)
 	}
 	requestedModel := payloadRequestedModel(opts, req.Model)
@@ -378,15 +376,12 @@ func (e *GitHubCopilotExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 
 			var chunks [][]byte
 			if useResponses && from.String() == "claude" {
-				strChunks := translateGitHubCopilotResponsesStreamToClaude(bytes.Clone(line), &param)
-				for _, s := range strChunks {
-					chunks = append(chunks, []byte(s))
-				}
+				chunks = translateGitHubCopilotResponsesStreamToClaude(bytes.Clone(line), &param)
 			} else {
 				chunks = sdktranslator.TranslateStream(ctx, to, from, req.Model, bytes.Clone(opts.OriginalRequest), body, bytes.Clone(line), &param)
 			}
 			for i := range chunks {
-				out <- cliproxyexecutor.StreamChunk{Payload: chunks[i]}
+				out <- cliproxyexecutor.StreamChunk{Payload: bytes.Clone(chunks[i])}
 			}
 		}
 
@@ -496,9 +491,7 @@ func (e *GitHubCopilotExecutor) applyHeaders(r *http.Request, apiToken string, b
 	r.Header.Set("X-Request-Id", uuid.NewString())
 
 	initiator := "user"
-	if e.cfg != nil && e.cfg.ForceGitHubCopilotAgentInitiator {
-		initiator = "agent"
-	} else if role := detectLastConversationRole(body); role == "assistant" || role == "tool" {
+	if role := detectLastConversationRole(body); role == "assistant" || role == "tool" {
 		initiator = "agent"
 	}
 	r.Header.Set("X-Initiator", initiator)
@@ -584,7 +577,31 @@ func useGitHubCopilotResponsesEndpoint(sourceFormat sdktranslator.Format, model 
 		return true
 	}
 	baseModel := strings.ToLower(thinking.ParseSuffix(model).ModelName)
+	if info := registry.GetGlobalRegistry().GetModelInfo(baseModel, githubCopilotAuthType); info != nil {
+		return len(info.SupportedEndpoints) > 0 && !containsEndpoint(info.SupportedEndpoints, githubCopilotChatPath) && containsEndpoint(info.SupportedEndpoints, githubCopilotResponsesPath)
+	}
+	if info := lookupGitHubCopilotStaticModelInfo(baseModel); info != nil {
+		return len(info.SupportedEndpoints) > 0 && !containsEndpoint(info.SupportedEndpoints, githubCopilotChatPath) && containsEndpoint(info.SupportedEndpoints, githubCopilotResponsesPath)
+	}
 	return strings.Contains(baseModel, "codex")
+}
+
+func lookupGitHubCopilotStaticModelInfo(model string) *registry.ModelInfo {
+	for _, info := range registry.GetStaticModelDefinitionsByChannel(githubCopilotAuthType) {
+		if info != nil && strings.EqualFold(info.ID, model) {
+			return info
+		}
+	}
+	return nil
+}
+
+func containsEndpoint(endpoints []string, endpoint string) bool {
+	for _, item := range endpoints {
+		if item == endpoint {
+			return true
+		}
+	}
+	return false
 }
 
 // flattenAssistantContent converts assistant message content from array format
@@ -839,14 +856,6 @@ func stripGitHubCopilotResponsesUnsupportedFields(body []byte) []byte {
 	return body
 }
 
-func stripGitHubCopilotChatUnsupportedFields(body []byte) []byte {
-	// GitHub Copilot /chat/completions rejects non-standard OpenAI fields.
-	// top_k is added by the Gemini→OpenAI request translator but is not valid for Copilot.
-	body, _ = sjson.DeleteBytes(body, "top_k")
-	body, _ = sjson.DeleteBytes(body, "service_tier")
-	return body
-}
-
 func normalizeGitHubCopilotResponsesTools(body []byte) []byte {
 	tools := gjson.GetBytes(body, "tools")
 	if tools.Exists() {
@@ -992,7 +1001,7 @@ type githubCopilotResponsesStreamState struct {
 	ItemIDToTool      map[string]*githubCopilotResponsesStreamToolState
 }
 
-func translateGitHubCopilotResponsesNonStreamToClaude(data []byte) string {
+func translateGitHubCopilotResponsesNonStreamToClaude(data []byte) []byte {
 	root := gjson.ParseBytes(data)
 	out := `{"id":"","type":"message","role":"assistant","model":"","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0}}`
 	out, _ = sjson.Set(out, "id", root.Get("id").String())
@@ -1082,10 +1091,10 @@ func translateGitHubCopilotResponsesNonStreamToClaude(data []byte) string {
 	} else {
 		out, _ = sjson.Set(out, "stop_reason", "end_turn")
 	}
-	return out
+	return []byte(out)
 }
 
-func translateGitHubCopilotResponsesStreamToClaude(line []byte, param *any) []string {
+func translateGitHubCopilotResponsesStreamToClaude(line []byte, param *any) [][]byte {
 	if *param == nil {
 		*param = &githubCopilotResponsesStreamState{
 			TextBlockIndex:    -1,
@@ -1107,7 +1116,10 @@ func translateGitHubCopilotResponsesStreamToClaude(line []byte, param *any) []st
 	}
 
 	event := gjson.GetBytes(payload, "type").String()
-	results := make([]string, 0, 4)
+	results := make([][]byte, 0, 4)
+	appendResult := func(chunk string) {
+		results = append(results, []byte(chunk))
+	}
 	ensureMessageStart := func() {
 		if state.MessageStarted {
 			return
@@ -1115,7 +1127,7 @@ func translateGitHubCopilotResponsesStreamToClaude(line []byte, param *any) []st
 		messageStart := `{"type":"message_start","message":{"id":"","type":"message","role":"assistant","model":"","content":[],"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0}}}`
 		messageStart, _ = sjson.Set(messageStart, "message.id", gjson.GetBytes(payload, "response.id").String())
 		messageStart, _ = sjson.Set(messageStart, "message.model", gjson.GetBytes(payload, "response.model").String())
-		results = append(results, "event: message_start\ndata: "+messageStart+"\n\n")
+		appendResult("event: message_start\ndata: " + messageStart + "\n\n")
 		state.MessageStarted = true
 	}
 	startTextBlockIfNeeded := func() {
@@ -1128,7 +1140,7 @@ func translateGitHubCopilotResponsesStreamToClaude(line []byte, param *any) []st
 		}
 		contentBlockStart := `{"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}`
 		contentBlockStart, _ = sjson.Set(contentBlockStart, "index", state.TextBlockIndex)
-		results = append(results, "event: content_block_start\ndata: "+contentBlockStart+"\n\n")
+		appendResult("event: content_block_start\ndata: " + contentBlockStart + "\n\n")
 		state.TextBlockStarted = true
 	}
 	stopTextBlockIfNeeded := func() {
@@ -1137,7 +1149,7 @@ func translateGitHubCopilotResponsesStreamToClaude(line []byte, param *any) []st
 		}
 		contentBlockStop := `{"type":"content_block_stop","index":0}`
 		contentBlockStop, _ = sjson.Set(contentBlockStop, "index", state.TextBlockIndex)
-		results = append(results, "event: content_block_stop\ndata: "+contentBlockStop+"\n\n")
+		appendResult("event: content_block_stop\ndata: " + contentBlockStop + "\n\n")
 		state.TextBlockStarted = false
 		state.TextBlockIndex = -1
 	}
@@ -1167,7 +1179,7 @@ func translateGitHubCopilotResponsesStreamToClaude(line []byte, param *any) []st
 			contentDelta := `{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":""}}`
 			contentDelta, _ = sjson.Set(contentDelta, "index", state.TextBlockIndex)
 			contentDelta, _ = sjson.Set(contentDelta, "delta.text", delta)
-			results = append(results, "event: content_block_delta\ndata: "+contentDelta+"\n\n")
+			appendResult("event: content_block_delta\ndata: " + contentDelta + "\n\n")
 		}
 	case "response.reasoning_summary_part.added":
 		ensureMessageStart()
@@ -1176,7 +1188,7 @@ func translateGitHubCopilotResponsesStreamToClaude(line []byte, param *any) []st
 		state.NextContentIndex++
 		thinkingStart := `{"type":"content_block_start","index":0,"content_block":{"type":"thinking","thinking":""}}`
 		thinkingStart, _ = sjson.Set(thinkingStart, "index", state.ReasoningIndex)
-		results = append(results, "event: content_block_start\ndata: "+thinkingStart+"\n\n")
+		appendResult("event: content_block_start\ndata: " + thinkingStart + "\n\n")
 	case "response.reasoning_summary_text.delta":
 		if state.ReasoningActive {
 			delta := gjson.GetBytes(payload, "delta").String()
@@ -1184,14 +1196,14 @@ func translateGitHubCopilotResponsesStreamToClaude(line []byte, param *any) []st
 				thinkingDelta := `{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":""}}`
 				thinkingDelta, _ = sjson.Set(thinkingDelta, "index", state.ReasoningIndex)
 				thinkingDelta, _ = sjson.Set(thinkingDelta, "delta.thinking", delta)
-				results = append(results, "event: content_block_delta\ndata: "+thinkingDelta+"\n\n")
+				appendResult("event: content_block_delta\ndata: " + thinkingDelta + "\n\n")
 			}
 		}
 	case "response.reasoning_summary_part.done":
 		if state.ReasoningActive {
 			thinkingStop := `{"type":"content_block_stop","index":0}`
 			thinkingStop, _ = sjson.Set(thinkingStop, "index", state.ReasoningIndex)
-			results = append(results, "event: content_block_stop\ndata: "+thinkingStop+"\n\n")
+			appendResult("event: content_block_stop\ndata: " + thinkingStop + "\n\n")
 			state.ReasoningActive = false
 		}
 	case "response.output_item.added":
@@ -1219,7 +1231,7 @@ func translateGitHubCopilotResponsesStreamToClaude(line []byte, param *any) []st
 		contentBlockStart, _ = sjson.Set(contentBlockStart, "index", tool.Index)
 		contentBlockStart, _ = sjson.Set(contentBlockStart, "content_block.id", tool.ID)
 		contentBlockStart, _ = sjson.Set(contentBlockStart, "content_block.name", tool.Name)
-		results = append(results, "event: content_block_start\ndata: "+contentBlockStart+"\n\n")
+		appendResult("event: content_block_start\ndata: " + contentBlockStart + "\n\n")
 	case "response.output_item.delta":
 		item := gjson.GetBytes(payload, "item")
 		if item.Get("type").String() != "function_call" {
@@ -1239,7 +1251,7 @@ func translateGitHubCopilotResponsesStreamToClaude(line []byte, param *any) []st
 		inputDelta := `{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":""}}`
 		inputDelta, _ = sjson.Set(inputDelta, "index", tool.Index)
 		inputDelta, _ = sjson.Set(inputDelta, "delta.partial_json", partial)
-		results = append(results, "event: content_block_delta\ndata: "+inputDelta+"\n\n")
+		appendResult("event: content_block_delta\ndata: " + inputDelta + "\n\n")
 	case "response.function_call_arguments.delta":
 		// Copilot sends tool call arguments via this event type (not response.output_item.delta).
 		// Data format: {"delta":"...", "item_id":"...", "output_index":N, ...}
@@ -1256,7 +1268,7 @@ func translateGitHubCopilotResponsesStreamToClaude(line []byte, param *any) []st
 		inputDelta := `{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":""}}`
 		inputDelta, _ = sjson.Set(inputDelta, "index", tool.Index)
 		inputDelta, _ = sjson.Set(inputDelta, "delta.partial_json", partial)
-		results = append(results, "event: content_block_delta\ndata: "+inputDelta+"\n\n")
+		appendResult("event: content_block_delta\ndata: " + inputDelta + "\n\n")
 	case "response.output_item.done":
 		if gjson.GetBytes(payload, "item.type").String() != "function_call" {
 			break
@@ -1267,7 +1279,7 @@ func translateGitHubCopilotResponsesStreamToClaude(line []byte, param *any) []st
 		}
 		contentBlockStop := `{"type":"content_block_stop","index":0}`
 		contentBlockStop, _ = sjson.Set(contentBlockStop, "index", tool.Index)
-		results = append(results, "event: content_block_stop\ndata: "+contentBlockStop+"\n\n")
+		appendResult("event: content_block_stop\ndata: " + contentBlockStop + "\n\n")
 	case "response.completed":
 		ensureMessageStart()
 		stopTextBlockIfNeeded()
@@ -1291,8 +1303,8 @@ func translateGitHubCopilotResponsesStreamToClaude(line []byte, param *any) []st
 			if cachedTokens > 0 {
 				messageDelta, _ = sjson.Set(messageDelta, "usage.cache_read_input_tokens", cachedTokens)
 			}
-			results = append(results, "event: message_delta\ndata: "+messageDelta+"\n\n")
-			results = append(results, "event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
+			appendResult("event: message_delta\ndata: " + messageDelta + "\n\n")
+			appendResult("event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
 			state.MessageStopSent = true
 		}
 	}

@@ -24,10 +24,6 @@ type usageReporter struct {
 	source      string
 	requestedAt time.Time
 	once        sync.Once
-	// Error tracking fields
-	errorCode  string
-	errorMsg   string
-	httpStatus int
 }
 
 func newUsageReporter(ctx context.Context, provider, model string, auth *cliproxyauth.Auth) *usageReporter {
@@ -54,28 +50,11 @@ func (r *usageReporter) publishFailure(ctx context.Context) {
 	r.publishWithOutcome(ctx, usage.Detail{}, true)
 }
 
-// publishFailureWithDetails publishes a failure with error details for analytics
-func (r *usageReporter) publishFailureWithDetails(ctx context.Context, httpStatus int, errorCode, errorMsg string) {
-	if r == nil {
-		return
-	}
-	r.httpStatus = httpStatus
-	r.errorCode = errorCode
-	// Truncate error message if too long (keep first 500 chars)
-	if len(errorMsg) > 500 {
-		r.errorMsg = errorMsg[:500] + "..."
-	} else {
-		r.errorMsg = errorMsg
-	}
-	r.publishWithOutcome(ctx, usage.Detail{}, true)
-}
-
 func (r *usageReporter) trackFailure(ctx context.Context, errPtr *error) {
 	if r == nil || errPtr == nil {
 		return
 	}
 	if *errPtr != nil {
-		r.errorMsg = (*errPtr).Error()
 		r.publishFailure(ctx)
 	}
 }
@@ -94,20 +73,7 @@ func (r *usageReporter) publishWithOutcome(ctx context.Context, detail usage.Det
 		return
 	}
 	r.once.Do(func() {
-		usage.PublishRecord(ctx, usage.Record{
-			Provider:    r.provider,
-			Model:       r.model,
-			Source:      r.source,
-			APIKey:      r.apiKey,
-			AuthID:      r.authID,
-			AuthIndex:   r.authIndex,
-			RequestedAt: r.requestedAt,
-			Failed:      failed,
-			ErrorCode:   r.errorCode,
-			ErrorMsg:    r.errorMsg,
-			HTTPStatus:  r.httpStatus,
-			Detail:      detail,
-		})
+		usage.PublishRecord(ctx, r.buildRecord(detail, failed))
 	})
 }
 
@@ -120,18 +86,37 @@ func (r *usageReporter) ensurePublished(ctx context.Context) {
 		return
 	}
 	r.once.Do(func() {
-		usage.PublishRecord(ctx, usage.Record{
-			Provider:    r.provider,
-			Model:       r.model,
-			Source:      r.source,
-			APIKey:      r.apiKey,
-			AuthID:      r.authID,
-			AuthIndex:   r.authIndex,
-			RequestedAt: r.requestedAt,
-			Failed:      false,
-			Detail:      usage.Detail{},
-		})
+		usage.PublishRecord(ctx, r.buildRecord(usage.Detail{}, false))
 	})
+}
+
+func (r *usageReporter) buildRecord(detail usage.Detail, failed bool) usage.Record {
+	if r == nil {
+		return usage.Record{Detail: detail, Failed: failed}
+	}
+	return usage.Record{
+		Provider:    r.provider,
+		Model:       r.model,
+		Source:      r.source,
+		APIKey:      r.apiKey,
+		AuthID:      r.authID,
+		AuthIndex:   r.authIndex,
+		RequestedAt: r.requestedAt,
+		Latency:     r.latency(),
+		Failed:      failed,
+		Detail:      detail,
+	}
+}
+
+func (r *usageReporter) latency() time.Duration {
+	if r == nil || r.requestedAt.IsZero() {
+		return 0
+	}
+	latency := time.Since(r.requestedAt)
+	if latency < 0 {
+		return 0
+	}
+	return latency
 }
 
 func apiKeyFromContext(ctx context.Context) string {
@@ -271,8 +256,6 @@ func parseOpenAIStreamUsage(line []byte) (usage.Detail, bool) {
 		detail.CachedTokens = cached.Int()
 	}
 	if reasoning := usageNode.Get("completion_tokens_details.reasoning_tokens"); reasoning.Exists() {
-		detail.ReasoningTokens = reasoning.Int()
-	} else if reasoning = usageNode.Get("output_tokens_details.reasoning_tokens"); reasoning.Exists() {
 		detail.ReasoningTokens = reasoning.Int()
 	}
 	return detail, true

@@ -27,7 +27,7 @@ func (r *recordingExecutor) Execute(_ context.Context, auth *Auth, _ cliproxyexe
 	return cliproxyexecutor.Response{Payload: []byte(`{}`)}, nil
 }
 
-func (r *recordingExecutor) ExecuteStream(context.Context, *Auth, cliproxyexecutor.Request, cliproxyexecutor.Options) (<-chan cliproxyexecutor.StreamChunk, error) {
+func (r *recordingExecutor) ExecuteStream(context.Context, *Auth, cliproxyexecutor.Request, cliproxyexecutor.Options) (*cliproxyexecutor.StreamResult, error) {
 	return nil, errors.New("not implemented")
 }
 

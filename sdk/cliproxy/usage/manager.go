@@ -17,6 +17,7 @@ type Record struct {
 	AuthIndex   string
 	Source      string
 	RequestedAt time.Time
+	Latency     time.Duration
 	Failed      bool
 	ErrorCode   string // HTTP status code or error code
 	ErrorMsg    string // Error message or response body excerpt
