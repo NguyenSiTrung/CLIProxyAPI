@@ -3775,11 +3775,21 @@ func (h *Handler) RequestKiloToken(c *gin.Context) {
 func (h *Handler) RequestCodeBuddyToken(c *gin.Context) {
 	ctx := context.Background()
 
-	fmt.Println("Initializing CodeBuddy authentication...")
+	server := strings.ToLower(strings.TrimSpace(c.Query("server")))
+	baseURL := codebuddy.BaseURL
+	defaultDomain := codebuddy.DefaultDomain
+	providerLabel := "codebuddy"
+	if server == "global" {
+		baseURL = codebuddy.GlobalBaseURL
+		defaultDomain = codebuddy.GlobalDomain
+		providerLabel = "codebuddy-global"
+	}
+
+	fmt.Printf("Initializing CodeBuddy authentication (%s)...\n", baseURL)
 
 	state := fmt.Sprintf("codebuddy-%d", time.Now().UnixNano())
 
-	authSvc := codebuddy.NewCodeBuddyAuth(h.cfg)
+	authSvc := codebuddy.NewCodeBuddyAuthWithBaseURL(h.cfg, baseURL)
 
 	authState, err := authSvc.FetchAuthState(ctx)
 	if err != nil {
@@ -3801,6 +3811,10 @@ func (h *Handler) RequestCodeBuddyToken(c *gin.Context) {
 			SetOAuthSessionError(state, codebuddy.GetUserFriendlyMessage(errPoll))
 			fmt.Printf("Authentication failed: %v\n", errPoll)
 			return
+		}
+
+		if storage.Domain == "" {
+			storage.Domain = defaultDomain
 		}
 
 		fileName := fmt.Sprintf("codebuddy-%s.json", storage.UserID)
@@ -3838,8 +3852,9 @@ func (h *Handler) RequestCodeBuddyToken(c *gin.Context) {
 	}()
 
 	c.JSON(200, gin.H{
-		"status": "ok",
-		"url":    authURL,
-		"state":  state,
+		"status":   "ok",
+		"url":      authURL,
+		"state":    state,
+		"provider": providerLabel,
 	})
 }

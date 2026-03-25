@@ -20,9 +20,11 @@ import (
 )
 
 const (
-	BaseURL       = "https://copilot.tencent.com"
-	DefaultDomain = "www.codebuddy.cn"
-	UserAgent     = "CLI/2.63.2 CodeBuddy/2.63.2"
+	BaseURL          = "https://copilot.tencent.com"
+	GlobalBaseURL    = "https://www.codebuddy.ai"
+	DefaultDomain    = "www.codebuddy.cn"
+	GlobalDomain     = "www.codebuddy.ai"
+	UserAgent        = "CLI/2.63.2 CodeBuddy/2.63.2"
 
 	codeBuddyStatePath   = "/v2/plugin/auth/state"
 	codeBuddyTokenPath   = "/v2/plugin/auth/token"
@@ -45,6 +47,14 @@ func NewCodeBuddyAuth(cfg *config.Config) *CodeBuddyAuth {
 		httpClient = util.SetProxy(&cfg.SDKConfig, httpClient)
 	}
 	return &CodeBuddyAuth{httpClient: httpClient, cfg: cfg, baseURL: BaseURL}
+}
+
+func NewCodeBuddyAuthWithBaseURL(cfg *config.Config, baseURL string) *CodeBuddyAuth {
+	auth := NewCodeBuddyAuth(cfg)
+	if baseURL != "" {
+		auth.baseURL = baseURL
+	}
+	return auth
 }
 
 // AuthState holds the state and auth URL returned by the auth state API.

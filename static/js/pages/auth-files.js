@@ -563,12 +563,13 @@ export async function startOAuth(provider) {
     'iflow': '/iflow-auth-url',
     'github': '/github-auth-url',
     'kiro': '/kiro-auth-url',
-    'codebuddy': '/codebuddy-auth-url'
+    'codebuddy': '/codebuddy-auth-url',
+    'codebuddy-global': '/codebuddy-auth-url?server=global'
   };
   const ep = endpoints[provider];
 
   // Device flow providers don't use redirect callbacks
-  const deviceFlowProviders = ['github', 'kiro', 'codebuddy'];
+  const deviceFlowProviders = ['github', 'kiro', 'codebuddy', 'codebuddy-global'];
   if (!deviceFlowProviders.includes(provider)) {
     showManualCallback();
   }
