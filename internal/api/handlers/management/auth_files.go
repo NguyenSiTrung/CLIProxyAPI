@@ -27,6 +27,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/auth/antigravity"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/auth/claude"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/auth/codebuddy"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/auth/codex"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/auth/copilot"
 	geminiAuth "github.com/router-for-me/CLIProxyAPI/v6/internal/auth/gemini"
@@ -3768,5 +3769,77 @@ func (h *Handler) RequestKiloToken(c *gin.Context) {
 		"state":            state,
 		"user_code":        resp.Code,
 		"verification_uri": resp.VerificationURL,
+	})
+}
+
+func (h *Handler) RequestCodeBuddyToken(c *gin.Context) {
+	ctx := context.Background()
+
+	fmt.Println("Initializing CodeBuddy authentication...")
+
+	state := fmt.Sprintf("codebuddy-%d", time.Now().UnixNano())
+
+	authSvc := codebuddy.NewCodeBuddyAuth(h.cfg)
+
+	authState, err := authSvc.FetchAuthState(ctx)
+	if err != nil {
+		log.Errorf("Failed to fetch CodeBuddy auth state: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to initiate CodeBuddy authentication"})
+		return
+	}
+
+	authURL := authState.AuthURL
+
+	RegisterOAuthSession(state, "codebuddy")
+
+	go func() {
+		fmt.Printf("Please visit %s to login to CodeBuddy\n", authURL)
+		fmt.Println("Waiting for authorization...")
+
+		storage, errPoll := authSvc.PollForToken(ctx, authState.State)
+		if errPoll != nil {
+			SetOAuthSessionError(state, codebuddy.GetUserFriendlyMessage(errPoll))
+			fmt.Printf("Authentication failed: %v\n", errPoll)
+			return
+		}
+
+		fileName := fmt.Sprintf("codebuddy-%s.json", storage.UserID)
+		label := storage.UserID
+		if label == "" {
+			label = "codebuddy-user"
+		}
+
+		record := &coreauth.Auth{
+			ID:       fileName,
+			Provider: "codebuddy",
+			FileName: fileName,
+			Label:    label,
+			Storage:  storage,
+			Metadata: map[string]any{
+				"access_token":  storage.AccessToken,
+				"refresh_token": storage.RefreshToken,
+				"user_id":       storage.UserID,
+				"domain":        storage.Domain,
+				"expires_in":    storage.ExpiresIn,
+				"type":          "codebuddy",
+			},
+		}
+
+		savedPath, errSave := h.saveTokenRecord(ctx, record)
+		if errSave != nil {
+			log.Errorf("Failed to save CodeBuddy tokens: %v", errSave)
+			SetOAuthSessionError(state, "Failed to save authentication tokens")
+			return
+		}
+
+		fmt.Printf("CodeBuddy authentication successful! Token saved to %s\n", savedPath)
+		CompleteOAuthSession(state)
+		CompleteOAuthSessionsByProvider("codebuddy")
+	}()
+
+	c.JSON(200, gin.H{
+		"status": "ok",
+		"url":    authURL,
+		"state":  state,
 	})
 }

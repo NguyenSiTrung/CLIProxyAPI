@@ -73,7 +73,8 @@ export async function loadAuthFiles() {
       'codex': '🧠', 'openai': '🧠',
       'antigravity': '🚀',
       'qwen': '💬',
-      'iflow': '🌊'
+      'iflow': '🌊',
+      'codebuddy': '🐼'
     };
 
     tbody.innerHTML = d.files.map(f => {
@@ -561,12 +562,13 @@ export async function startOAuth(provider) {
     'qwen': '/qwen-auth-url',
     'iflow': '/iflow-auth-url',
     'github': '/github-auth-url',
-    'kiro': '/kiro-auth-url'
+    'kiro': '/kiro-auth-url',
+    'codebuddy': '/codebuddy-auth-url'
   };
   const ep = endpoints[provider];
 
   // Device flow providers don't use redirect callbacks
-  const deviceFlowProviders = ['github', 'kiro'];
+  const deviceFlowProviders = ['github', 'kiro', 'codebuddy'];
   if (!deviceFlowProviders.includes(provider)) {
     showManualCallback();
   }
