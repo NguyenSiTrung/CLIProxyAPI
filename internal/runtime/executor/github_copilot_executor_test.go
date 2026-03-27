@@ -188,6 +188,34 @@ func TestShouldBypassGitHubCopilotChatThinking(t *testing.T) {
 	}
 }
 
+func TestStripGitHubCopilotGeminiThinkingFromSource_GeminiFormat(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{"generationConfig":{"thinkingConfig":{"thinkingLevel":"low","includeThoughts":true},"temperature":0.2}}`)
+	got := stripGitHubCopilotGeminiThinkingFromSource(body, sdktranslator.FromString("gemini"))
+
+	if gjson.GetBytes(got, "generationConfig.thinkingConfig").Exists() {
+		t.Fatalf("generationConfig.thinkingConfig should be removed, got %s", gjson.GetBytes(got, "generationConfig.thinkingConfig").Raw)
+	}
+	if gotTemp := gjson.GetBytes(got, "generationConfig.temperature").Float(); gotTemp != 0.2 {
+		t.Fatalf("generationConfig.temperature = %v, want 0.2", gotTemp)
+	}
+}
+
+func TestStripGitHubCopilotGeminiThinkingFromSource_OpenAIFormat(t *testing.T) {
+	t.Parallel()
+
+	body := []byte(`{"reasoning_effort":"low","temperature":0.2}`)
+	got := stripGitHubCopilotGeminiThinkingFromSource(body, sdktranslator.FromString("openai"))
+
+	if gjson.GetBytes(got, "reasoning_effort").Exists() {
+		t.Fatalf("reasoning_effort should be removed, got %s", gjson.GetBytes(got, "reasoning_effort").Raw)
+	}
+	if gotTemp := gjson.GetBytes(got, "temperature").Float(); gotTemp != 0.2 {
+		t.Fatalf("temperature = %v, want 0.2", gotTemp)
+	}
+}
+
 func TestNormalizeGitHubCopilotChatTools_KeepFunctionOnly(t *testing.T) {
 	t.Parallel()
 	body := []byte(`{"tools":[{"type":"function","function":{"name":"ok"}},{"type":"code_interpreter"}],"tool_choice":"auto"}`)

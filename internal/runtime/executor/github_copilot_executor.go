@@ -122,8 +122,13 @@ func (e *GitHubCopilotExecutor) Execute(ctx context.Context, auth *cliproxyauth.
 	if len(opts.OriginalRequest) > 0 {
 		originalPayload = bytes.Clone(opts.OriginalRequest)
 	}
+	requestPayload := bytes.Clone(req.Payload)
+	if shouldBypassGitHubCopilotChatThinking(req.Model, useResponses) {
+		originalPayload = stripGitHubCopilotGeminiThinkingFromSource(originalPayload, from)
+		requestPayload = stripGitHubCopilotGeminiThinkingFromSource(requestPayload, from)
+	}
 	originalTranslated := sdktranslator.TranslateRequest(from, to, req.Model, originalPayload, false)
-	body := sdktranslator.TranslateRequest(from, to, req.Model, bytes.Clone(req.Payload), false)
+	body := sdktranslator.TranslateRequest(from, to, req.Model, requestPayload, false)
 	body = e.normalizeModel(req.Model, body)
 	body = flattenAssistantContent(body)
 
@@ -257,8 +262,13 @@ func (e *GitHubCopilotExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 	if len(opts.OriginalRequest) > 0 {
 		originalPayload = bytes.Clone(opts.OriginalRequest)
 	}
+	requestPayload := bytes.Clone(req.Payload)
+	if shouldBypassGitHubCopilotChatThinking(req.Model, useResponses) {
+		originalPayload = stripGitHubCopilotGeminiThinkingFromSource(originalPayload, from)
+		requestPayload = stripGitHubCopilotGeminiThinkingFromSource(requestPayload, from)
+	}
 	originalTranslated := sdktranslator.TranslateRequest(from, to, req.Model, originalPayload, false)
-	body := sdktranslator.TranslateRequest(from, to, req.Model, bytes.Clone(req.Payload), true)
+	body := sdktranslator.TranslateRequest(from, to, req.Model, requestPayload, true)
 	body = e.normalizeModel(req.Model, body)
 	body = flattenAssistantContent(body)
 
@@ -981,6 +991,25 @@ func stripGitHubCopilotChatUnsupportedFields(model string, body []byte) []byte {
 
 func shouldBypassGitHubCopilotChatThinking(model string, useResponses bool) bool {
 	return !useResponses && isGitHubCopilotNonOpenAIModel(model)
+}
+
+func stripGitHubCopilotGeminiThinkingFromSource(body []byte, format sdktranslator.Format) []byte {
+	switch format.String() {
+	case "gemini":
+		return thinking.StripThinkingConfig(body, "gemini")
+	case "gemini-cli", "antigravity":
+		return thinking.StripThinkingConfig(body, format.String())
+	case "openai":
+		return thinking.StripThinkingConfig(body, "openai")
+	case "openai-response":
+		return thinking.StripThinkingConfig(body, "codex")
+	default:
+		body = thinking.StripThinkingConfig(body, "gemini")
+		body = thinking.StripThinkingConfig(body, "gemini-cli")
+		body = thinking.StripThinkingConfig(body, "openai")
+		body = thinking.StripThinkingConfig(body, "codex")
+		return body
+	}
 }
 
 func isGitHubCopilotResponsesBuiltinTool(toolType string) bool {
