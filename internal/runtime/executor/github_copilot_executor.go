@@ -965,6 +965,7 @@ func stripReasoningEffort(body []byte) []byte {
 // stripGitHubCopilotChatUnsupportedFields removes fields that GitHub Copilot's
 // /chat/completions endpoint rejects for Gemini-family models.
 func stripGitHubCopilotChatUnsupportedFields(model string, body []byte) []byte {
+	body, _ = sjson.DeleteBytes(body, "service_tier")
 	if !isGitHubCopilotNonOpenAIModel(model) {
 		return body
 	}

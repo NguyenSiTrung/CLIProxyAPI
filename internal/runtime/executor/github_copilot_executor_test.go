@@ -123,7 +123,7 @@ func TestGitHubCopilotClaudeThinkingRetained(t *testing.T) {
 func TestStripGitHubCopilotChatUnsupportedFields_Gemini(t *testing.T) {
 	t.Parallel()
 
-	body := []byte(`{"model":"gemini-3-flash-preview","messages":[],"reasoning_effort":"low","top_k":40,"n":2,"temperature":0.2}`)
+	body := []byte(`{"model":"gemini-3-flash-preview","messages":[],"reasoning_effort":"low","top_k":40,"n":2,"service_tier":"default","temperature":0.2}`)
 	got := stripGitHubCopilotChatUnsupportedFields("gemini-3-flash-preview", body)
 
 	if gjson.GetBytes(got, "reasoning_effort").Exists() {
@@ -135,6 +135,9 @@ func TestStripGitHubCopilotChatUnsupportedFields_Gemini(t *testing.T) {
 	if gjson.GetBytes(got, "n").Exists() {
 		t.Fatalf("n should be removed, got %s", gjson.GetBytes(got, "n").Raw)
 	}
+	if gjson.GetBytes(got, "service_tier").Exists() {
+		t.Fatalf("service_tier should be removed, got %s", gjson.GetBytes(got, "service_tier").Raw)
+	}
 	if gotTemp := gjson.GetBytes(got, "temperature").Float(); gotTemp != 0.2 {
 		t.Fatalf("temperature = %v, want 0.2", gotTemp)
 	}
@@ -143,7 +146,7 @@ func TestStripGitHubCopilotChatUnsupportedFields_Gemini(t *testing.T) {
 func TestStripGitHubCopilotChatUnsupportedFields_OpenAIModelNoop(t *testing.T) {
 	t.Parallel()
 
-	body := []byte(`{"model":"gpt-4o","messages":[],"reasoning_effort":"medium","top_k":40,"n":2}`)
+	body := []byte(`{"model":"gpt-4o","messages":[],"reasoning_effort":"medium","top_k":40,"n":2,"service_tier":"default"}`)
 	got := stripGitHubCopilotChatUnsupportedFields("gpt-4o", body)
 
 	if !gjson.GetBytes(got, "reasoning_effort").Exists() {
@@ -154,6 +157,9 @@ func TestStripGitHubCopilotChatUnsupportedFields_OpenAIModelNoop(t *testing.T) {
 	}
 	if !gjson.GetBytes(got, "n").Exists() {
 		t.Fatal("n should be preserved for OpenAI models")
+	}
+	if gjson.GetBytes(got, "service_tier").Exists() {
+		t.Fatal("service_tier should be removed for all GitHub Copilot chat requests")
 	}
 }
 
