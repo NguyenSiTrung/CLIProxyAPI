@@ -143,17 +143,14 @@ func (e *GitHubCopilotExecutor) Execute(ctx context.Context, auth *cliproxyauth.
 		body = normalizeGitHubCopilotResponsesInput(body)
 		body = normalizeGitHubCopilotResponsesTools(body)
 	} else {
-		// GitHub Copilot's /chat/completions endpoint does not accept
-		// reasoning_effort for non-OpenAI models (e.g. Gemini). Strip it
-		// to avoid 400 "invalid request body" errors from upstream.
-		if isGitHubCopilotNonOpenAIModel(req.Model) {
-			body = stripReasoningEffort(body)
-		}
 		body = normalizeGitHubCopilotChatTools(body)
 	}
 	requestedModel := payloadRequestedModel(opts, req.Model)
 	body = applyPayloadConfigWithRoot(e.cfg, req.Model, to.String(), "", body, originalTranslated, requestedModel)
 	body, _ = sjson.SetBytes(body, "stream", false)
+	if !useResponses {
+		body = stripGitHubCopilotChatUnsupportedFields(req.Model, body)
+	}
 
 	path := githubCopilotChatPath
 	if useResponses {
@@ -279,12 +276,6 @@ func (e *GitHubCopilotExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 		body = normalizeGitHubCopilotResponsesInput(body)
 		body = normalizeGitHubCopilotResponsesTools(body)
 	} else {
-		// GitHub Copilot's /chat/completions endpoint does not accept
-		// reasoning_effort for non-OpenAI models (e.g. Gemini). Strip it
-		// to avoid 400 "invalid request body" errors from upstream.
-		if isGitHubCopilotNonOpenAIModel(req.Model) {
-			body = stripReasoningEffort(body)
-		}
 		body = normalizeGitHubCopilotChatTools(body)
 	}
 	requestedModel := payloadRequestedModel(opts, req.Model)
@@ -293,6 +284,7 @@ func (e *GitHubCopilotExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 	// Enable stream options for usage stats in stream
 	if !useResponses {
 		body, _ = sjson.SetBytes(body, "stream_options.include_usage", true)
+		body = stripGitHubCopilotChatUnsupportedFields(req.Model, body)
 	}
 
 	path := githubCopilotChatPath
@@ -968,6 +960,18 @@ func stripReasoningEffort(body []byte) []byte {
 	}
 	result, _ := sjson.DeleteBytes(body, "reasoning_effort")
 	return result
+}
+
+// stripGitHubCopilotChatUnsupportedFields removes fields that GitHub Copilot's
+// /chat/completions endpoint rejects for Gemini-family models.
+func stripGitHubCopilotChatUnsupportedFields(model string, body []byte) []byte {
+	if !isGitHubCopilotNonOpenAIModel(model) {
+		return body
+	}
+	body = stripReasoningEffort(body)
+	body, _ = sjson.DeleteBytes(body, "top_k")
+	body, _ = sjson.DeleteBytes(body, "n")
+	return body
 }
 
 func isGitHubCopilotResponsesBuiltinTool(toolType string) bool {
