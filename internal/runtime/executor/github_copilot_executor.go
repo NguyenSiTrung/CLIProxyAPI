@@ -122,13 +122,8 @@ func (e *GitHubCopilotExecutor) Execute(ctx context.Context, auth *cliproxyauth.
 	if len(opts.OriginalRequest) > 0 {
 		originalPayload = bytes.Clone(opts.OriginalRequest)
 	}
-	requestPayload := bytes.Clone(req.Payload)
-	if shouldBypassGitHubCopilotChatThinking(req.Model, useResponses) {
-		originalPayload = stripGitHubCopilotGeminiThinkingFromSource(originalPayload, from)
-		requestPayload = stripGitHubCopilotGeminiThinkingFromSource(requestPayload, from)
-	}
 	originalTranslated := sdktranslator.TranslateRequest(from, to, req.Model, originalPayload, false)
-	body := sdktranslator.TranslateRequest(from, to, req.Model, requestPayload, false)
+	body := sdktranslator.TranslateRequest(from, to, req.Model, bytes.Clone(req.Payload), false)
 	body = e.normalizeModel(req.Model, body)
 	body = flattenAssistantContent(body)
 
@@ -139,11 +134,9 @@ func (e *GitHubCopilotExecutor) Execute(ctx context.Context, auth *cliproxyauth.
 	if useResponses {
 		thinkingProvider = "codex"
 	}
-	if !shouldBypassGitHubCopilotChatThinking(req.Model, useResponses) {
-		body, err = thinking.ApplyThinking(body, req.Model, from.String(), thinkingProvider, e.Identifier())
-		if err != nil {
-			return resp, err
-		}
+	body, err = thinking.ApplyThinking(body, req.Model, from.String(), thinkingProvider, e.Identifier())
+	if err != nil {
+		return resp, err
 	}
 
 	if useResponses {
@@ -155,9 +148,6 @@ func (e *GitHubCopilotExecutor) Execute(ctx context.Context, auth *cliproxyauth.
 	requestedModel := payloadRequestedModel(opts, req.Model)
 	body = applyPayloadConfigWithRoot(e.cfg, req.Model, to.String(), "", body, originalTranslated, requestedModel)
 	body, _ = sjson.SetBytes(body, "stream", false)
-	if !useResponses {
-		body = stripGitHubCopilotChatUnsupportedFields(req.Model, body)
-	}
 
 	path := githubCopilotChatPath
 	if useResponses {
@@ -262,13 +252,8 @@ func (e *GitHubCopilotExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 	if len(opts.OriginalRequest) > 0 {
 		originalPayload = bytes.Clone(opts.OriginalRequest)
 	}
-	requestPayload := bytes.Clone(req.Payload)
-	if shouldBypassGitHubCopilotChatThinking(req.Model, useResponses) {
-		originalPayload = stripGitHubCopilotGeminiThinkingFromSource(originalPayload, from)
-		requestPayload = stripGitHubCopilotGeminiThinkingFromSource(requestPayload, from)
-	}
 	originalTranslated := sdktranslator.TranslateRequest(from, to, req.Model, originalPayload, false)
-	body := sdktranslator.TranslateRequest(from, to, req.Model, requestPayload, true)
+	body := sdktranslator.TranslateRequest(from, to, req.Model, bytes.Clone(req.Payload), true)
 	body = e.normalizeModel(req.Model, body)
 	body = flattenAssistantContent(body)
 
@@ -279,11 +264,9 @@ func (e *GitHubCopilotExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 	if useResponses {
 		thinkingProvider = "codex"
 	}
-	if !shouldBypassGitHubCopilotChatThinking(req.Model, useResponses) {
-		body, err = thinking.ApplyThinking(body, req.Model, from.String(), thinkingProvider, e.Identifier())
-		if err != nil {
-			return nil, err
-		}
+	body, err = thinking.ApplyThinking(body, req.Model, from.String(), thinkingProvider, e.Identifier())
+	if err != nil {
+		return nil, err
 	}
 
 	if useResponses {
@@ -298,7 +281,6 @@ func (e *GitHubCopilotExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 	// Enable stream options for usage stats in stream
 	if !useResponses {
 		body, _ = sjson.SetBytes(body, "stream_options.include_usage", true)
-		body = stripGitHubCopilotChatUnsupportedFields(req.Model, body)
 	}
 
 	path := githubCopilotChatPath
@@ -953,63 +935,6 @@ func normalizeGitHubCopilotResponsesTools(body []byte) []byte {
 	}
 	body, _ = sjson.SetBytes(body, "tool_choice", "auto")
 	return body
-}
-
-// isGitHubCopilotNonOpenAIModel reports whether the model is a non-OpenAI model
-// (e.g. Gemini, Claude) that does not support reasoning_effort on the
-// /chat/completions endpoint.
-func isGitHubCopilotNonOpenAIModel(model string) bool {
-	base := strings.ToLower(thinking.ParseSuffix(model).ModelName)
-	// Gemini models don't support reasoning_effort on /chat/completions.
-	if strings.HasPrefix(base, "gemini") {
-		return true
-	}
-	return false
-}
-
-// stripReasoningEffort removes the reasoning_effort field from the request body.
-func stripReasoningEffort(body []byte) []byte {
-	if !gjson.GetBytes(body, "reasoning_effort").Exists() {
-		return body
-	}
-	result, _ := sjson.DeleteBytes(body, "reasoning_effort")
-	return result
-}
-
-// stripGitHubCopilotChatUnsupportedFields removes fields that GitHub Copilot's
-// /chat/completions endpoint rejects for Gemini-family models.
-func stripGitHubCopilotChatUnsupportedFields(model string, body []byte) []byte {
-	body, _ = sjson.DeleteBytes(body, "service_tier")
-	if !isGitHubCopilotNonOpenAIModel(model) {
-		return body
-	}
-	body = stripReasoningEffort(body)
-	body, _ = sjson.DeleteBytes(body, "top_k")
-	body, _ = sjson.DeleteBytes(body, "n")
-	return body
-}
-
-func shouldBypassGitHubCopilotChatThinking(model string, useResponses bool) bool {
-	return !useResponses && isGitHubCopilotNonOpenAIModel(model)
-}
-
-func stripGitHubCopilotGeminiThinkingFromSource(body []byte, format sdktranslator.Format) []byte {
-	switch format.String() {
-	case "gemini":
-		return thinking.StripThinkingConfig(body, "gemini")
-	case "gemini-cli", "antigravity":
-		return thinking.StripThinkingConfig(body, format.String())
-	case "openai":
-		return thinking.StripThinkingConfig(body, "openai")
-	case "openai-response":
-		return thinking.StripThinkingConfig(body, "codex")
-	default:
-		body = thinking.StripThinkingConfig(body, "gemini")
-		body = thinking.StripThinkingConfig(body, "gemini-cli")
-		body = thinking.StripThinkingConfig(body, "openai")
-		body = thinking.StripThinkingConfig(body, "codex")
-		return body
-	}
 }
 
 func isGitHubCopilotResponsesBuiltinTool(toolType string) bool {
