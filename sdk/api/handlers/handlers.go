@@ -485,6 +485,7 @@ func (h *BaseAPIHandler) ExecuteWithAuthManager(ctx context.Context, handlerType
 	if errMsg != nil {
 		return nil, nil, errMsg
 	}
+	providers = preferCodexForResponses(providers, handlerType)
 	reqMeta := requestExecutionMetadata(ctx)
 	reqMeta[coreexecutor.RequestedModelMetadataKey] = normalizedModel
 	payload := rawJSON
@@ -531,6 +532,7 @@ func (h *BaseAPIHandler) ExecuteCountWithAuthManager(ctx context.Context, handle
 	if errMsg != nil {
 		return nil, nil, errMsg
 	}
+	providers = preferCodexForResponses(providers, handlerType)
 	reqMeta := requestExecutionMetadata(ctx)
 	reqMeta[coreexecutor.RequestedModelMetadataKey] = normalizedModel
 	payload := rawJSON
@@ -575,6 +577,7 @@ func (h *BaseAPIHandler) ExecuteCountWithAuthManager(ctx context.Context, handle
 // The returned http.Header carries upstream response headers captured before streaming begins.
 func (h *BaseAPIHandler) ExecuteStreamWithAuthManager(ctx context.Context, handlerType, modelName string, rawJSON []byte, alt string) (<-chan []byte, http.Header, <-chan *interfaces.ErrorMessage) {
 	providers, normalizedModel, errMsg := h.getRequestDetails(modelName)
+	providers = preferCodexForResponses(providers, handlerType)
 	if errMsg != nil {
 		errChan := make(chan *interfaces.ErrorMessage, 1)
 		errChan <- errMsg
@@ -821,6 +824,35 @@ func (h *BaseAPIHandler) getRequestDetails(modelName string) (providers []string
 	// The thinking suffix is preserved in the model name itself, so no
 	// metadata-based configuration passing is needed.
 	return providers, resolvedModelName, nil
+}
+
+// preferCodexForResponses reorders providers so that "codex" is tried before
+// "github-copilot" when the incoming request uses the OpenAI Responses API
+// format (v1/responses). The Codex executor natively supports the Responses
+// API while the GitHub Copilot executor may not handle all GPT models
+// correctly through its /responses endpoint.
+func preferCodexForResponses(providers []string, handlerType string) []string {
+	if handlerType != "openai-response" || len(providers) < 2 {
+		return providers
+	}
+	codexIdx := -1
+	copilotIdx := -1
+	for i, p := range providers {
+		switch p {
+		case "codex":
+			codexIdx = i
+		case "github-copilot":
+			copilotIdx = i
+		}
+	}
+	// Only reorder when both are present and codex comes after github-copilot.
+	if codexIdx > 0 && copilotIdx >= 0 && codexIdx > copilotIdx {
+		reordered := make([]string, len(providers))
+		copy(reordered, providers)
+		reordered[copilotIdx], reordered[codexIdx] = reordered[codexIdx], reordered[copilotIdx]
+		return reordered
+	}
+	return providers
 }
 
 func cloneBytes(src []byte) []byte {
