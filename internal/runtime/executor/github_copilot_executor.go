@@ -853,8 +853,15 @@ func normalizeGitHubCopilotResponsesInput(body []byte) []byte {
 }
 
 func stripGitHubCopilotResponsesUnsupportedFields(body []byte) []byte {
-	// GitHub Copilot /responses rejects service_tier, so always remove it.
+	// GitHub Copilot /responses rejects several fields that clients like Amp may send.
 	body, _ = sjson.DeleteBytes(body, "service_tier")
+	body, _ = sjson.DeleteBytes(body, "max_output_tokens")
+	body, _ = sjson.DeleteBytes(body, "max_completion_tokens")
+	body, _ = sjson.DeleteBytes(body, "temperature")
+	body, _ = sjson.DeleteBytes(body, "top_p")
+	body, _ = sjson.DeleteBytes(body, "truncation")
+	body, _ = sjson.DeleteBytes(body, "user")
+	body, _ = sjson.DeleteBytes(body, "context_management")
 	return body
 }
 
