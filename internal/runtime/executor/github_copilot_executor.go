@@ -143,6 +143,12 @@ func (e *GitHubCopilotExecutor) Execute(ctx context.Context, auth *cliproxyauth.
 		body = normalizeGitHubCopilotResponsesInput(body)
 		body = normalizeGitHubCopilotResponsesTools(body)
 	} else {
+		// GitHub Copilot's /chat/completions endpoint does not accept
+		// reasoning_effort for non-OpenAI models (e.g. Gemini). Strip it
+		// to avoid 400 "invalid request body" errors from upstream.
+		if isGitHubCopilotNonOpenAIModel(req.Model) {
+			body = stripReasoningEffort(body)
+		}
 		body = normalizeGitHubCopilotChatTools(body)
 	}
 	requestedModel := payloadRequestedModel(opts, req.Model)
@@ -273,6 +279,12 @@ func (e *GitHubCopilotExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 		body = normalizeGitHubCopilotResponsesInput(body)
 		body = normalizeGitHubCopilotResponsesTools(body)
 	} else {
+		// GitHub Copilot's /chat/completions endpoint does not accept
+		// reasoning_effort for non-OpenAI models (e.g. Gemini). Strip it
+		// to avoid 400 "invalid request body" errors from upstream.
+		if isGitHubCopilotNonOpenAIModel(req.Model) {
+			body = stripReasoningEffort(body)
+		}
 		body = normalizeGitHubCopilotChatTools(body)
 	}
 	requestedModel := payloadRequestedModel(opts, req.Model)
@@ -935,6 +947,27 @@ func normalizeGitHubCopilotResponsesTools(body []byte) []byte {
 	}
 	body, _ = sjson.SetBytes(body, "tool_choice", "auto")
 	return body
+}
+
+// isGitHubCopilotNonOpenAIModel reports whether the model is a non-OpenAI model
+// (e.g. Gemini, Claude) that does not support reasoning_effort on the
+// /chat/completions endpoint.
+func isGitHubCopilotNonOpenAIModel(model string) bool {
+	base := strings.ToLower(thinking.ParseSuffix(model).ModelName)
+	// Gemini models don't support reasoning_effort on /chat/completions.
+	if strings.HasPrefix(base, "gemini") {
+		return true
+	}
+	return false
+}
+
+// stripReasoningEffort removes the reasoning_effort field from the request body.
+func stripReasoningEffort(body []byte) []byte {
+	if !gjson.GetBytes(body, "reasoning_effort").Exists() {
+		return body
+	}
+	result, _ := sjson.DeleteBytes(body, "reasoning_effort")
+	return result
 }
 
 func isGitHubCopilotResponsesBuiltinTool(toolType string) bool {
