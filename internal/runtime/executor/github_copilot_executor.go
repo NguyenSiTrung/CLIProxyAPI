@@ -134,9 +134,11 @@ func (e *GitHubCopilotExecutor) Execute(ctx context.Context, auth *cliproxyauth.
 	if useResponses {
 		thinkingProvider = "codex"
 	}
-	body, err = thinking.ApplyThinking(body, req.Model, from.String(), thinkingProvider, e.Identifier())
-	if err != nil {
-		return resp, err
+	if !shouldBypassGitHubCopilotChatThinking(req.Model, useResponses) {
+		body, err = thinking.ApplyThinking(body, req.Model, from.String(), thinkingProvider, e.Identifier())
+		if err != nil {
+			return resp, err
+		}
 	}
 
 	if useResponses {
@@ -267,9 +269,11 @@ func (e *GitHubCopilotExecutor) ExecuteStream(ctx context.Context, auth *cliprox
 	if useResponses {
 		thinkingProvider = "codex"
 	}
-	body, err = thinking.ApplyThinking(body, req.Model, from.String(), thinkingProvider, e.Identifier())
-	if err != nil {
-		return nil, err
+	if !shouldBypassGitHubCopilotChatThinking(req.Model, useResponses) {
+		body, err = thinking.ApplyThinking(body, req.Model, from.String(), thinkingProvider, e.Identifier())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if useResponses {
@@ -973,6 +977,10 @@ func stripGitHubCopilotChatUnsupportedFields(model string, body []byte) []byte {
 	body, _ = sjson.DeleteBytes(body, "top_k")
 	body, _ = sjson.DeleteBytes(body, "n")
 	return body
+}
+
+func shouldBypassGitHubCopilotChatThinking(model string, useResponses bool) bool {
+	return !useResponses && isGitHubCopilotNonOpenAIModel(model)
 }
 
 func isGitHubCopilotResponsesBuiltinTool(toolType string) bool {

@@ -163,6 +163,31 @@ func TestStripGitHubCopilotChatUnsupportedFields_OpenAIModelNoop(t *testing.T) {
 	}
 }
 
+func TestShouldBypassGitHubCopilotChatThinking(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		model        string
+		useResponses bool
+		want         bool
+	}{
+		{name: "gemini chat bypasses thinking", model: "gemini-3-flash-preview", useResponses: false, want: true},
+		{name: "gemini responses keeps thinking path", model: "gemini-3-flash-preview", useResponses: true, want: false},
+		{name: "openai chat keeps thinking path", model: "gpt-4o", useResponses: false, want: false},
+		{name: "claude chat keeps thinking path", model: "claude-opus-4.6", useResponses: false, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := shouldBypassGitHubCopilotChatThinking(tt.model, tt.useResponses); got != tt.want {
+				t.Fatalf("shouldBypassGitHubCopilotChatThinking(%q, %v) = %v, want %v", tt.model, tt.useResponses, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestNormalizeGitHubCopilotChatTools_KeepFunctionOnly(t *testing.T) {
 	t.Parallel()
 	body := []byte(`{"tools":[{"type":"function","function":{"name":"ok"}},{"type":"code_interpreter"}],"tool_choice":"auto"}`)
