@@ -137,6 +137,7 @@ func (e *ClaudeExecutor) Execute(ctx context.Context, auth *cliproxyauth.Auth, r
 
 	// Disable thinking if tool_choice forces tool use (Anthropic API constraint)
 	body = disableThinkingIfToolChoiceForced(body)
+	body = normalizeClaudeTemperatureForThinking(body)
 
 	// Auto-inject cache_control if missing (optimization for ClawdBot/clients without caching support)
 	if countCacheControls(body) == 0 {
@@ -307,6 +308,7 @@ func (e *ClaudeExecutor) ExecuteStream(ctx context.Context, auth *cliproxyauth.A
 
 	// Disable thinking if tool_choice forces tool use (Anthropic API constraint)
 	body = disableThinkingIfToolChoiceForced(body)
+	body = normalizeClaudeTemperatureForThinking(body)
 
 	// Auto-inject cache_control if missing (optimization for ClawdBot/clients without caching support)
 	if countCacheControls(body) == 0 {
@@ -651,6 +653,25 @@ func disableThinkingIfToolChoiceForced(body []byte) []byte {
 	return body
 }
 
+// normalizeClaudeTemperatureForThinking keeps Anthropic message requests valid when
+// thinking is enabled. Anthropic rejects temperatures other than 1 when
+// thinking.type is enabled/adaptive/auto.
+func normalizeClaudeTemperatureForThinking(body []byte) []byte {
+	if !gjson.GetBytes(body, "temperature").Exists() {
+		return body
+	}
+
+	thinkingType := strings.ToLower(strings.TrimSpace(gjson.GetBytes(body, "thinking.type").String()))
+	switch thinkingType {
+	case "enabled", "adaptive", "auto":
+		if temp := gjson.GetBytes(body, "temperature"); temp.Exists() && temp.Type == gjson.Number && temp.Float() == 1 {
+			return body
+		}
+		body, _ = sjson.SetBytes(body, "temperature", 1)
+	}
+	return body
+}
+
 type compositeReadCloser struct {
 	io.Reader
 	closers []func() error
@@ -824,6 +845,14 @@ func applyClaudeHeaders(r *http.Request, auth *cliproxyauth.Auth, apiKey string,
 	hasClaude1MHeader := false
 	if ginHeaders != nil {
 		if _, ok := ginHeaders[textproto.CanonicalMIMEHeaderKey("X-CPA-CLAUDE-1M")]; ok {
+			hasClaude1MHeader = true
+		}
+	}
+	// Also check auth attributes — GitLab Duo sets gitlab_duo_force_context_1m
+	// when routing through the Anthropic gateway, but the gin headers won't have
+	// X-CPA-CLAUDE-1M because the request is internally constructed.
+	if !hasClaude1MHeader && auth != nil && auth.Attributes != nil {
+		if auth.Attributes["gitlab_duo_force_context_1m"] == "true" {
 			hasClaude1MHeader = true
 		}
 	}
