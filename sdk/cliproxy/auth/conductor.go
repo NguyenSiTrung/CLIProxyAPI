@@ -2473,7 +2473,7 @@ func (m *Manager) pickNextLegacy(ctx context.Context, provider, model string, op
 	}
 	candidates := make([]*Auth, 0, len(m.auths))
 	accessKey := accessKeyFromOptions(opts)
-	allowedAuths, restricted := m.accessKeyAuthAllowlist(accessKey, provider)
+	_, _ = m.accessKeyAuthAllowlist(accessKey, provider) // Filter not implemented yet
 	modelKey := strings.TrimSpace(model)
 	// Always use base model name (without thinking suffix) for auth matching.
 	if modelKey != "" {
@@ -2592,13 +2592,7 @@ func (m *Manager) pickNextMixedLegacy(ctx context.Context, providers []string, m
 	}
 
 	m.mu.RLock()
-	accessKey := accessKeyFromOptions(opts)
-	var allowedByProvider map[string]map[string]struct{}
-	var restrictedByProvider map[string]bool
-	if accessKey != "" {
-		allowedByProvider = make(map[string]map[string]struct{})
-		restrictedByProvider = make(map[string]bool)
-	}
+	_ = accessKeyFromOptions(opts) // Note: accessKey-based filtering not implemented in this legacy path
 	candidates := make([]*Auth, 0, len(m.auths))
 	modelKey := strings.TrimSpace(model)
 	// Always use base model name (without thinking suffix) for auth matching.
