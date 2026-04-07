@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	codeBuddyChatPath = "/v2/chat/completions"
+	codeBuddyChatPath = "/v1/chat/completions"
 	codeBuddyAuthType = "codebuddy"
 )
 
