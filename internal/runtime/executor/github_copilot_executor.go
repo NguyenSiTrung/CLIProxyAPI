@@ -500,7 +500,7 @@ func (e *GitHubCopilotExecutor) nativeGateway(
 	if err != nil {
 		return nil, nil, req, false, err
 	}
-	nativeAuth := buildCopilotAnthropicGatewayAuth(auth, apiToken, baseURL, req.Payload)
+	nativeAuth := buildCopilotAnthropicGatewayAuth(e.cfg, auth, apiToken, baseURL, req.Payload)
 	if nativeAuth == nil {
 		return nil, nil, req, false, nil
 	}
@@ -512,7 +512,7 @@ func githubCopilotUsesAnthropicGateway(model string) bool {
 	return strings.HasPrefix(baseModel, "claude-")
 }
 
-func buildCopilotAnthropicGatewayAuth(auth *cliproxyauth.Auth, apiToken, baseURL string, body []byte) *cliproxyauth.Auth {
+func buildCopilotAnthropicGatewayAuth(cfg *config.Config, auth *cliproxyauth.Auth, apiToken, baseURL string, body []byte) *cliproxyauth.Auth {
 	apiToken = strings.TrimSpace(apiToken)
 	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
 	if apiToken == "" || baseURL == "" {
@@ -538,11 +538,13 @@ func buildCopilotAnthropicGatewayAuth(auth *cliproxyauth.Auth, apiToken, baseURL
 	nativeAuth.Attributes["header:Copilot-Integration-Id"] = copilotIntegrationID
 	nativeAuth.Attributes["header:X-Github-Api-Version"] = copilotGitHubAPIVer
 	nativeAuth.Attributes["header:X-Request-Id"] = uuid.NewString()
-	if isAgentInitiated(body) {
-		nativeAuth.Attributes["header:X-Initiator"] = "agent"
-	} else {
-		nativeAuth.Attributes["header:X-Initiator"] = "user"
+	initiator := "user"
+	if cfg != nil && cfg.ForceGitHubCopilotAgentInitiator {
+		initiator = "agent"
+	} else if isAgentInitiated(body) {
+		initiator = "agent"
 	}
+	nativeAuth.Attributes["header:X-Initiator"] = initiator
 	if detectVisionContent(body) {
 		nativeAuth.Attributes["header:Copilot-Vision-Request"] = "true"
 	}

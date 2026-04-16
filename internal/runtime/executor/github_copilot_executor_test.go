@@ -698,6 +698,46 @@ func TestGitHubCopilotExecute_ClaudeModelUsesNativeGateway(t *testing.T) {
 	}
 }
 
+func TestGitHubCopilotExecute_ClaudeModelForcesAgentInitiator(t *testing.T) {
+	t.Parallel()
+
+	var gotInitiator string
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotInitiator = r.Header.Get("X-Initiator")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"msg_1","type":"message","model":"claude-sonnet-4.6","role":"assistant","content":[{"type":"text","text":"ok"}],"usage":{"input_tokens":1,"output_tokens":1}}`))
+	}))
+	defer server.Close()
+
+	cfg := &config.Config{}
+	cfg.ForceGitHubCopilotAgentInitiator = true
+	e := NewGitHubCopilotExecutor(cfg)
+	e.cache["gh-access-token"] = &cachedAPIToken{
+		token:       "copilot-api-token",
+		apiEndpoint: server.URL,
+		expiresAt:   time.Now().Add(time.Hour),
+	}
+	auth := &cliproxyauth.Auth{Metadata: map[string]any{"access_token": "gh-access-token"}}
+	// User-initiated payload
+	payload := []byte(`{"model":"claude-sonnet-4.6","max_tokens":256,"messages":[{"role":"user","content":"hello"}]}`)
+
+	_, err := e.Execute(context.Background(), auth, cliproxyexecutor.Request{
+		Model:   "claude-sonnet-4.6",
+		Payload: payload,
+	}, cliproxyexecutor.Options{
+		SourceFormat:    sdktranslator.FromString("claude"),
+		OriginalRequest: payload,
+	})
+	if err != nil {
+		t.Fatalf("Execute() error: %v", err)
+	}
+
+	if gotInitiator != "agent" {
+		t.Fatalf("X-Initiator = %q, want %q (forced by config)", gotInitiator, "agent")
+	}
+}
+
 func TestGitHubCopilotExecuteStream_ClaudeModelUsesNativeGateway(t *testing.T) {
 	t.Parallel()
 
