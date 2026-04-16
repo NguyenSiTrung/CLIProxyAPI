@@ -68,9 +68,9 @@ func TestHotReloadLimitChange(t *testing.T) {
 
 	// Check limit - should be BLOCKED now (100 >= 1)
 	allowed, currentCost, costLimit, exceeded := m.CheckLimit(apiKey)
-	t.Logf("After limit change: allowed=%v, currentCost=%f, costLimit=%f, exceeded=%v", 
+	t.Logf("After limit change: allowed=%v, currentCost=%f, costLimit=%f, exceeded=%v",
 		allowed, currentCost, costLimit, exceeded)
-	
+
 	if allowed {
 		t.Error("Should be BLOCKED after limit change (100 requests >= limit 1)")
 	}

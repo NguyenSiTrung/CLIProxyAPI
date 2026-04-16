@@ -20,11 +20,11 @@ import (
 )
 
 const (
-	BaseURL          = "https://copilot.tencent.com"
-	GlobalBaseURL    = "https://www.codebuddy.ai"
-	DefaultDomain    = "www.codebuddy.cn"
-	GlobalDomain     = "www.codebuddy.ai"
-	UserAgent        = "CLI/2.63.2 CodeBuddy/2.63.2"
+	BaseURL       = "https://copilot.tencent.com"
+	GlobalBaseURL = "https://www.codebuddy.ai"
+	DefaultDomain = "www.codebuddy.cn"
+	GlobalDomain  = "www.codebuddy.ai"
+	UserAgent     = "CLI/2.63.2 CodeBuddy/2.63.2"
 
 	codeBuddyStatePath   = "/v2/plugin/auth/state"
 	codeBuddyTokenPath   = "/v2/plugin/auth/token"

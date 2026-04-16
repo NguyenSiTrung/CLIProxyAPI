@@ -173,14 +173,14 @@ func parseResetDuration(value string) (time.Duration, bool) {
 
 // AutoResetScheduler manages background auto-reset operations.
 type AutoResetScheduler struct {
-	mu           sync.Mutex
-	state        *AutoResetState
-	ticker       *time.Ticker
-	stopCh       chan struct{}
-	running      bool
-	checkFn      func()
-	checkPeriod  time.Duration
-	stateFile    string
+	mu          sync.Mutex
+	state       *AutoResetState
+	ticker      *time.Ticker
+	stopCh      chan struct{}
+	running     bool
+	checkFn     func()
+	checkPeriod time.Duration
+	stateFile   string
 }
 
 // NewAutoResetScheduler creates a new AutoResetScheduler.

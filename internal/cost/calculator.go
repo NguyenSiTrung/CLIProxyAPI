@@ -21,19 +21,19 @@ type ModelPricing struct {
 // Prices are per 1M tokens in USD.
 var DefaultModelPricing = map[string]ModelPricing{
 	// OpenAI Models
-	"gpt-4o":             {Input: 2.50, Output: 10.00, CachedInput: 1.25},
-	"gpt-4o-2024-08-06":  {Input: 2.50, Output: 10.00, CachedInput: 1.25},
-	"gpt-4o-mini":        {Input: 0.15, Output: 0.60, CachedInput: 0.075},
-	"gpt-4-turbo":        {Input: 10.00, Output: 30.00},
-	"gpt-4":              {Input: 30.00, Output: 60.00},
-	"gpt-4.1":            {Input: 2.00, Output: 8.00, CachedInput: 0.50},
-	"gpt-4.1-mini":       {Input: 0.40, Output: 1.60, CachedInput: 0.10},
-	"gpt-3.5-turbo":      {Input: 0.50, Output: 1.50},
-	"o1":                 {Input: 15.00, Output: 60.00},
-	"o1-preview":         {Input: 15.00, Output: 60.00},
-	"o1-mini":            {Input: 1.10, Output: 4.40},
-	"o3":                 {Input: 10.00, Output: 40.00, CachedInput: 2.50},
-	"o4-mini":            {Input: 1.10, Output: 4.40, CachedInput: 0.275},
+	"gpt-4o":            {Input: 2.50, Output: 10.00, CachedInput: 1.25},
+	"gpt-4o-2024-08-06": {Input: 2.50, Output: 10.00, CachedInput: 1.25},
+	"gpt-4o-mini":       {Input: 0.15, Output: 0.60, CachedInput: 0.075},
+	"gpt-4-turbo":       {Input: 10.00, Output: 30.00},
+	"gpt-4":             {Input: 30.00, Output: 60.00},
+	"gpt-4.1":           {Input: 2.00, Output: 8.00, CachedInput: 0.50},
+	"gpt-4.1-mini":      {Input: 0.40, Output: 1.60, CachedInput: 0.10},
+	"gpt-3.5-turbo":     {Input: 0.50, Output: 1.50},
+	"o1":                {Input: 15.00, Output: 60.00},
+	"o1-preview":        {Input: 15.00, Output: 60.00},
+	"o1-mini":           {Input: 1.10, Output: 4.40},
+	"o3":                {Input: 10.00, Output: 40.00, CachedInput: 2.50},
+	"o4-mini":           {Input: 1.10, Output: 4.40, CachedInput: 0.275},
 
 	// Anthropic Claude Models
 	"claude-3-5-sonnet-20241022": {Input: 3.00, Output: 15.00, CachedInput: 0.30},
