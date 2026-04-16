@@ -1,8 +1,8 @@
 {
-  "last_refresh": "2026-01-29T14:28:00Z",
+  "last_refresh": "2026-04-17T00:23:00Z",
   "changes": [
-    "Added missing dependencies to tech-stack.md",
-    "Updated workflow.md to reflect Beads usage",
-    "Added refresh markers to core files"
+    "Updated refresh markers in product.md and tech-stack.md",
+    "Checked archived tracks for learnings (none found)",
+    "No patterns.md consolidation needed (no learnings present)"
   ]
 }
