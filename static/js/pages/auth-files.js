@@ -72,7 +72,6 @@ export async function loadAuthFiles() {
       'gemini': '✨', 'gemini-cli': '✨',
       'codex': '🧠', 'openai': '🧠',
       'antigravity': '🚀',
-      'qwen': '💬',
       'iflow': '🌊',
       'codebuddy': '🐼'
     };
@@ -559,7 +558,6 @@ export async function startOAuth(provider) {
     'gemini-cli': '/gemini-cli-auth-url',
     'codex': '/codex-auth-url',
     'antigravity': '/antigravity-auth-url',
-    'qwen': '/qwen-auth-url',
     'iflow': '/iflow-auth-url',
     'github': '/github-auth-url',
     'kiro': '/kiro-auth-url',
@@ -650,7 +648,6 @@ export async function submitManualCallback() {
     else if (pathLower.includes('google') || pathLower.includes('gemini')) provider = 'gemini';
     else if (pathLower.includes('iflow')) provider = 'iflow';
     else if (pathLower.includes('antigravity')) provider = 'antigravity';
-    else if (pathLower.includes('qwen')) provider = 'qwen';
 
     // If not detected by path, try by port number
     if (!provider && port) {

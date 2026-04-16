@@ -78,7 +78,7 @@ The feature must support quota checking for:
 - Different styling for error states
 
 #### FR5.2: Unsupported Providers
-- Show "Quota N/A" badge for non-supported providers (Anthropic, Qwen, iFlow)
+- Show "Quota N/A" badge for non-supported providers (Anthropic, iFlow)
 - Option to filter/hide unsupported providers from Quota page
 
 #### FR5.3: Retry Logic

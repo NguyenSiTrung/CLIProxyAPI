@@ -30,7 +30,7 @@ A proxy server that:
 ## Core Features
 
 ### Authentication & Access
-- OAuth login flows for Gemini, Claude, Codex, Qwen, and iFlow
+- OAuth login flows for Gemini, Claude, Codex, and iFlow
 - API key authentication for direct access
 - Management API with localhost-only security option
 
@@ -38,9 +38,9 @@ A proxy server that:
 - Gemini CLI / AI Studio / Vertex AI
 - Claude Code / Anthropic API
 - OpenAI Codex
-- Qwen Code
 - iFlow
 - OpenAI-compatible upstream providers (OpenRouter, etc.)
+- Kiro (provides access to Qwen models via Kiro OAuth)
 
 ### Request Handling
 - Streaming and non-streaming responses

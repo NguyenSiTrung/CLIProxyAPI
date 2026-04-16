@@ -145,10 +145,6 @@
   border-color: rgba(167, 139, 250, 0.3);
 }
 
-.auth-provider-card.qwen .auth-provider-icon {
-  background: rgba(96, 165, 250, 0.15);
-  border-color: rgba(96, 165, 250, 0.3);
-}
 
 .auth-provider-card.iflow .auth-provider-icon {
   background: rgba(34, 211, 160, 0.15);
