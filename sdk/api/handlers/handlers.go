@@ -196,10 +196,10 @@ func requestExecutionMetadata(ctx context.Context) map[string]any {
 			key = strings.TrimSpace(ginCtx.GetHeader("Idempotency-Key"))
 		}
 	}
-	if key == "" {
-		return make(map[string]any)
+	meta := make(map[string]any)
+	if key != "" {
+		meta[idempotencyKeyMetadataKey] = key
 	}
-	meta := map[string]any{idempotencyKeyMetadataKey: key}
 	if ginCtx != nil {
 		if apiKey, exists := ginCtx.Get("apiKey"); exists {
 			if apiKeyStr, ok := apiKey.(string); ok {
