@@ -75,7 +75,7 @@ func (p *usageQueuePlugin) HandleUsage(ctx context.Context, record coreusage.Rec
 		Timestamp: timestamp,
 		LatencyMs: record.Latency.Milliseconds(),
 		Source:    record.Source,
-		AuthIndex: record.AuthIndex,
+		AuthIndex: internalusage.AuthIndex(record.AuthIndex),
 		Tokens:    tokens,
 		Failed:    failed,
 	}
