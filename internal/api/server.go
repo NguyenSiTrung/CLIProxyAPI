@@ -7,8 +7,10 @@ package api
 import (
 	"context"
 	"crypto/subtle"
+	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -31,6 +33,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/logging"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/managementasset"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/ratelimit"
+	"github.com/router-for-me/CLIProxyAPI/v6/internal/redisqueue"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/usage"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/util"
 	sdkaccess "github.com/router-for-me/CLIProxyAPI/v6/sdk/access"
@@ -41,6 +44,7 @@ import (
 	sdkAuth "github.com/router-for-me/CLIProxyAPI/v6/sdk/auth"
 	"github.com/router-for-me/CLIProxyAPI/v6/sdk/cliproxy/auth"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/net/http2"
 	"gopkg.in/yaml.v3"
 )
 
@@ -129,6 +133,12 @@ type Server struct {
 
 	// server is the underlying HTTP server.
 	server *http.Server
+
+	// muxBaseListener is the shared TCP listener used to serve both HTTP and Redis protocol traffic.
+	muxBaseListener net.Listener
+
+	// muxHTTPListener receives HTTP connections selected by the multiplexer.
+	muxHTTPListener *muxListener
 
 	// handlers contains the API handlers for processing requests.
 	handlers *handlers.BaseAPIHandler
@@ -364,6 +374,7 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 	// or when a local management password is provided (e.g. TUI mode).
 	hasManagementSecret := cfg.RemoteManagement.SecretKey != "" || envManagementSecret || s.localPassword != ""
 	s.managementRoutesEnabled.Store(hasManagementSecret)
+	redisqueue.SetEnabled(hasManagementSecret)
 	if hasManagementSecret {
 		s.registerManagementRoutes()
 	}
@@ -389,9 +400,16 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 // setupRoutes configures the API routes for the server.
 // It defines the endpoints and associates them with their respective handlers.
 func (s *Server) setupRoutes() {
-	s.engine.GET("/healthz", func(c *gin.Context) {
+	healthzHandler := func(c *gin.Context) {
+		if c.Request.Method == http.MethodHead {
+			c.Status(http.StatusOK)
+			return
+		}
+
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
-	})
+	}
+	s.engine.GET("/healthz", healthzHandler)
+	s.engine.HEAD("/healthz", healthzHandler)
 
 	s.engine.GET("/management.html", s.serveManagementControlPanel)
 	s.engine.GET("/css/*filepath", s.serveManagementStaticAsset)
@@ -411,11 +429,22 @@ func (s *Server) setupRoutes() {
 		v1.GET("/models", s.unifiedModelsHandler(openaiHandlers, claudeCodeHandlers))
 		v1.POST("/chat/completions", openaiHandlers.ChatCompletions)
 		v1.POST("/completions", openaiHandlers.Completions)
+		v1.POST("/images/generations", openaiHandlers.ImagesGenerations)
+		v1.POST("/images/edits", openaiHandlers.ImagesEdits)
 		v1.POST("/messages", claudeCodeHandlers.ClaudeMessages)
 		v1.POST("/messages/count_tokens", claudeCodeHandlers.ClaudeCountTokens)
 		v1.GET("/responses", openaiResponsesHandlers.ResponsesWebsocket)
 		v1.POST("/responses", openaiResponsesHandlers.Responses)
 		v1.POST("/responses/compact", openaiResponsesHandlers.Compact)
+	}
+
+	// Codex CLI direct route aliases (chatgpt_base_url compatible)
+	codexDirect := s.engine.Group("/backend-api/codex")
+	codexDirect.Use(AuthMiddleware(s.accessManager))
+	{
+		codexDirect.GET("/responses", openaiResponsesHandlers.ResponsesWebsocket)
+		codexDirect.POST("/responses", openaiResponsesHandlers.Responses)
+		codexDirect.POST("/responses/compact", openaiResponsesHandlers.Compact)
 	}
 
 	// Gemini compatible API routes
@@ -1012,26 +1041,98 @@ func (s *Server) Start() error {
 		return fmt.Errorf("failed to start HTTP server: server not initialized")
 	}
 
+	addr := s.server.Addr
+	listener, errListen := net.Listen("tcp", addr)
+	if errListen != nil {
+		return fmt.Errorf("failed to start HTTP server: %v", errListen)
+	}
+
 	useTLS := s.cfg != nil && s.cfg.TLS.Enable
 	if useTLS {
-		cert := strings.TrimSpace(s.cfg.TLS.Cert)
-		key := strings.TrimSpace(s.cfg.TLS.Key)
-		if cert == "" || key == "" {
+		certPath := strings.TrimSpace(s.cfg.TLS.Cert)
+		keyPath := strings.TrimSpace(s.cfg.TLS.Key)
+		if certPath == "" || keyPath == "" {
+			if errClose := listener.Close(); errClose != nil {
+				log.Errorf("failed to close listener after TLS validation failure: %v", errClose)
+			}
 			return fmt.Errorf("failed to start HTTPS server: tls.cert or tls.key is empty")
 		}
-		log.Debugf("Starting API server on %s with TLS", s.server.Addr)
-		if errServeTLS := s.server.ListenAndServeTLS(cert, key); errServeTLS != nil && !errors.Is(errServeTLS, http.ErrServerClosed) {
-			return fmt.Errorf("failed to start HTTPS server: %v", errServeTLS)
+		certPair, errLoad := tls.LoadX509KeyPair(certPath, keyPath)
+		if errLoad != nil {
+			if errClose := listener.Close(); errClose != nil {
+				log.Errorf("failed to close listener after TLS key pair load failure: %v", errClose)
+			}
+			return fmt.Errorf("failed to start HTTPS server: %v", errLoad)
+		}
+
+		tlsConfig := &tls.Config{
+			Certificates: []tls.Certificate{certPair},
+			NextProtos:   []string{"h2", "http/1.1"},
+		}
+		s.server.TLSConfig = tlsConfig
+		if errHTTP2 := http2.ConfigureServer(s.server, &http2.Server{}); errHTTP2 != nil {
+			log.Warnf("failed to configure HTTP/2: %v", errHTTP2)
+		}
+		listener = tls.NewListener(listener, tlsConfig)
+		log.Debugf("Starting API server on %s with TLS", addr)
+	} else {
+		log.Debugf("Starting API server on %s", addr)
+	}
+
+	httpListener := newMuxListener(listener.Addr(), 1024)
+	s.muxBaseListener = listener
+	s.muxHTTPListener = httpListener
+
+	httpErrCh := make(chan error, 1)
+	acceptErrCh := make(chan error, 1)
+
+	go func() {
+		httpErrCh <- s.server.Serve(httpListener)
+	}()
+	go func() {
+		acceptErrCh <- s.acceptMuxConnections(listener, httpListener)
+	}()
+
+	select {
+	case errServe := <-httpErrCh:
+		if s.muxBaseListener != nil {
+			if errClose := s.muxBaseListener.Close(); errClose != nil && !errors.Is(errClose, net.ErrClosed) {
+				log.Debugf("failed to close shared listener after HTTP serve exit: %v", errClose)
+			}
+		}
+		if s.muxHTTPListener != nil {
+			_ = s.muxHTTPListener.Close()
+		}
+		errAccept := <-acceptErrCh
+		errServe = normalizeHTTPServeError(errServe)
+		errAccept = normalizeListenerError(errAccept)
+		if errServe != nil {
+			return fmt.Errorf("failed to start HTTP server: %v", errServe)
+		}
+		if errAccept != nil {
+			return fmt.Errorf("failed to start HTTP server: %v", errAccept)
+		}
+		return nil
+	case errAccept := <-acceptErrCh:
+		if s.muxHTTPListener != nil {
+			_ = s.muxHTTPListener.Close()
+		}
+		if s.muxBaseListener != nil {
+			if errClose := s.muxBaseListener.Close(); errClose != nil && !errors.Is(errClose, net.ErrClosed) {
+				log.Debugf("failed to close shared listener after accept loop exit: %v", errClose)
+			}
+		}
+		errServe := <-httpErrCh
+		errServe = normalizeHTTPServeError(errServe)
+		errAccept = normalizeListenerError(errAccept)
+		if errAccept != nil {
+			return fmt.Errorf("failed to start HTTP server: %v", errAccept)
+		}
+		if errServe != nil {
+			return fmt.Errorf("failed to start HTTP server: %v", errServe)
 		}
 		return nil
 	}
-
-	log.Debugf("Starting API server on %s", s.server.Addr)
-	if errServe := s.server.ListenAndServe(); errServe != nil && !errors.Is(errServe, http.ErrServerClosed) {
-		return fmt.Errorf("failed to start HTTP server: %v", errServe)
-	}
-
-	return nil
 }
 
 // Stop gracefully shuts down the API server without interrupting any
@@ -1060,6 +1161,14 @@ func (s *Server) Stop(ctx context.Context) error {
 	// Stop the rate limit manager if running
 	if s.rateLimitManager != nil {
 		s.rateLimitManager.Stop()
+	}
+	if s.muxHTTPListener != nil {
+		_ = s.muxHTTPListener.Close()
+	}
+	if s.muxBaseListener != nil {
+		if errClose := s.muxBaseListener.Close(); errClose != nil && !errors.Is(errClose, net.ErrClosed) {
+			log.Debugf("failed to close shared listener: %v", errClose)
+		}
 	}
 
 	// Shutdown the HTTP server.
@@ -1188,6 +1297,7 @@ func (s *Server) UpdateClients(cfg *config.Config) {
 			s.managementRoutesEnabled.Store(!newSecretEmpty)
 		}
 	}
+	redisqueue.SetEnabled(s.managementRoutesEnabled.Load())
 
 	s.applyAccessConfig(oldCfg, cfg)
 	s.cfg = cfg
@@ -1235,6 +1345,9 @@ func (s *Server) UpdateClients(cfg *config.Config) {
 	openAICompatCount := 0
 	for i := range cfg.OpenAICompatibility {
 		entry := cfg.OpenAICompatibility[i]
+		if entry.Disabled {
+			continue
+		}
 		openAICompatCount += len(entry.APIKeyEntries)
 	}
 

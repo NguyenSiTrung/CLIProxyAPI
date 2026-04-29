@@ -216,7 +216,7 @@ disable-cooling: false
 quota-exceeded:
   switch-project: true # Whether to automatically switch to another project when a quota is exceeded
   switch-preview-model: true # Whether to automatically switch to a preview model when a quota is exceeded
-  antigravity-credits: true # Whether to retry Antigravity quota_exhausted 429s once with enabledCreditTypes=["GOOGLE_ONE_AI"]
+  antigravity-credits: true # Whether to use credits as last-resort fallback when all free-tier auths are exhausted for Claude models
 
 # Routing strategy for selecting credentials when multiple match.
 routing:
@@ -385,6 +385,7 @@ codex-instructions-enabled: false
 # OpenAI compatibility providers
 # openai-compatibility:
 #   - name: "openrouter" # The name of the provider; it will be used in the user agent and other places.
+#     disabled: false # optional: set to true to disable this provider without removing it
 #     prefix: "test" # optional: require calls like "test/kimi-k2" to target this provider's credentials
 #     base-url: "https://openrouter.ai/api/v1" # The base URL of the provider.
 #     headers:

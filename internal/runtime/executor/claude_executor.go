@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/textproto"
 	"strings"
 	"time"
 
@@ -927,7 +926,7 @@ func applyClaudeHeaders(r *http.Request, auth *cliproxyauth.Auth, apiKey string,
 	}
 
 	// Merge extra betas from request body and request flags.
-	if len(extraBetas) > 0 || hasClaude1MHeader {
+	if len(extraBetas) > 0 {
 		existingSet := make(map[string]bool)
 		for _, b := range strings.Split(baseBetas, ",") {
 			betaName := strings.TrimSpace(b)
@@ -941,9 +940,6 @@ func applyClaudeHeaders(r *http.Request, auth *cliproxyauth.Auth, apiKey string,
 				baseBetas += "," + beta
 				existingSet[beta] = true
 			}
-		}
-		if hasClaude1MHeader && !existingSet["context-1m-2025-08-07"] {
-			baseBetas += ",context-1m-2025-08-07"
 		}
 	}
 	r.Header.Set("Anthropic-Beta", baseBetas)
