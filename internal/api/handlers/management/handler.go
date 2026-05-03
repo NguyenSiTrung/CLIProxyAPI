@@ -41,8 +41,8 @@ type Handler struct {
 	attemptsMu          sync.Mutex
 	failedAttempts      map[string]*attemptInfo // keyed by client IP
 	authManager         *coreauth.Manager
-	usageStats          *usage.RequestStatistics
 	tokenStore          coreauth.Store
+	usageStats          *usage.RequestStatistics
 	localPassword       string
 	allowRemoteOverride bool
 	envSecret           string
@@ -127,9 +127,6 @@ func (h *Handler) SetAuthManager(manager *coreauth.Manager) {
 	h.mu.Unlock()
 }
 
-// SetUsageStatistics allows replacing the usage statistics reference.
-func (h *Handler) SetUsageStatistics(stats *usage.RequestStatistics) { h.usageStats = stats }
-
 // SetLocalPassword configures the runtime-local password accepted for localhost requests.
 func (h *Handler) SetLocalPassword(password string) { h.localPassword = password }
 
@@ -145,6 +142,9 @@ func (h *Handler) SetLogDirectory(dir string) {
 	}
 	h.logDir = dir
 }
+
+// SetUsageStatistics updates the usage statistics reference used by management endpoints.
+func (h *Handler) SetUsageStatistics(stats *usage.RequestStatistics) { h.usageStats = stats }
 
 // SetPostAuthHook registers a hook to be called after auth record creation but before persistence.
 func (h *Handler) SetPostAuthHook(hook coreauth.PostAuthHook) {
