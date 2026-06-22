@@ -14,6 +14,10 @@ services:
     #   - .env
     environment:
       DEPLOY: ${DEPLOY:-}
+      # Use mounted path for persistent data (cost/request accumulators, auto-reset state)
+      WRITABLE_PATH: /data
+      # Telegram bot configuration (optional)
+      # TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
     ports:
       - "8317:8317"
       - "8085:8085"
@@ -26,4 +30,7 @@ services:
       - ${CLI_PROXY_AUTH_PATH:-./auths}:/root/.cli-proxy-api
       - ${CLI_PROXY_LOG_PATH:-./logs}:/CLIProxyAPI/logs
       - ${CLI_PROXY_PLUGIN_PATH:-./plugins}:/CLIProxyAPI/plugins
+      - ./static:/CLIProxyAPI/static
+      - /root/.dataCLIProxyAPI:/data
+      - /root/.backups:/backups
     restart: unless-stopped
