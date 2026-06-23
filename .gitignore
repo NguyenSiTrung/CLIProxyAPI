@@ -51,6 +51,9 @@ AGENTS.override.md
 .opencode/*
 .idea/*
 .beads/*
+.antigravitycli/*
+.factory/*
+.gitattributes
 .bmad/*
 _bmad/*
 _bmad-output/*
