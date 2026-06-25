@@ -71,8 +71,8 @@ func TestHostApplyConfig_DisabledPluginSkipsCapability(t *testing.T) {
 	if loader.openCalls != 0 {
 		t.Fatalf("Open calls = %d, want 0", loader.openCalls)
 	}
-	if len(h.Snapshot().records) != 0 {
-		t.Fatalf("Snapshot records = %d, want 0", len(h.Snapshot().records))
+	if len(h.activeRecords()) != 0 {
+		t.Fatalf("Snapshot records = %d, want 0", len(h.activeRecords()))
 	}
 }
 
@@ -95,8 +95,8 @@ func TestHostApplyConfig_DefaultDisabledPluginSkipsLoad(t *testing.T) {
 	if plugin.registerCalls != 0 || loader.openCalls != 0 {
 		t.Fatalf("calls = register %d open %d, want 0", plugin.registerCalls, loader.openCalls)
 	}
-	if len(h.Snapshot().records) != 0 {
-		t.Fatalf("Snapshot records = %d, want 0", len(h.Snapshot().records))
+	if len(h.activeRecords()) != 0 {
+		t.Fatalf("Snapshot records = %d, want 0", len(h.activeRecords()))
 	}
 }
 
@@ -123,6 +123,9 @@ func TestPluginLoadedTracksLoadedPluginAfterDisabled(t *testing.T) {
 	if !h.PluginLoaded("alpha") {
 		t.Fatal("PluginLoaded(alpha) = false, want true after load")
 	}
+	if !h.PluginRegistered("alpha") {
+		t.Fatal("PluginRegistered(alpha) = false, want true after load")
+	}
 	if len(h.RegisteredPlugins()) != 1 {
 		t.Fatalf("RegisteredPlugins() len = %d, want 1", len(h.RegisteredPlugins()))
 	}
@@ -139,6 +142,9 @@ func TestPluginLoadedTracksLoadedPluginAfterDisabled(t *testing.T) {
 
 	if len(h.RegisteredPlugins()) != 0 {
 		t.Fatalf("RegisteredPlugins() len = %d, want 0 after disable", len(h.RegisteredPlugins()))
+	}
+	if h.PluginRegistered("alpha") {
+		t.Fatal("PluginRegistered(alpha) = true, want false after disable")
 	}
 	if !h.PluginLoaded("alpha") {
 		t.Fatal("PluginLoaded(alpha) = false, want true while library remains loaded")
@@ -280,8 +286,8 @@ func TestHostApplyConfigRegistersInterceptorOnlyPlugin(t *testing.T) {
 		},
 	})
 
-	if len(h.Snapshot().records) != 1 {
-		t.Fatalf("Snapshot records = %d, want 1", len(h.Snapshot().records))
+	if len(h.activeRecords()) != 1 {
+		t.Fatalf("Snapshot records = %d, want 1", len(h.activeRecords()))
 	}
 }
 
@@ -323,11 +329,11 @@ func TestHostApplyConfigDispatchesInterceptorRPCMethods(t *testing.T) {
 		},
 	})
 
-	if len(h.Snapshot().records) != 1 {
-		t.Fatalf("Snapshot records = %d, want 1", len(h.Snapshot().records))
+	if len(h.activeRecords()) != 1 {
+		t.Fatalf("Snapshot records = %d, want 1", len(h.activeRecords()))
 	}
 
-	caps := h.Snapshot().records[0].plugin.Capabilities
+	caps := h.activeRecords()[0].plugin.Capabilities
 	reqResp, errReq := caps.RequestInterceptor.InterceptRequestBeforeAuth(context.Background(), pluginapi.RequestInterceptRequest{Body: []byte("request")})
 	if errReq != nil {
 		t.Fatalf("InterceptRequestBeforeAuth() error = %v", errReq)
@@ -542,8 +548,8 @@ func TestHostApplyConfig_ReconfigureCalledOnReload(t *testing.T) {
 	if loader.openCalls != 1 {
 		t.Fatalf("Open calls = %d, want 1", loader.openCalls)
 	}
-	if len(h.Snapshot().records) != 1 {
-		t.Fatalf("Snapshot records = %d, want 1", len(h.Snapshot().records))
+	if len(h.activeRecords()) != 1 {
+		t.Fatalf("Snapshot records = %d, want 1", len(h.activeRecords()))
 	}
 }
 
@@ -611,8 +617,8 @@ func TestHostApplyConfig_InvalidMetadataOrNoCapabilitiesSkipped(t *testing.T) {
 		},
 	})
 
-	if len(h.Snapshot().records) != 0 {
-		t.Fatalf("Snapshot records = %d, want 0", len(h.Snapshot().records))
+	if len(h.activeRecords()) != 0 {
+		t.Fatalf("Snapshot records = %d, want 0", len(h.activeRecords()))
 	}
 }
 
@@ -644,8 +650,8 @@ func TestHostApplyConfig_PanicFusesPluginForProcessLifetime(t *testing.T) {
 	if plugin.reconfigureCalls != 1 {
 		t.Fatalf("Reconfigure calls = %d, want 1", plugin.reconfigureCalls)
 	}
-	if len(h.Snapshot().records) != 0 {
-		t.Fatalf("Snapshot records = %d, want 0 after fuse", len(h.Snapshot().records))
+	if len(h.activeRecords()) != 0 {
+		t.Fatalf("Snapshot records = %d, want 0 after fuse", len(h.activeRecords()))
 	}
 }
 
