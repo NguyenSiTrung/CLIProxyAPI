@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/sys/cpu"
 )
 
 var (
@@ -112,18 +111,19 @@ func pluginExtension(goos string) string {
 	}
 }
 
-func selectPluginFiles(root string) ([]pluginFile, error) {
-	selected, _, errSelect := selectPluginFilesWithCandidates(root)
+func selectPluginFiles(root string, desiredVersions ...map[string]string) ([]pluginFile, error) {
+	selected, _, errSelect := selectPluginFilesWithCandidates(root, desiredVersions...)
 	return selected, errSelect
 }
 
-func selectPluginFilesWithCandidates(root string) ([]pluginFile, []pluginFile, error) {
+func selectPluginFilesWithCandidates(root string, desiredVersions ...map[string]string) ([]pluginFile, []pluginFile, error) {
 	root = strings.TrimSpace(root)
 	if root == "" {
 		root = "plugins"
 	}
+	desired := normalizeDesiredPluginVersions(desiredVersions...)
 
-	candidates := candidateDirs(root, runtime.GOOS, runtime.GOARCH, cpuVariant())
+	candidates := candidateDirs(root, runtime.GOOS, runtime.GOARCH)
 	extension := pluginExtension(runtime.GOOS)
 	selectedByID := make(map[string]pluginFile)
 	order := make([]string, 0)
@@ -158,16 +158,47 @@ func selectPluginFilesWithCandidates(root string) ([]pluginFile, []pluginFile, e
 				order = append(order, file.ID)
 				continue
 			}
-			if pluginFilePreferred(file, current) {
+			if pluginFilePreferredForDesired(file, current, desired[file.ID]) {
 				selectedByID[file.ID] = file
 			}
 		}
 	}
 	selected := make([]pluginFile, 0, len(order))
 	for _, id := range order {
-		selected = append(selected, selectedByID[id])
+		file := selectedByID[id]
+		if desiredVersion := desired[id]; desiredVersion != "" && file.Version != desiredVersion {
+			continue
+		}
+		selected = append(selected, file)
 	}
 	return selected, all, nil
+}
+
+func normalizeDesiredPluginVersions(sources ...map[string]string) map[string]string {
+	out := make(map[string]string)
+	for _, source := range sources {
+		for id, version := range source {
+			id = strings.TrimSpace(id)
+			version = normalizePluginDesiredVersion(version)
+			if id == "" || version == "" {
+				continue
+			}
+			out[id] = version
+		}
+	}
+	return out
+}
+
+func pluginFilePreferredForDesired(candidate pluginFile, current pluginFile, desiredVersion string) bool {
+	desiredVersion = normalizePluginDesiredVersion(desiredVersion)
+	if desiredVersion != "" {
+		candidateMatches := candidate.Version == desiredVersion
+		currentMatches := current.Version == desiredVersion
+		if candidateMatches != currentMatches {
+			return candidateMatches
+		}
+	}
+	return pluginFilePreferred(candidate, current)
 }
 
 func pluginFilePreferred(candidate pluginFile, current pluginFile) bool {
@@ -258,8 +289,8 @@ func cleanupUnselectedPluginFiles(root string, loaded []pluginFile) error {
 }
 
 // DiscoverPluginFiles returns plugin binaries selected by the current host discovery rules.
-func DiscoverPluginFiles(root string) ([]PluginFileInfo, error) {
-	files, errSelect := selectPluginFiles(root)
+func DiscoverPluginFiles(root string, desiredVersions ...map[string]string) ([]PluginFileInfo, error) {
+	files, errSelect := selectPluginFiles(root, desiredVersions...)
 	if errSelect != nil {
 		return nil, errSelect
 	}
@@ -274,28 +305,9 @@ func DiscoverPluginFiles(root string) ([]PluginFileInfo, error) {
 	return out, nil
 }
 
-func candidateDirs(root, goos, goarch, variant string) []string {
-	dirs := make([]string, 0, 3)
-	if variant != "" {
-		dirs = append(dirs, filepath.Join(root, goos, goarch+"-"+variant))
-	}
+func candidateDirs(root, goos, goarch string) []string {
+	dirs := make([]string, 0, 2)
 	dirs = append(dirs, filepath.Join(root, goos, goarch))
 	dirs = append(dirs, root)
 	return dirs
-}
-
-func cpuVariant() string {
-	if runtime.GOARCH != "amd64" {
-		return ""
-	}
-	if cpu.X86.HasAVX512F && cpu.X86.HasAVX512BW && cpu.X86.HasAVX512CD && cpu.X86.HasAVX512DQ && cpu.X86.HasAVX512VL {
-		return "v4"
-	}
-	if cpu.X86.HasAVX && cpu.X86.HasAVX2 && cpu.X86.HasBMI1 && cpu.X86.HasBMI2 && cpu.X86.HasFMA {
-		return "v3"
-	}
-	if cpu.X86.HasSSE3 && cpu.X86.HasSSSE3 && cpu.X86.HasSSE41 && cpu.X86.HasSSE42 && cpu.X86.HasPOPCNT {
-		return "v2"
-	}
-	return "v1"
 }

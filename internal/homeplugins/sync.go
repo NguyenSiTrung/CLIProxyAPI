@@ -16,14 +16,12 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/util"
 	sdkconfig "github.com/router-for-me/CLIProxyAPI/v7/sdk/config"
 	sdkpluginstore "github.com/router-for-me/CLIProxyAPI/v7/sdk/pluginstore"
-	"golang.org/x/sys/cpu"
 	"gopkg.in/yaml.v3"
 )
 
 type Platform struct {
-	GOOS    string `json:"goos"`
-	GOARCH  string `json:"goarch"`
-	Variant string `json:"variant,omitempty"`
+	GOOS   string `json:"goos"`
+	GOARCH string `json:"goarch"`
 }
 
 type PluginRuntime interface {
@@ -56,6 +54,7 @@ type PluginInstallStatus struct {
 	Version       string `json:"version,omitempty"`
 	ReleaseTag    string `json:"release_tag,omitempty"`
 	Repository    string `json:"repository,omitempty"`
+	InstallType   string `json:"install_type,omitempty"`
 	InstallStatus string `json:"install_status"`
 	LoadStatus    string `json:"load_status,omitempty"`
 	Path          string `json:"path,omitempty"`
@@ -85,9 +84,8 @@ const (
 // CurrentPlatform reports the platform used by pluginhost discovery.
 func CurrentPlatform() Platform {
 	return Platform{
-		GOOS:    runtime.GOOS,
-		GOARCH:  runtime.GOARCH,
-		Variant: cpuVariant(),
+		GOOS:   runtime.GOOS,
+		GOARCH: runtime.GOARCH,
 	}
 }
 
@@ -104,8 +102,7 @@ func NormalizePlatform(platform Platform) Platform {
 	case "aarch64":
 		goarch = "arm64"
 	}
-	variant := strings.ToLower(strings.TrimSpace(platform.Variant))
-	return Platform{GOOS: goos, GOARCH: goarch, Variant: variant}
+	return Platform{GOOS: goos, GOARCH: goarch}
 }
 
 func Sync(ctx context.Context, cfg *config.Config, pluginRuntime PluginRuntime) error {
@@ -254,42 +251,70 @@ func deletePluginArtifact(root string, id string, pluginRuntime PluginRuntime) (
 	if !validPluginFileID(id) {
 		return "", false, fmt.Errorf("invalid plugin id %q", id)
 	}
-	path, errPath := currentPluginFilePath(root, id)
-	if errPath != nil {
-		return "", false, errPath
+	paths, errPaths := pluginFilePaths(root, id)
+	if errPaths != nil {
+		return "", false, errPaths
 	}
-	if path == "" {
+	if len(paths) == 0 {
 		return "", false, nil
 	}
 	if pluginRuntime != nil && pluginRuntime.PluginBusy(id) {
 		if !pluginRuntime.UnloadPlugin(id) && pluginRuntime.PluginBusy(id) {
-			return path, false, sdkpluginstore.ErrLoadedPluginLocked
+			return paths[0], false, sdkpluginstore.ErrLoadedPluginLocked
 		}
 	}
-	if errRemove := os.Remove(path); errRemove != nil {
-		if errors.Is(errRemove, os.ErrNotExist) {
-			return path, false, nil
+	deleted := false
+	for _, path := range paths {
+		if errRemove := os.Remove(path); errRemove != nil {
+			if errors.Is(errRemove, os.ErrNotExist) {
+				continue
+			}
+			return paths[0], deleted, errRemove
 		}
-		return path, false, errRemove
+		deleted = true
 	}
-	return path, true, nil
+	return paths[0], deleted, nil
 }
 
 func currentPluginFilePath(root string, id string) (string, error) {
+	paths, errPaths := pluginFilePaths(root, id)
+	if errPaths != nil {
+		return "", errPaths
+	}
+	if len(paths) == 0 {
+		return "", nil
+	}
+	return paths[0], nil
+}
+
+func pluginFilePaths(root string, id string) ([]string, error) {
+	files, errFiles := pluginFileInfos(root, id)
+	if errFiles != nil {
+		return nil, errFiles
+	}
+	out := make([]string, 0, len(files))
+	for _, file := range files {
+		out = append(out, file.Path)
+	}
+	return out, nil
+}
+
+func pluginFileInfos(root string, id string) ([]pluginFileInfo, error) {
 	root = strings.TrimSpace(root)
 	if root == "" {
 		root = "plugins"
 	}
+	id = strings.TrimSpace(id)
 	platform := CurrentPlatform()
 	extension := pluginExtension(platform.GOOS)
-	var selected pluginFileInfo
-	for _, dir := range pluginCandidateDirs(root, platform.GOOS, platform.GOARCH, platform.Variant) {
+	candidates := make([]pluginFileInfo, 0)
+	for _, dir := range pluginCandidateDirs(root, platform.GOOS, platform.GOARCH) {
 		entries, errReadDir := os.ReadDir(dir)
 		if errReadDir != nil {
 			if errors.Is(errReadDir, os.ErrNotExist) {
 				continue
 			}
-			return "", errReadDir
+			return nil, errReadDir
 		}
 		files := make([]string, 0, len(entries))
 		for _, entry := range entries {
@@ -306,12 +331,30 @@ func currentPluginFilePath(root string, id string) (string, error) {
 			if !okFile || file.ID != id {
 				continue
 			}
-			if pluginFilePreferred(file, selected) {
-				selected = file
-			}
+			candidates = append(candidates, file)
 		}
 	}
-	return selected.Path, nil
+	if len(candidates) <= 1 {
+		return candidates, nil
+	}
+	bestIndex := 0
+	for index := 1; index < len(candidates); index++ {
+		if pluginFilePreferred(candidates[index], candidates[bestIndex]) {
+			bestIndex = index
+		}
+	}
+	if bestIndex == 0 {
+		return candidates, nil
+	}
+	out := make([]pluginFileInfo, 0, len(candidates))
+	out = append(out, candidates[bestIndex])
+	for index, candidate := range candidates {
+		if index == bestIndex {
+			continue
+		}
+		out = append(out, candidate)
+	}
+	return out, nil
 }
 
 type pluginFileInfo struct {
@@ -320,11 +363,8 @@ type pluginFileInfo struct {
 	Version string
 }
 
-func pluginCandidateDirs(root string, goos string, goarch string, variant string) []string {
-	dirs := make([]string, 0, 3)
-	if variant != "" {
-		dirs = append(dirs, filepath.Join(root, goos, goarch+"-"+variant))
-	}
+func pluginCandidateDirs(root string, goos string, goarch string) []string {
+	dirs := make([]string, 0, 2)
 	dirs = append(dirs, filepath.Join(root, goos, goarch))
 	dirs = append(dirs, root)
 	return dirs
@@ -505,6 +545,7 @@ func pluginStatusFromManifest(manifest sdkpluginstore.Manifest) PluginInstallSta
 		Version:       strings.TrimSpace(manifest.Version),
 		ReleaseTag:    strings.TrimSpace(manifest.ReleaseTag),
 		Repository:    strings.TrimSpace(manifest.Repository),
+		InstallType:   manifest.InstallType(),
 		InstallStatus: pluginInstallStatusFailed,
 	}
 }
@@ -546,28 +587,16 @@ func yamlMappingValue(node *yaml.Node, key string) *yaml.Node {
 
 var newPluginStoreClient = func(cfg *config.Config) sdkpluginstore.Client {
 	client := &http.Client{}
+	var storeAuth []sdkpluginstore.AuthConfig
 	if cfg != nil && strings.TrimSpace(cfg.ProxyURL) != "" {
 		util.SetProxy(&sdkconfig.SDKConfig{ProxyURL: strings.TrimSpace(cfg.ProxyURL)}, client)
 	}
-	return sdkpluginstore.NewClient(client, "")
+	if cfg != nil {
+		storeAuth = cfg.Plugins.StoreAuth
+	}
+	return sdkpluginstore.NewClientWithAuth(client, "", storeAuth)
 }
 
 func pluginConfigEnabled(item config.PluginInstanceConfig) bool {
 	return item.Enabled != nil && *item.Enabled
-}
-
-func cpuVariant() string {
-	if runtime.GOARCH != "amd64" {
-		return ""
-	}
-	if cpu.X86.HasAVX512F && cpu.X86.HasAVX512BW && cpu.X86.HasAVX512CD && cpu.X86.HasAVX512DQ && cpu.X86.HasAVX512VL {
-		return "v4"
-	}
-	if cpu.X86.HasAVX && cpu.X86.HasAVX2 && cpu.X86.HasBMI1 && cpu.X86.HasBMI2 && cpu.X86.HasFMA {
-		return "v3"
-	}
-	if cpu.X86.HasSSE3 && cpu.X86.HasSSSE3 && cpu.X86.HasSSE41 && cpu.X86.HasSSE42 && cpu.X86.HasPOPCNT {
-		return "v2"
-	}
-	return "v1"
 }
