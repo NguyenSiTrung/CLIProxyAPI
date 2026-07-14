@@ -1,7 +1,9 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -19,8 +21,66 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/registry"
 	sdkaccess "github.com/router-for-me/CLIProxyAPI/v7/sdk/access"
 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
+	coreexecutor "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/executor"
 	sdkconfig "github.com/router-for-me/CLIProxyAPI/v7/sdk/config"
 )
+
+type codexSearchCaptureExecutor struct {
+	request *http.Request
+	body    []byte
+	authIDs []string
+}
+
+func (e *codexSearchCaptureExecutor) Identifier() string { return "codex" }
+
+func (e *codexSearchCaptureExecutor) Execute(context.Context, *auth.Auth, coreexecutor.Request, coreexecutor.Options) (coreexecutor.Response, error) {
+	return coreexecutor.Response{}, nil
+}
+
+func (e *codexSearchCaptureExecutor) ExecuteStream(context.Context, *auth.Auth, coreexecutor.Request, coreexecutor.Options) (*coreexecutor.StreamResult, error) {
+	return nil, nil
+}
+
+func (e *codexSearchCaptureExecutor) Refresh(_ context.Context, a *auth.Auth) (*auth.Auth, error) {
+	return a, nil
+}
+
+func (e *codexSearchCaptureExecutor) CountTokens(context.Context, *auth.Auth, coreexecutor.Request, coreexecutor.Options) (coreexecutor.Response, error) {
+	return coreexecutor.Response{}, nil
+}
+
+func (e *codexSearchCaptureExecutor) PrepareRequest(req *http.Request, a *auth.Auth) error {
+	token, _ := a.Metadata["access_token"].(string)
+	req.Header.Set("Authorization", "Bearer "+token)
+	return nil
+}
+
+type codexSearchGinContextSelector struct {
+	ginContext *gin.Context
+}
+
+func (s *codexSearchGinContextSelector) Pick(ctx context.Context, _ string, _ string, _ coreexecutor.Options, auths []*auth.Auth) (*auth.Auth, error) {
+	s.ginContext, _ = ctx.Value("gin").(*gin.Context)
+	if len(auths) == 0 {
+		return nil, nil
+	}
+	return auths[0], nil
+}
+
+func (e *codexSearchCaptureExecutor) HttpRequest(_ context.Context, selected *auth.Auth, req *http.Request) (*http.Response, error) {
+	e.request = req.Clone(req.Context())
+	e.authIDs = append(e.authIDs, selected.ID)
+	body, err := io.ReadAll(req.Body)
+	if err != nil {
+		return nil, err
+	}
+	e.body = body
+	return &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       io.NopCloser(strings.NewReader(`{"results":[{"url":"https://example.com"}]}`)),
+	}, nil
+}
 
 func newTestServer(t *testing.T) *Server {
 	t.Helper()
@@ -91,6 +151,186 @@ func TestHealthz(t *testing.T) {
 			t.Fatalf("expected empty body for HEAD request, got %q", rr.Body.String())
 		}
 	})
+}
+
+func TestCodexAlphaSearchForwardsRequest(t *testing.T) {
+	server := newTestServer(t)
+	executor := &codexSearchCaptureExecutor{}
+	server.handlers.AuthManager.RegisterExecutor(executor)
+	credential := &auth.Auth{
+		ID:       "codex-auth",
+		Provider: "codex",
+		Status:   auth.StatusActive,
+		Metadata: map[string]any{"access_token": "codex-token", "account_id": "account-123"},
+	}
+	if _, err := server.handlers.AuthManager.Register(context.Background(), credential); err != nil {
+		t.Fatalf("register Codex auth: %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/alpha/search", strings.NewReader(`{"query":"GPT-5.6"}`))
+	req.Header.Set("Authorization", "Bearer test-key")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Session_id", "session-123")
+	rr := httptest.NewRecorder()
+	server.engine.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rr.Code, http.StatusOK, rr.Body.String())
+	}
+	if executor.request == nil {
+		t.Fatal("Codex executor did not receive a request")
+	}
+	if got, want := executor.request.URL.String(), "https://chatgpt.com/backend-api/codex/alpha/search"; got != want {
+		t.Fatalf("upstream URL = %q, want %q", got, want)
+	}
+	if got, want := string(executor.body), `{"query":"GPT-5.6"}`; got != want {
+		t.Fatalf("upstream body = %q, want %q", got, want)
+	}
+	if got := executor.request.Header.Get("Authorization"); got != "Bearer codex-token" {
+		t.Fatalf("Authorization = %q", got)
+	}
+	if got := executor.request.Header.Get("Chatgpt-Account-Id"); got != "account-123" {
+		t.Fatalf("Chatgpt-Account-Id = %q", got)
+	}
+	if got := executor.request.Header.Get("Session_id"); got != "session-123" {
+		t.Fatalf("Session_id = %q", got)
+	}
+	if got := rr.Header().Get("Content-Type"); got != "application/json" {
+		t.Fatalf("response Content-Type = %q", got)
+	}
+}
+
+func TestCodexAlphaSearchPassesGinContextToAuthSelection(t *testing.T) {
+	server := newTestServer(t)
+	selector := &codexSearchGinContextSelector{}
+	server.handlers.AuthManager.SetSelector(selector)
+	executor := &codexSearchCaptureExecutor{}
+	server.handlers.AuthManager.RegisterExecutor(executor)
+	credential := &auth.Auth{
+		ID:       "codex-auth",
+		Provider: "codex",
+		Status:   auth.StatusActive,
+		Metadata: map[string]any{"access_token": "codex-token"},
+	}
+	if _, errRegister := server.handlers.AuthManager.Register(context.Background(), credential); errRegister != nil {
+		t.Fatalf("register Codex auth: %v", errRegister)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/alpha/search?key=home-query-key", strings.NewReader(`{"query":"GPT-5.6"}`))
+	req.Header.Set("Authorization", "Bearer test-key")
+	rr := httptest.NewRecorder()
+	server.engine.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rr.Code, http.StatusOK, rr.Body.String())
+	}
+	if selector.ginContext == nil {
+		t.Fatal("auth selection did not receive the Gin context required by Home scheduling")
+	}
+	if got := selector.ginContext.Query("key"); got != "home-query-key" {
+		t.Fatalf("Gin query key = %q, want %q", got, "home-query-key")
+	}
+}
+
+func TestCodexAlphaSearchUsesRequestIDForSessionAffinity(t *testing.T) {
+	server := newTestServer(t)
+	server.handlers.AuthManager.SetSelector(auth.NewSessionAffinitySelector(&auth.RoundRobinSelector{}))
+	executor := &codexSearchCaptureExecutor{}
+	server.handlers.AuthManager.RegisterExecutor(executor)
+	for _, id := range []string{"codex-auth-a", "codex-auth-b"} {
+		registry.GetGlobalRegistry().RegisterClient(id, "codex", []*registry.ModelInfo{{ID: "gpt-5.6-luna"}})
+		t.Cleanup(func() {
+			registry.GetGlobalRegistry().UnregisterClient(id)
+		})
+		credential := &auth.Auth{
+			ID:       id,
+			Provider: "codex",
+			Status:   auth.StatusActive,
+			Metadata: map[string]any{"access_token": id},
+		}
+		if _, errRegister := server.handlers.AuthManager.Register(context.Background(), credential); errRegister != nil {
+			t.Fatalf("register Codex auth: %v", errRegister)
+		}
+	}
+
+	for _, payload := range []string{
+		`{"id":"session-a","model":"gpt-5.6-luna"}`,
+		`{"id":"session-b","model":"gpt-5.6-luna"}`,
+		`{"id":"session-a","model":"gpt-5.6-luna"}`,
+	} {
+		req := httptest.NewRequest(http.MethodPost, "/v1/alpha/search", strings.NewReader(payload))
+		req.Header.Set("Authorization", "Bearer test-key")
+		rr := httptest.NewRecorder()
+		server.engine.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("status = %d, want %d; body=%s", rr.Code, http.StatusOK, rr.Body.String())
+		}
+	}
+
+	if got, want := len(executor.authIDs), 3; got != want {
+		t.Fatalf("selected auth count = %d, want %d", got, want)
+	}
+	if executor.authIDs[0] == executor.authIDs[1] {
+		t.Fatalf("different sessions selected the same auth %q", executor.authIDs[0])
+	}
+	if got, want := executor.authIDs[2], executor.authIDs[0]; got != want {
+		t.Fatalf("session-affinity auth = %q, want %q", got, want)
+	}
+}
+
+func TestCodexAlphaSearchRecordsRequestLog(t *testing.T) {
+	server := newTestServer(t)
+	server.cfg.RequestLog = true
+
+	executor := &codexSearchCaptureExecutor{}
+	server.handlers.AuthManager.RegisterExecutor(executor)
+	credential := &auth.Auth{
+		ID:       "codex-auth",
+		Provider: "codex",
+		Status:   auth.StatusActive,
+		Metadata: map[string]any{"access_token": "codex-token", "account_id": "account-123"},
+	}
+	if _, err := server.handlers.AuthManager.Register(context.Background(), credential); err != nil {
+		t.Fatalf("register Codex auth: %v", err)
+	}
+
+	rr := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rr)
+	req := httptest.NewRequest(http.MethodPost, "/v1/alpha/search", strings.NewReader(`{"query":"GPT-5.6"}`))
+	req.Header.Set("Authorization", "Bearer test-key")
+	req.Header.Set("Content-Type", "application/json")
+	c.Request = req
+
+	server.codexAlphaSearch(c)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rr.Code, http.StatusOK, rr.Body.String())
+	}
+	rawAPIRequest, okRequest := c.Get("API_REQUEST")
+	if !okRequest {
+		t.Fatal("API_REQUEST was not captured")
+	}
+	apiRequest, _ := rawAPIRequest.([]byte)
+	if !strings.Contains(string(apiRequest), "=== API REQUEST 1 ===") {
+		t.Fatalf("API_REQUEST missing request header section: %q", apiRequest)
+	}
+	if !strings.Contains(string(apiRequest), "https://chatgpt.com/backend-api/codex/alpha/search") {
+		t.Fatalf("API_REQUEST missing upstream URL: %q", apiRequest)
+	}
+	if !strings.Contains(string(apiRequest), `{"query":"GPT-5.6"}`) {
+		t.Fatalf("API_REQUEST missing body: %q", apiRequest)
+	}
+	rawAPIResponse, okResponse := c.Get("API_RESPONSE")
+	if !okResponse {
+		t.Fatal("API_RESPONSE was not captured")
+	}
+	apiResponse, _ := rawAPIResponse.([]byte)
+	if !strings.Contains(string(apiResponse), "=== API RESPONSE 1 ===") {
+		t.Fatalf("API_RESPONSE missing response header section: %q", apiResponse)
+	}
+	if !strings.Contains(string(apiResponse), `{"results":[{"url":"https://example.com"}]}`) {
+		t.Fatalf("API_RESPONSE missing body: %q", apiResponse)
+	}
 }
 
 func TestManagementResponseExposesPluginSupportHeaderForCORS(t *testing.T) {
@@ -483,6 +723,12 @@ func TestModelsDispatchByAnthropicVersionHeader(t *testing.T) {
 			ContextLength:       200000,
 			MaxCompletionTokens: 64000,
 		},
+		{
+			ID:      "gpt-4o",
+			Object:  "model",
+			OwnedBy: "openai",
+			Type:    "openai",
+		},
 	})
 	t.Cleanup(func() {
 		modelRegistry.UnregisterClient(clientID)
@@ -519,13 +765,23 @@ func TestModelsDispatchByAnthropicVersionHeader(t *testing.T) {
 		}
 
 		var claudeModel map[string]any
+		var rewrittenModel map[string]any
 		for _, m := range resp.Data {
-			if id, _ := m["id"].(string); id == "claude-sonnet-4-6" {
+			id, _ := m["id"].(string)
+			switch id {
+			case "claude-sonnet-4-6":
 				claudeModel = m
+			case "claude-fable-5-dd-o4-tpg":
+				rewrittenModel = m
+			case "gpt-4o", "claude-gpt-4o":
+				t.Fatalf("expected non-claude model id to be rewritten as claude-fable-5-dd-<reversed>, got %q", id)
 			}
 		}
 		if claudeModel == nil {
 			t.Fatalf("expected claude-sonnet-4-6 in response, got %s", rr.Body.String())
+		}
+		if rewrittenModel == nil {
+			t.Fatalf("expected claude-fable-5-dd-o4-tpg in response, got %s", rr.Body.String())
 		}
 		for _, field := range []string{"max_input_tokens", "max_tokens", "display_name"} {
 			if _, ok := claudeModel[field]; !ok {
@@ -556,10 +812,20 @@ func TestModelsDispatchByAnthropicVersionHeader(t *testing.T) {
 		if resp.Object != "list" {
 			t.Fatalf("expected OpenAI format (object=list), got %s", rr.Body.String())
 		}
+		foundRawGPT := false
 		for _, m := range resp.Data {
 			if _, ok := m["max_input_tokens"]; ok {
 				t.Fatalf("did not expect max_input_tokens in OpenAI format, got %v", m)
 			}
+			if id, _ := m["id"].(string); id == "gpt-4o" {
+				foundRawGPT = true
+			}
+			if id, _ := m["id"].(string); id == "claude-gpt-4o" || id == "claude-fable-5-dd-o4-tpg" {
+				t.Fatalf("did not expect Anthropic id rewrite on OpenAI format models, got %v", m)
+			}
+		}
+		if !foundRawGPT {
+			t.Fatalf("expected raw gpt-4o in OpenAI format response, got %s", rr.Body.String())
 		}
 	})
 }
@@ -653,8 +919,9 @@ func TestModelsWithClientVersionReturnsCodexCatalog(t *testing.T) {
 	if got, _ := custom["display_name"].(string); got != "Custom Codex Model" {
 		t.Fatalf("custom display_name = %q, want Custom Codex Model", got)
 	}
-	if got := int(codexClientTestPriority(custom["priority"])); got != 129 {
-		t.Fatalf("custom priority = %v, want 129", custom["priority"])
+	wantCustomPriority := codexClientTestMaxTemplatePriority(t) + 100
+	if got := int(codexClientTestPriority(custom["priority"])); got != wantCustomPriority {
+		t.Fatalf("custom priority = %v, want %d", custom["priority"], wantCustomPriority)
 	}
 	if got, _ := custom["description"].(string); got != "Custom model from registry" {
 		t.Fatalf("custom description = %q, want Custom model from registry", got)
@@ -719,6 +986,23 @@ func codexClientTestPriority(raw any) int {
 	default:
 		return -1
 	}
+}
+
+func codexClientTestMaxTemplatePriority(t *testing.T) int {
+	t.Helper()
+	var payload struct {
+		Models []map[string]any `json:"models"`
+	}
+	if err := json.Unmarshal(registry.GetCodexClientModelsJSON(), &payload); err != nil {
+		t.Fatalf("parse Codex client model templates: %v", err)
+	}
+	maxPriority := 0
+	for _, model := range payload.Models {
+		if priority := codexClientTestPriority(model["priority"]); priority > maxPriority {
+			maxPriority = priority
+		}
+	}
+	return maxPriority
 }
 
 func assertCodexSupportedReasoningLevels(t *testing.T, model map[string]any, want []string) {
@@ -870,6 +1154,14 @@ func TestFormatHomeClaudeModelIncludesAnthropicSchemaFields(t *testing.T) {
 	if got := withDefaults["display_name"]; got != "claude-no-limits" {
 		t.Fatalf("display_name fallback = %v, want claude-no-limits", got)
 	}
+
+	prefixed := formatHomeClaudeModel(homeModelEntry{id: "gpt-4o", displayName: "GPT-4o"})
+	if got := prefixed["id"]; got != "claude-fable-5-dd-o4-tpg" {
+		t.Fatalf("id = %v, want claude-fable-5-dd-o4-tpg", got)
+	}
+	if got := prefixed["display_name"]; got != "GPT-4o" {
+		t.Fatalf("display_name = %v, want GPT-4o", got)
+	}
 	if got := withDefaults["max_input_tokens"]; got != registry.DefaultClaudeMaxInputTokens {
 		t.Fatalf("max_input_tokens fallback = %v, want %d", got, registry.DefaultClaudeMaxInputTokens)
 	}
@@ -878,6 +1170,24 @@ func TestFormatHomeClaudeModelIncludesAnthropicSchemaFields(t *testing.T) {
 	}
 	if _, ok := withDefaults["created_at"]; ok {
 		t.Fatalf("created_at should be omitted when source created is missing, got %v", withDefaults)
+	}
+}
+
+func TestFormatHomeClaudeModelsSortsByDisplayName(t *testing.T) {
+	out := formatHomeClaudeModels([]homeModelEntry{
+		{id: "claude-z", displayName: "Zebra"},
+		{id: "gpt-4o", displayName: "Alpha"},
+		{id: "claude-b", displayName: "Beta"},
+	})
+	if len(out) != 3 {
+		t.Fatalf("len(out) = %d, want 3", len(out))
+	}
+	wantNames := []string{"Alpha", "Beta", "Zebra"}
+	for i, want := range wantNames {
+		got, _ := out[i]["display_name"].(string)
+		if got != want {
+			t.Fatalf("out[%d].display_name = %q, want %q", i, got, want)
+		}
 	}
 }
 
