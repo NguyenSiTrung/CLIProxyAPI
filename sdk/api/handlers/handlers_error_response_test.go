@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v7/internal/interfaces"
@@ -41,20 +42,70 @@ func TestWriteErrorResponse_AddonHeadersDisabledByDefault(t *testing.T) {
 	}
 }
 
+func TestInternalConcurrencyBusyWritesRetryAfterWithoutPassthrough(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
+
+	handler := NewBaseAPIHandlers(nil, nil)
+	handler.WriteErrorResponse(c, &interfaces.ErrorMessage{
+		StatusCode: http.StatusTooManyRequests,
+		Error:      coreauth.NewHomeConcurrencyBusyError("busy", 750*time.Millisecond),
+	})
+
+	if recorder.Code != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want %d", recorder.Code, http.StatusTooManyRequests)
+	}
+	if got := recorder.Header().Get("Retry-After"); got != "1" {
+		t.Fatalf("Retry-After = %q, want 1", got)
+	}
+}
+
+func TestWriteErrorResponseHomeBusyNormalAndStreamHeaders(t *testing.T) {
+	for _, stream := range []bool{false, true} {
+		t.Run(map[bool]string{false: "normal", true: "stream"}[stream], func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			recorder := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(recorder)
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+			if stream {
+				c.Request.Header.Set("Accept", "text/event-stream")
+			}
+
+			handler := NewBaseAPIHandlers(nil, nil)
+			handler.WriteErrorResponse(c, &interfaces.ErrorMessage{
+				StatusCode: http.StatusTooManyRequests,
+				Error:      coreauth.NewHomeConcurrencyBusyError("busy", 750*time.Millisecond),
+			})
+			if recorder.Code != http.StatusTooManyRequests {
+				t.Fatalf("status = %d, want %d", recorder.Code, http.StatusTooManyRequests)
+			}
+			if got := recorder.Header().Get("Retry-After"); got != "1" {
+				t.Fatalf("Retry-After = %q, want 1", got)
+			}
+		})
+	}
+}
+
 func TestWriteErrorResponse_AddonHeadersEnabled(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
 	c.Request = httptest.NewRequest(http.MethodGet, "/", nil)
 	c.Writer.Header().Set("X-Request-Id", "old-value")
+	c.Writer.Header().Set("x-cpa-trace-id", "local-trace")
+	c.Writer.Header().Set("Access-Control-Expose-Headers", "x-cpa-trace-id")
 
 	handler := NewBaseAPIHandlers(&sdkconfig.SDKConfig{PassthroughHeaders: true}, nil)
 	handler.WriteErrorResponse(c, &interfaces.ErrorMessage{
 		StatusCode: http.StatusTooManyRequests,
 		Error:      errors.New("rate limit"),
 		Addon: http.Header{
-			"Retry-After":  {"30"},
-			"X-Request-Id": {"new-1", "new-2"},
+			"Retry-After":                   {"30"},
+			"X-Request-Id":                  {"new-1", "new-2"},
+			"x-cpa-trace-id":                {"upstream-trace"},
+			"Access-Control-Expose-Headers": {"upstream-header"},
 		},
 	})
 
@@ -66,6 +117,12 @@ func TestWriteErrorResponse_AddonHeadersEnabled(t *testing.T) {
 	}
 	if got := recorder.Header().Values("X-Request-Id"); !reflect.DeepEqual(got, []string{"new-1", "new-2"}) {
 		t.Fatalf("X-Request-Id = %#v, want %#v", got, []string{"new-1", "new-2"})
+	}
+	if got := recorder.Header().Get("x-cpa-trace-id"); got != "local-trace" {
+		t.Fatalf("x-cpa-trace-id = %q, want local trace", got)
+	}
+	if got := recorder.Header().Get("Access-Control-Expose-Headers"); got != "x-cpa-trace-id" {
+		t.Fatalf("Access-Control-Expose-Headers = %q, want CPA value", got)
 	}
 }
 

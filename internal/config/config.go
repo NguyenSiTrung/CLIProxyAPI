@@ -41,6 +41,12 @@ type Config struct {
 	// Home config is runtime-only and is populated from -home-jwt.
 	Home HomeConfig `yaml:"-" json:"-"`
 
+	// CredentialConcurrency contains Home-authoritative credential lifecycle settings.
+	CredentialConcurrency CredentialConcurrencyConfig `yaml:"credential-concurrency" json:"credential-concurrency"`
+
+	// CredentialInFlight configures credential observation snapshots.
+	CredentialInFlight CredentialInFlightConfig `yaml:"credential-in-flight" json:"credential-in-flight"`
+
 	// RemoteManagement nests management-related options under 'remote-management'.
 	RemoteManagement RemoteManagement `yaml:"remote-management" json:"-"`
 
@@ -182,6 +188,8 @@ type PluginsConfig struct {
 	StoreSources []string `yaml:"store-sources,omitempty" json:"store-sources,omitempty"`
 	// StoreAuth defines optional auth rules for plugin store registry, metadata, and artifact requests.
 	StoreAuth []sdkpluginstore.AuthConfig `yaml:"store-auth,omitempty" json:"store-auth,omitempty"`
+	// AuthRevision changes when Home-managed plugin credentials change.
+	AuthRevision int64 `yaml:"auth-revision,omitempty" json:"auth-revision,omitempty"`
 	// Configs stores per-plugin instance configuration by plugin ID.
 	Configs map[string]PluginInstanceConfig `yaml:"configs" json:"configs"`
 }
@@ -360,6 +368,9 @@ type OAuthModelAlias struct {
 	Name  string `yaml:"name" json:"name"`
 	Alias string `yaml:"alias" json:"alias"`
 	Fork  bool   `yaml:"fork,omitempty" json:"fork,omitempty"`
+
+	// DisplayName is the optional human-readable name shown in model catalogs.
+	DisplayName string `yaml:"display-name,omitempty" json:"display-name,omitempty"`
 
 	ForceMapping bool `yaml:"force-mapping,omitempty" json:"force-mapping,omitempty"`
 }
@@ -725,7 +736,7 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 		if optional {
 			if os.IsNotExist(err) || errors.Is(err, syscall.EISDIR) {
 				// Missing and optional: return empty config (cloud deploy standby).
-				cfg := &Config{}
+				cfg := &Config{CredentialInFlight: DefaultCredentialInFlightConfig()}
 				cfg.NormalizePluginsConfig()
 				return cfg, nil
 			}
@@ -734,8 +745,8 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 	}
 
 	// In cloud deploy mode (optional=true), if file is empty or contains only whitespace, return empty config.
-	if optional && len(data) == 0 {
-		cfg := &Config{}
+	if optional && len(bytes.TrimSpace(data)) == 0 {
+		cfg := &Config{CredentialInFlight: DefaultCredentialInFlightConfig()}
 		cfg.NormalizePluginsConfig()
 		return cfg, nil
 	}
@@ -757,14 +768,20 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 	cfg.Pprof.Enable = false
 	cfg.Pprof.Addr = DefaultPprofAddr
 	cfg.RemoteManagement.PanelGitHubRepository = DefaultPanelGitHubRepository
+	cfg.CredentialInFlight = DefaultCredentialInFlightConfig()
 	if err = yaml.Unmarshal(data, &cfg); err != nil {
 		if optional {
 			// In cloud deploy mode, if YAML parsing fails, return empty config instead of error.
-			cfgOptional := &Config{}
+			cfgOptional := &Config{CredentialInFlight: DefaultCredentialInFlightConfig()}
 			cfgOptional.NormalizePluginsConfig()
 			return cfgOptional, nil
 		}
 		return nil, fmt.Errorf("failed to parse config file: %w", err)
+	}
+
+	cfg.CredentialConcurrency = cfg.CredentialConcurrency.WithDefaults()
+	if errValidate := cfg.CredentialInFlight.Validate(); errValidate != nil {
+		return nil, errValidate
 	}
 
 	// Hash remote management key if plaintext is detected (nested)
@@ -811,6 +828,9 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 	}
 
 	cfg.NormalizePluginsConfig()
+	if errResolvePluginsDir := cfg.ResolvePluginsDir(); errResolvePluginsDir != nil && cfg.Plugins.Enabled {
+		return nil, errResolvePluginsDir
+	}
 
 	// Sanitize Gemini API key configuration and migrate legacy entries.
 	cfg.SanitizeGeminiKeys()
@@ -859,7 +879,7 @@ func (cfg *Config) NormalizePluginsConfig() {
 	}
 	cfg.Plugins.Dir = strings.TrimSpace(cfg.Plugins.Dir)
 	if cfg.Plugins.Dir == "" {
-		cfg.Plugins.Dir = "plugins"
+		cfg.Plugins.Dir = defaultPluginsDir
 	}
 	if len(cfg.Plugins.StoreSources) > 0 {
 		sources := make([]string, 0, len(cfg.Plugins.StoreSources))
@@ -986,7 +1006,13 @@ func (cfg *Config) SanitizeOAuthModelAlias() {
 				continue
 			}
 			seenAlias[aliasKey] = struct{}{}
-			clean = append(clean, OAuthModelAlias{Name: name, Alias: alias, Fork: entry.Fork, ForceMapping: entry.ForceMapping})
+			clean = append(clean, OAuthModelAlias{
+				Name:         name,
+				Alias:        alias,
+				Fork:         entry.Fork,
+				DisplayName:  strings.TrimSpace(entry.DisplayName),
+				ForceMapping: entry.ForceMapping,
+			})
 		}
 		if len(clean) > 0 {
 			out[channel] = clean

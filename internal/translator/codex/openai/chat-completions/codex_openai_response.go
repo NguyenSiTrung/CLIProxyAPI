@@ -163,13 +163,23 @@ func ConvertCodexResponseToOpenAI(_ context.Context, modelName string, originalR
 
 		template, _ = sjson.SetBytes(template, "choices.0.delta.role", "assistant")
 		template, _ = sjson.SetRawBytes(template, "choices.0.delta.images.-1", imagePayload)
-	} else if dataType == "response.completed" {
+	} else if dataType == "response.completed" || dataType == "response.incomplete" {
 		finishReason := "stop"
-		if (*param).(*ConvertCliToOpenAIParams).FunctionCallIndex != -1 {
+		nativeFinishReason := finishReason
+		if dataType == "response.incomplete" {
+			nativeFinishReason = rootResult.Get("response.incomplete_details.reason").String()
+			switch nativeFinishReason {
+			case "max_tokens", "max_output_tokens":
+				finishReason = "length"
+			case "content_filter":
+				finishReason = "content_filter"
+			}
+		} else if (*param).(*ConvertCliToOpenAIParams).FunctionCallIndex != -1 {
 			finishReason = "tool_calls"
+			nativeFinishReason = finishReason
 		}
 		template, _ = sjson.SetBytes(template, "choices.0.finish_reason", finishReason)
-		template, _ = sjson.SetBytes(template, "choices.0.native_finish_reason", finishReason)
+		template, _ = sjson.SetBytes(template, "choices.0.native_finish_reason", nativeFinishReason)
 	} else if dataType == "response.output_item.added" {
 		itemResult := rootResult.Get("item")
 		if !itemResult.Exists() || itemResult.Get("type").String() != "function_call" {
@@ -318,8 +328,9 @@ func ConvertCodexResponseToOpenAI(_ context.Context, modelName string, originalR
 //   - []byte: An OpenAI-compatible JSON response containing all message content and metadata
 func ConvertCodexResponseToOpenAINonStream(_ context.Context, _ string, originalRequestRawJSON, requestRawJSON, rawJSON []byte, _ *any) []byte {
 	rootResult := gjson.ParseBytes(rawJSON)
-	// Verify this is a response.completed event
-	if rootResult.Get("type").String() != "response.completed" {
+	// Verify this is a terminal response event.
+	responseType := rootResult.Get("type").String()
+	if responseType != "response.completed" && responseType != "response.incomplete" {
 		return []byte{}
 	}
 
@@ -448,12 +459,10 @@ func ConvertCodexResponseToOpenAINonStream(_ context.Context, _ string, original
 		// Set content and reasoning content if found
 		if contentText != "" {
 			template, _ = sjson.SetBytes(template, "choices.0.message.content", contentText)
-			template, _ = sjson.SetBytes(template, "choices.0.message.role", "assistant")
 		}
 
 		if reasoningText != "" {
 			template, _ = sjson.SetBytes(template, "choices.0.message.reasoning_content", reasoningText)
-			template, _ = sjson.SetBytes(template, "choices.0.message.role", "assistant")
 		}
 
 		// Add tool calls if any
@@ -462,7 +471,6 @@ func ConvertCodexResponseToOpenAINonStream(_ context.Context, _ string, original
 			for _, toolCall := range toolCalls {
 				template, _ = sjson.SetRawBytes(template, "choices.0.message.tool_calls.-1", toolCall)
 			}
-			template, _ = sjson.SetBytes(template, "choices.0.message.role", "assistant")
 		}
 
 		// Add images if any
@@ -471,20 +479,36 @@ func ConvertCodexResponseToOpenAINonStream(_ context.Context, _ string, original
 			for _, image := range images {
 				template, _ = sjson.SetRawBytes(template, "choices.0.message.images.-1", image)
 			}
-			template, _ = sjson.SetBytes(template, "choices.0.message.role", "assistant")
 		}
 	}
 
-	// Extract and set the finish reason based on status
+	// Extract and set the finish reason based on status.
 	if statusResult := responseResult.Get("status"); statusResult.Exists() {
 		status := statusResult.String()
-		if status == "completed" {
-			finishReason := "stop"
+		finishReason := ""
+		nativeFinishReason := ""
+		switch status {
+		case "completed":
+			finishReason = "stop"
+			nativeFinishReason = finishReason
 			if len(toolCalls) > 0 {
 				finishReason = "tool_calls"
+				nativeFinishReason = finishReason
 			}
+		case "incomplete":
+			nativeFinishReason = responseResult.Get("incomplete_details.reason").String()
+			switch nativeFinishReason {
+			case "max_tokens", "max_output_tokens":
+				finishReason = "length"
+			case "content_filter":
+				finishReason = "content_filter"
+			default:
+				finishReason = "stop"
+			}
+		}
+		if finishReason != "" {
 			template, _ = sjson.SetBytes(template, "choices.0.finish_reason", finishReason)
-			template, _ = sjson.SetBytes(template, "choices.0.native_finish_reason", finishReason)
+			template, _ = sjson.SetBytes(template, "choices.0.native_finish_reason", nativeFinishReason)
 		}
 	}
 

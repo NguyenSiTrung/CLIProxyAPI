@@ -46,6 +46,7 @@ import (
 	sdkAuth "github.com/router-for-me/CLIProxyAPI/v7/sdk/auth"
 	"github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/auth"
 	coreexecutor "github.com/router-for-me/CLIProxyAPI/v7/sdk/cliproxy/executor"
+	"github.com/router-for-me/CLIProxyAPI/v7/sdk/pluginapi"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/net/http2"
 	"gopkg.in/yaml.v3"
@@ -53,7 +54,10 @@ import (
 
 const oauthCallbackSuccessHTML = `<html><head><meta charset="utf-8"><title>Authentication successful</title><script>setTimeout(function(){window.close();},5000);</script></head><body><h1>Authentication successful!</h1><p>You can close this window.</p><p>This window will close automatically in 5 seconds.</p></body></html>`
 
+const codexAlphaSearchSourceFormat = "codex-alpha-search"
+
 var corsExposedResponseHeaders = []string{
+	logging.CPATraceIDHeader,
 	"X-CPA-VERSION",
 	"X-CPA-COMMIT",
 	"X-CPA-BUILD-DATE",
@@ -292,6 +296,7 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 	// Add middleware
 	engine.Use(logging.GinLogrusLogger())
 	engine.Use(logging.GinLogrusRecovery())
+	engine.Use(logging.CPATraceIDMiddleware())
 	for _, mw := range optionState.extraMiddleware {
 		engine.Use(mw)
 	}
@@ -553,6 +558,7 @@ func (s *Server) setupRoutes() {
 		codexDirect.GET("/responses", openaiResponsesHandlers.ResponsesWebsocket)
 		codexDirect.POST("/responses", openaiResponsesHandlers.Responses)
 		codexDirect.POST("/responses/compact", openaiResponsesHandlers.Compact)
+		codexDirect.POST("/alpha/search", s.codexAlphaSearch)
 	}
 
 	// Gemini compatible API routes
@@ -625,6 +631,92 @@ func (s *Server) setupRoutes() {
 	// Management routes are registered lazily by registerManagementRoutes when a secret is configured.
 }
 
+func (s *Server) codexAlphaSearchModelRouterHost() handlers.PluginModelRouterHost {
+	if s == nil {
+		return nil
+	}
+	if s.pluginHost != nil {
+		return s.pluginHost
+	}
+	if s.handlers != nil && s.handlers.ModelRouterHost != nil {
+		return s.handlers.ModelRouterHost
+	}
+	return nil
+}
+
+func (s *Server) codexAlphaSearchSelectionModel(ctx context.Context, c *gin.Context, body []byte, model string) (string, error) {
+	host := s.codexAlphaSearchModelRouterHost()
+	if host == nil {
+		return model, nil
+	}
+
+	var headers http.Header
+	queryValues := make(map[string][]string)
+	requestPath := ""
+	if c != nil && c.Request != nil {
+		headers = c.Request.Header.Clone()
+		if c.Request.URL != nil {
+			queryValues = c.Request.URL.Query()
+			requestPath = c.Request.URL.Path
+		}
+	}
+	metadata := map[string]any{
+		coreexecutor.RequestedModelMetadataKey: model,
+	}
+	if requestPath != "" {
+		metadata[coreexecutor.RequestPathMetadataKey] = requestPath
+	}
+	resp, handled := host.RouteModel(ctx, pluginapi.ModelRouteRequest{
+		SourceFormat:   codexAlphaSearchSourceFormat,
+		RequestedModel: model,
+		Headers:        headers,
+		Query:          queryValues,
+		Body:           body,
+		Metadata:       metadata,
+	})
+	if !handled || !resp.Handled {
+		return model, nil
+	}
+	if resp.TargetKind != pluginapi.ModelRouteTargetProvider || !strings.EqualFold(strings.TrimSpace(resp.Target), "codex") {
+		return "", fmt.Errorf("unsupported Codex Alpha Search model route target %q (%q)", resp.TargetKind, resp.Target)
+	}
+	if targetModel := strings.TrimSpace(resp.TargetModel); targetModel != "" {
+		return targetModel, nil
+	}
+	return model, nil
+}
+
+func sanitizeCodexAlphaSearchBody(body []byte) []byte {
+	var payload map[string]json.RawMessage
+	if errUnmarshal := json.Unmarshal(body, &payload); errUnmarshal != nil || payload == nil {
+		return body
+	}
+
+	removed := false
+	for _, field := range []string{"prompt_cache_key", "prompt_cache_retention"} {
+		if _, exists := payload[field]; exists {
+			delete(payload, field)
+			removed = true
+		}
+	}
+	if !removed {
+		return body
+	}
+
+	sanitizedBody, errMarshal := json.Marshal(payload)
+	if errMarshal != nil {
+		return body
+	}
+	return sanitizedBody
+}
+
+func homeSelectionAttemptContext(ctx context.Context, selection *auth.HomeDispatchSelection) (context.Context, func(), error) {
+	if selection == nil {
+		return nil, func() {}, errors.New("Home dispatch selection is nil")
+	}
+	return selection.AttemptContext(ctx)
+}
+
 // codexAlphaSearch forwards the standalone search endpoint used by current
 // Codex clients. Unlike /responses, this payload is already in Codex search
 // format and must not pass through a protocol translator.
@@ -645,24 +737,61 @@ func (s *Server) codexAlphaSearch(c *gin.Context) {
 		Model string `json:"model"`
 	}
 	_ = json.Unmarshal(body, &routing)
+	upstreamRequestBody := sanitizeCodexAlphaSearchBody(body)
 
 	selectionHeaders := c.Request.Header.Clone()
 	if sessionID := strings.TrimSpace(routing.ID); sessionID != "" {
 		selectionHeaders.Set("X-Session-ID", sessionID)
 	}
 	ctx := context.WithValue(c.Request.Context(), "gin", c)
-	selected, err := s.handlers.AuthManager.SelectAuth(ctx, "codex", strings.TrimSpace(routing.Model), coreexecutor.Options{
-		Headers:         selectionHeaders,
-		OriginalRequest: body,
-	})
+	selectionModel, errRoute := s.codexAlphaSearchSelectionModel(ctx, c, body, strings.TrimSpace(routing.Model))
+	if errRoute != nil {
+		log.WithError(errRoute).Warn("codex alpha search: model router returned an unsupported target")
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": errRoute.Error()})
+		return
+	}
+	selectionOpts := coreexecutor.Options{Headers: selectionHeaders, OriginalRequest: body}
+	var selection *auth.HomeDispatchSelection
+	var selected *auth.Auth
+	if s.handlers.AuthManager.HomeEnabled() {
+		selection, err = s.handlers.AuthManager.SelectHomeAuthByKind(ctx, "codex", selectionModel, auth.AuthKindOAuth, selectionOpts)
+		if selection != nil {
+			selected = selection.CloneAuth()
+		}
+	} else {
+		selected, err = s.handlers.AuthManager.SelectAuthByKind(ctx, "codex", selectionModel, auth.AuthKindOAuth, selectionOpts)
+	}
 	if err != nil {
 		status := http.StatusServiceUnavailable
 		if statusError, ok := err.(interface{ StatusCode() int }); ok && statusError.StatusCode() > 0 {
 			status = statusError.StatusCode()
 		}
+		for _, value := range auth.SafeResponseHeaders(err).Values("Retry-After") {
+			c.Writer.Header().Add("Retry-After", value)
+		}
 		c.JSON(status, gin.H{"error": err.Error()})
 		return
 	}
+	if selected == nil {
+		if selection != nil {
+			selection.End("missing_auth")
+		}
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Codex auth unavailable"})
+		return
+	}
+	var releaseAttempt func()
+	if selection != nil {
+		attemptCtx, release, errBind := homeSelectionAttemptContext(ctx, selection)
+		if errBind != nil {
+			selection.End("attempt_bind_failed")
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": errBind.Error()})
+			return
+		}
+		ctx = attemptCtx
+		releaseAttempt = release
+		defer releaseAttempt()
+	}
+	logging.SetGinCPATraceID(c, selected.EnsureIndex())
 
 	headers := make(http.Header)
 	headers.Set("Content-Type", "application/json")
@@ -679,9 +808,12 @@ func (s *Server) codexAlphaSearch(c *gin.Context) {
 
 	const upstreamURL = "https://chatgpt.com/backend-api/codex/alpha/search"
 	req, err := s.handlers.AuthManager.NewHttpRequest(
-		ctx, selected, http.MethodPost, upstreamURL, body, headers,
+		ctx, selected, http.MethodPost, upstreamURL, upstreamRequestBody, headers,
 	)
 	if err != nil {
+		if selection != nil {
+			selection.End("request_build_failed")
+		}
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
@@ -697,7 +829,7 @@ func (s *Server) codexAlphaSearch(c *gin.Context) {
 		URL:       upstreamURL,
 		Method:    http.MethodPost,
 		Headers:   helpHeaders,
-		Body:      body,
+		Body:      upstreamRequestBody,
 		Provider:  "codex",
 		AuthID:    authID,
 		AuthLabel: authLabel,
@@ -705,17 +837,39 @@ func (s *Server) codexAlphaSearch(c *gin.Context) {
 		AuthValue: authValue,
 	})
 
+	if errCtx := ctx.Err(); errCtx != nil {
+		if selection != nil {
+			selection.End("attempt_canceled")
+		}
+		c.JSON(http.StatusRequestTimeout, gin.H{"error": errCtx.Error()})
+		return
+	}
 	resp, err := s.handlers.AuthManager.HttpRequest(ctx, selected, req)
 	if err != nil {
+		if selection != nil {
+			selection.End("request_failed")
+		}
 		helps.RecordAPIResponseError(ctx, s.cfg, err)
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
 	}
-	defer func() {
-		if errClose := resp.Body.Close(); errClose != nil {
+	closeResponseBody := func() error {
+		errClose := resp.Body.Close()
+		if errClose != nil {
 			log.Errorf("codex alpha search: close response body error: %v", errClose)
 		}
-	}()
+		return errClose
+	}
+	if selection != nil {
+		if errBind := selection.Bind(closeResponseBody); errBind != nil {
+			selection.End("response_bind_failed")
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": errBind.Error()})
+			return
+		}
+		defer selection.End("response_closed")
+	} else {
+		defer func() { _ = closeResponseBody() }()
+	}
 	helps.RecordAPIResponseMetadata(ctx, s.cfg, resp.StatusCode, resp.Header.Clone())
 	upstreamBody, err := io.ReadAll(io.LimitReader(resp.Body, 32<<20))
 	if err != nil {
@@ -1783,6 +1937,21 @@ func (s *Server) applyAccessConfig(oldCfg, newCfg *config.Config) bool {
 //   - clients: The new slice of AI service clients
 //   - cfg: The new application configuration
 func (s *Server) UpdateClients(cfg *config.Config) {
+	s.UpdateClientsContext(context.Background(), cfg)
+}
+
+// UpdateClientsContext updates runtime clients while honoring cancellation between
+// short configuration and filesystem operations.
+func (s *Server) UpdateClientsContext(ctx context.Context, cfg *config.Config) bool {
+	if s == nil || cfg == nil {
+		return false
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if errContext := ctx.Err(); errContext != nil {
+		return false
+	}
 	// Reconstruct old config from YAML snapshot to avoid reference sharing issues
 	var oldCfg *config.Config
 	if len(s.oldConfigYaml) > 0 {
@@ -1811,6 +1980,9 @@ func (s *Server) UpdateClients(cfg *config.Config) {
 	if oldCfg == nil || oldCfg.LoggingToFile != cfg.LoggingToFile || oldCfg.LogsMaxTotalSizeMB != cfg.LogsMaxTotalSizeMB {
 		if err := logging.ConfigureLogOutput(cfg); err != nil {
 			log.Errorf("failed to reconfigure log output: %v", err)
+		}
+		if errContext := ctx.Err(); errContext != nil {
+			return false
 		}
 	}
 
@@ -1897,6 +2069,9 @@ func (s *Server) UpdateClients(cfg *config.Config) {
 		s.wsAuthChanged(oldCfg.WebsocketAuth, cfg.WebsocketAuth)
 	}
 	managementasset.SetCurrentConfig(cfg)
+	if errContext := ctx.Err(); errContext != nil {
+		return false
+	}
 	// Save YAML snapshot for next comparison
 	s.oldConfigYaml, _ = yaml.Marshal(cfg)
 
@@ -1921,7 +2096,10 @@ func (s *Server) UpdateClients(cfg *config.Config) {
 		if dirSetter, ok := tokenStore.(interface{ SetBaseDir(string) }); ok {
 			dirSetter.SetBaseDir(cfg.AuthDir)
 		}
-		authEntries = util.CountAuthFiles(context.Background(), tokenStore)
+		authEntries = util.CountAuthFiles(ctx, tokenStore)
+		if errContext := ctx.Err(); errContext != nil {
+			return false
+		}
 	}
 	geminiAPIKeyCount := len(cfg.GeminiKey)
 	interactionsAPIKeyCount := len(cfg.InteractionsKey)
@@ -1950,6 +2128,7 @@ func (s *Server) UpdateClients(cfg *config.Config) {
 		vertexAICompatCount,
 		openAICompatCount,
 	)
+	return ctx.Err() == nil
 }
 
 func (s *Server) SetWebsocketAuthChangeHandler(fn func(bool, bool)) {
