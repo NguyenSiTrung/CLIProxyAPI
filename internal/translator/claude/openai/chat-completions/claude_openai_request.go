@@ -46,6 +46,16 @@ var (
 // Returns:
 //   - []byte: The transformed request data in Claude Code API format
 func ConvertOpenAIRequestToClaude(modelName string, inputRawJSON []byte, stream bool) []byte {
+	return convertOpenAIRequestToClaude(modelName, inputRawJSON, stream, false)
+}
+
+// ConvertOpenAIRequestToClaudeWithCompat preserves assistant reasoning content
+// as an unsigned thinking block for configured compatibility endpoints.
+func ConvertOpenAIRequestToClaudeWithCompat(modelName string, inputRawJSON []byte, stream bool) []byte {
+	return convertOpenAIRequestToClaude(modelName, inputRawJSON, stream, true)
+}
+
+func convertOpenAIRequestToClaude(modelName string, inputRawJSON []byte, stream, preserveEmptyThinkingBlocks bool) []byte {
 	rawJSON := inputRawJSON
 
 	if account == "" {
@@ -164,14 +174,17 @@ func ConvertOpenAIRequestToClaude(modelName string, inputRawJSON []byte, stream 
 	// Process messages and transform them to Claude Code format
 	if messages := root.Get("messages"); messages.Exists() && messages.IsArray() {
 		systemBlocks := make([][]byte, 0)
-		messageBlocks := make([][]byte, 0)
-		previousRole := ""
+		messageAccumulator := common.NewClaudeMessageAccumulator(int(root.Get("messages.#").Int()))
 		messages.ForEach(func(_, message gjson.Result) bool {
 			role := message.Get("role").String()
 			contentResult := message.Get("content")
 
 			switch role {
-			case "system":
+			// Developer messages rank with system messages in OpenAI's instruction
+			// hierarchy, so both become top-level Claude system blocks. Dropping the
+			// developer role, as this translator used to, silently removed operator
+			// instructions from the upstream request.
+			case "system", "developer":
 				systemStart := len(systemBlocks)
 				if contentResult.Exists() && contentResult.Type == gjson.String && contentResult.String() != "" {
 					textPart := []byte(`{"type":"text","text":""}`)
@@ -200,8 +213,15 @@ func ConvertOpenAIRequestToClaude(modelName string, inputRawJSON []byte, stream 
 				}
 			case "user", "assistant":
 				contentBlocks := make([][]byte, 0, 4)
+				if preserveEmptyThinkingBlocks && role == "assistant" {
+					if reasoningContent := message.Get("reasoning_content"); reasoningContent.Type == gjson.String && strings.TrimSpace(reasoningContent.String()) != "" {
+						part := []byte(`{"type":"thinking","thinking":"","signature":""}`)
+						part, _ = sjson.SetBytes(part, "thinking", reasoningContent.String())
+						contentBlocks = append(contentBlocks, part)
+					}
+				}
 
-				// Handle content based on its type (string or array)
+				// Handle content based on its type
 				if contentResult.Exists() && contentResult.Type == gjson.String && contentResult.String() != "" {
 					part := []byte(`{"type":"text","text":""}`)
 					part, _ = sjson.SetBytes(part, "text", contentResult.String())
@@ -258,7 +278,7 @@ func ConvertOpenAIRequestToClaude(modelName string, inputRawJSON []byte, stream 
 				msg, _ = sjson.SetBytes(msg, "role", role)
 				msg, _ = sjson.SetRawBytes(msg, "content", common.JoinRawArray(contentBlocks))
 				msg = common.AttachMessageCacheControl(msg, message)
-				messageBlocks = append(messageBlocks, msg)
+				messageAccumulator.Append(msg)
 
 			case "tool":
 				// Handle tool result messages conversion
@@ -275,17 +295,12 @@ func ConvertOpenAIRequestToClaude(modelName string, inputRawJSON []byte, stream 
 					msg, _ = sjson.SetBytes(msg, "content.0.content", toolResultContent)
 				}
 				msg = common.AttachMessageCacheControl(msg, message)
-				if previousRole == "tool" && len(messageBlocks) > 0 {
-					toolResult := gjson.GetBytes(msg, "content.0")
-					lastIdx := len(messageBlocks) - 1
-					messageBlocks[lastIdx], _ = sjson.SetRawBytes(messageBlocks[lastIdx], "content.-1", []byte(toolResult.Raw))
-				} else {
-					messageBlocks = append(messageBlocks, msg)
-				}
+				messageAccumulator.Append(msg)
 			}
-			previousRole = role
 			return true
 		})
+
+		messageBlocks := messageAccumulator.Messages()
 
 		// Preserve a minimal conversational turn for system-only inputs.
 		// Claude payloads with top-level system instructions but no messages are risky for downstream validation.
