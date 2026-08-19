@@ -82,7 +82,7 @@ func (e *CodexWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *clipr
 	var identityState codexIdentityConfuseState
 	upstreamBody, identityState := applyCodexIdentityConfuseBody(e.cfg, auth, originalPayloadSource, body)
 	reporter.SetTranslatedReasoningEffort(clientBody, to.String())
-	wsHeaders = applyCodexWebsocketHeaders(ctx, wsHeaders, auth, apiKey, e.cfg)
+	wsHeaders = applyCodexWebsocketHeaders(ctx, wsHeaders, auth, apiKey, e.cfg, opts.Headers)
 	applyModelHeaderOverrides(wsHeaders, baseModel)
 	applyCodexIdentityConfuseHeaders(wsHeaders, &identityState)
 
@@ -400,7 +400,8 @@ func (e *CodexWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *clipr
 
 			clientPayload := applyCodexIdentityExposeResponsePayload(payload, identityState)
 			if cliproxyexecutor.DownstreamWebsocket(ctx) {
-				if !send(cliproxyexecutor.StreamChunk{Payload: clientPayload}) {
+				downstreamPayload := helps.EnsureResponsesUsageDetails(clientPayload)
+				if !send(cliproxyexecutor.StreamChunk{Payload: downstreamPayload}) {
 					terminateReason = "context_done"
 					terminateErr = ctx.Err()
 					return
