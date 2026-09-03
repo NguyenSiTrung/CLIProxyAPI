@@ -50,15 +50,8 @@ func formatGeminiClaudeCarrierValue(modelName, signature, direction, targetKind 
 }
 
 func formatClaudeSignatureValue(modelName, signature string) string {
-	// Gemini signatures are provider-native replay state. Keep them raw so an
-	// empty detached thinking block or tool_use block can round-trip through
-	// Claude Code and be recognized by the Gemini request translator.
-	if cache.GetModelGroup(modelName) == "gemini" {
-		return signature
-	}
-	if cache.SignatureCacheEnabled() {
-		return fmt.Sprintf("%s#%s", cache.GetModelGroup(modelName), signature)
-	}
+	// Provider signatures are emitted as provider-native opaque values without
+	// CPA-specific prefixes (such as claude#, gemini#, or gpt#).
 	if cache.GetModelGroup(modelName) == "claude" {
 		return decodeSignature(signature)
 	}
@@ -204,6 +197,10 @@ func ConvertAntigravityResponseToClaude(ctx context.Context, _ string, originalR
 		}
 		if params.ResponseType == 2 && !params.CurrentThinkingSigned {
 			appendThinkingSignature(signature, direction, targetKind)
+			return false
+		}
+		if direction == geminiClaudeCarrierPrevious && targetKind == geminiClaudeCarrierText {
+			cache.CacheSignatureBestEffort(ctx, modelName, "", signature)
 			return false
 		}
 		closeCurrentBlock()
@@ -686,6 +683,8 @@ func ConvertAntigravityResponseToClaudeNonStream(_ context.Context, _ string, or
 						thinkingSignatureDirection = geminiClaudeCarrierStandalone
 						thinkingSignatureTargetKind = geminiClaudeCarrierText
 						flushThinking()
+					} else if hasSemanticContent && lastSemanticKind == geminiClaudeCarrierText {
+						cache.CacheSignatureBestEffort(context.Background(), modelName, "", signature)
 					} else if hasSemanticContent {
 						appendSignatureCarrier(signature, geminiClaudeCarrierPrevious, lastSemanticKind)
 					} else {
@@ -708,6 +707,8 @@ func ConvertAntigravityResponseToClaudeNonStream(_ context.Context, _ string, or
 					if text.Exists() && text.String() != "" {
 						appendSignatureCarrier(signature, geminiClaudeCarrierNext, geminiClaudeCarrierText)
 						visibleSignatureCarrier = true
+					} else if hasSemanticContent && lastSemanticKind == geminiClaudeCarrierText {
+						cache.CacheSignatureBestEffort(context.Background(), modelName, "", signature)
 					} else if hasSemanticContent {
 						appendSignatureCarrier(signature, geminiClaudeCarrierPrevious, lastSemanticKind)
 					} else {

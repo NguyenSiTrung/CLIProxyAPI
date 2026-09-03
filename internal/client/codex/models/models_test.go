@@ -257,6 +257,66 @@ func TestCodexClientModelsResponse_PreservesUltraReasoningEffort(t *testing.T) {
 	t.Fatalf("supported_reasoning_levels = %#v, want ultra", levels)
 }
 
+func TestCodexClientModelsResponse_FiltersMaxAndUltraForOlderClients(t *testing.T) {
+	resp := BuildResponseForClient([]map[string]any{{"id": "gpt-5.6-sol"}}, nil, false, "0.137.0")
+	models, ok := resp["models"].([]map[string]any)
+	if !ok {
+		t.Fatalf("models type = %T, want []map[string]any", resp["models"])
+	}
+
+	var sol map[string]any
+	for _, entry := range models {
+		if stringModelValue(entry, "slug") == "gpt-5.6-sol" {
+			sol = entry
+			break
+		}
+	}
+	if sol == nil {
+		t.Fatal("expected codex client entry for gpt-5.6-sol")
+	}
+
+	levels, ok := sol["supported_reasoning_levels"].([]any)
+	if !ok {
+		t.Fatalf("supported_reasoning_levels = %T, want []any", sol["supported_reasoning_levels"])
+	}
+	for _, rawLevel := range levels {
+		level, ok := rawLevel.(map[string]any)
+		if !ok {
+			continue
+		}
+		effort := stringModelValue(level, "effort")
+		if effort == "max" || effort == "ultra" {
+			t.Fatalf("supported_reasoning_levels contains %q for older client 0.137.0: %#v", effort, levels)
+		}
+	}
+}
+
+func TestSupportsExtendedReasoningLevels(t *testing.T) {
+	tests := []struct {
+		version string
+		want    bool
+	}{
+		{"", true},
+		{"pi", true},
+		{"latest", true},
+		{"unknown", true},
+		{"0.137.0", false},
+		{"0.143.9", false},
+		{"v0.137.0", false},
+		{"0.137.0-beta.1", false},
+		{"0.144.0", true},
+		{"0.144.1", true},
+		{"0.149.1", true},
+		{"1.0.0", true},
+		{"invalid", true},
+	}
+	for _, tt := range tests {
+		if got := supportsExtendedReasoningLevels(tt.version); got != tt.want {
+			t.Errorf("supportsExtendedReasoningLevels(%q) = %v, want %v", tt.version, got, tt.want)
+		}
+	}
+}
+
 func TestLoadCodexClientModelTemplatesRefreshesOnRevision(t *testing.T) {
 	codexClientModelTemplatesMu.Lock()
 	previousLoaded := codexClientModelTemplatesLoaded
@@ -313,12 +373,12 @@ func TestApplyCodexClientModelMetadataPreservesMultiAgentVersionWhenDisabled(t *
 	entry := map[string]any{"multi_agent_version": "v1"}
 	model := map[string]any{"id": "custom-model"}
 
-	applyCodexClientModelMetadata(entry, "custom-model", model, false)
+	applyCodexClientModelMetadata(entry, "custom-model", model, false, "")
 	if got := entry["multi_agent_version"]; got != "v1" {
 		t.Fatalf("disabled multi_agent_version = %#v, want preserved v1", got)
 	}
 
-	applyCodexClientModelMetadata(entry, "custom-model", model, true)
+	applyCodexClientModelMetadata(entry, "custom-model", model, true, "")
 	if got := entry["multi_agent_version"]; got != "v2" {
 		t.Fatalf("enabled multi_agent_version = %#v, want v2", got)
 	}
@@ -396,5 +456,93 @@ func TestCodexClientModelsResponseMapsMaxCompletionTokensToMaxTokens(t *testing.
 		if got := intModelValue(entry, "max_tokens"); got != testCase.want {
 			t.Errorf("%s max_tokens = %d, want %d", testCase.slug, got, testCase.want)
 		}
+	}
+}
+
+func TestCodexClientModelsResponseUsesProvidedCapabilitiesForNewHomeModel(t *testing.T) {
+	const modelID = "gemini-new-home-model-test"
+	const wantContextWindow = 1048576
+
+	resp := BuildResponse([]map[string]any{{
+		"id":             modelID,
+		"context_length": wantContextWindow,
+		"thinking": &registry.ThinkingSupport{
+			Levels: []string{"low", "medium", "high"},
+		},
+	}}, nil, false)
+	models, ok := resp["models"].([]map[string]any)
+	if !ok || len(models) != 1 {
+		t.Fatalf("models = %#v, want one model", resp["models"])
+	}
+	model := models[0]
+	if got := intModelValue(model, "context_window"); got != wantContextWindow {
+		t.Fatalf("context_window = %d, want %d", got, wantContextWindow)
+	}
+	if got := intModelValue(model, "max_context_window"); got != wantContextWindow {
+		t.Fatalf("max_context_window = %d, want %d", got, wantContextWindow)
+	}
+
+	rawLevels, ok := model["supported_reasoning_levels"].([]any)
+	if !ok || len(rawLevels) != 3 {
+		t.Fatalf("supported_reasoning_levels = %#v, want low/medium/high", model["supported_reasoning_levels"])
+	}
+	for index, want := range []string{"low", "medium", "high"} {
+		level, ok := rawLevels[index].(map[string]any)
+		if !ok || stringModelValue(level, "effort") != want {
+			t.Fatalf("supported_reasoning_levels[%d] = %#v, want %q", index, rawLevels[index], want)
+		}
+	}
+}
+
+func TestCodexClientModelsResponseDoesNotInheritUnsupportedReasoningLevels(t *testing.T) {
+	tests := []struct {
+		name        string
+		version     string
+		levels      []string
+		wantEfforts []string
+		wantDefault string
+	}{
+		{name: "modern client", version: "0.144.0", levels: []string{"max", "ultra"}, wantEfforts: []string{"max", "ultra"}, wantDefault: "max"},
+		{name: "legacy client with no compatible level", version: "0.143.9", levels: []string{"max", "ultra"}},
+		{name: "legacy client with one compatible level", version: "0.143.9", levels: []string{"high", "max"}, wantEfforts: []string{"high"}, wantDefault: "high"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resp := BuildResponseForClient([]map[string]any{{
+				"id": "home-extended-reasoning-model-test",
+				"thinking": &registry.ThinkingSupport{
+					Levels: tt.levels,
+				},
+			}}, nil, false, tt.version)
+			models, ok := resp["models"].([]map[string]any)
+			if !ok || len(models) != 1 {
+				t.Fatalf("models = %#v, want one model", resp["models"])
+			}
+			model := models[0]
+			if len(tt.wantEfforts) == 0 {
+				if _, exists := model["supported_reasoning_levels"]; exists {
+					t.Fatalf("supported_reasoning_levels = %#v, want absent", model["supported_reasoning_levels"])
+				}
+				if _, exists := model["default_reasoning_level"]; exists {
+					t.Fatalf("default_reasoning_level = %#v, want absent", model["default_reasoning_level"])
+				}
+				return
+			}
+
+			rawLevels, ok := model["supported_reasoning_levels"].([]any)
+			if !ok || len(rawLevels) != len(tt.wantEfforts) {
+				t.Fatalf("supported_reasoning_levels = %#v, want %v", model["supported_reasoning_levels"], tt.wantEfforts)
+			}
+			for index, want := range tt.wantEfforts {
+				level, ok := rawLevels[index].(map[string]any)
+				if !ok || stringModelValue(level, "effort") != want {
+					t.Fatalf("supported_reasoning_levels[%d] = %#v, want %q", index, rawLevels[index], want)
+				}
+			}
+			if got := stringModelValue(model, "default_reasoning_level"); got != tt.wantDefault {
+				t.Fatalf("default_reasoning_level = %q, want %q", got, tt.wantDefault)
+			}
+		})
 	}
 }

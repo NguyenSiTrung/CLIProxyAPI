@@ -39,7 +39,7 @@ const (
 	antigravityClientID                    = "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com"
 	antigravityClientSecret                = "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"
 	antigravityAuthType                    = "antigravity"
-	refreshSkew                            = 3000 * time.Second
+	antigravityRequestTokenSafetyWindow    = 5 * time.Minute
 	antigravityCreditsHintRefreshInterval  = 10 * time.Minute
 	antigravityCreditsHintRefreshTimeout   = 5 * time.Second
 	antigravityShortQuotaCooldownThreshold = 5 * time.Minute
@@ -388,7 +388,7 @@ func normalizeAntigravityGeminiFunctionResponseRoles(rawJSON []byte) []byte {
 		}
 
 		var calls, responses []functionRef
-		var responseParts []json.RawMessage
+		var responseParts, otherParts []json.RawMessage
 		partCount := 0
 		hasOtherPart := false
 		parts.ForEach(func(_, part gjson.Result) bool {
@@ -401,6 +401,7 @@ func normalizeAntigravityGeminiFunctionResponseRoles(rawJSON []byte) []byte {
 				responseParts = append(responseParts, json.RawMessage(part.Raw))
 			default:
 				hasOtherPart = true
+				otherParts = append(otherParts, json.RawMessage(part.Raw))
 			}
 			return true
 		})
@@ -418,35 +419,35 @@ func normalizeAntigravityGeminiFunctionResponseRoles(rawJSON []byte) []byte {
 			}
 			return true
 		}
-		if hasOtherPart || len(calls) > 0 {
+		if len(calls) > 0 {
 			pending = nil
 			return true
 		}
 
 		var contentJSON []byte
 		contentChanged := false
-		if len(pending) == len(responses) {
-			ordered := make([]json.RawMessage, 0, len(responseParts))
+		if len(pending) > 0 && len(responses) > 0 {
+			ordered := make([]json.RawMessage, 0, partCount)
 			used := make([]bool, len(responses))
 			for _, call := range pending {
-				matched := -1
 				for responseIndex, response := range responses {
 					if used[responseIndex] {
 						continue
 					}
 					if (call.id != "" && response.id == call.id) || (call.id == "" && call.name != "" && response.name == call.name) {
-						matched = responseIndex
+						used[responseIndex] = true
+						ordered = append(ordered, responseParts[responseIndex])
 						break
 					}
 				}
-				if matched < 0 {
-					ordered = nil
-					break
+			}
+			for responseIndex := range responses {
+				if !used[responseIndex] {
+					ordered = append(ordered, responseParts[responseIndex])
 				}
-				used[matched] = true
-				ordered = append(ordered, responseParts[matched])
 			}
 			if len(ordered) == len(responseParts) {
+				ordered = append(ordered, otherParts...)
 				encoded, errMarshal := json.Marshal(ordered)
 				if errMarshal == nil && !bytes.Equal(encoded, []byte(parts.Raw)) {
 					contentJSON = []byte(content.Raw)
@@ -458,7 +459,7 @@ func normalizeAntigravityGeminiFunctionResponseRoles(rawJSON []byte) []byte {
 			}
 		}
 		pending = nil
-		if content.Get("role").String() != "model" {
+		if !hasOtherPart && content.Get("role").String() != "model" {
 			if contentJSON == nil {
 				contentJSON = []byte(content.Raw)
 			}
