@@ -724,6 +724,8 @@ type HostAuthFileEntry struct {
 	Priority int `json:"priority,omitempty"`
 	// Note is the credential note when available.
 	Note string `json:"note,omitempty"`
+	// BaseURL is the upstream base URL configured for the credential when available.
+	BaseURL string `json:"base_url,omitempty"`
 	// Websockets reports whether websocket mode is enabled when available.
 	Websockets bool `json:"websockets,omitempty"`
 	// Success is the recent success count.
@@ -774,6 +776,48 @@ type HostAuthSaveResponse struct {
 	Path string `json:"path"`
 }
 
+// Host affinity lookup status outcomes.
+const (
+	HostAffinityStatusBound       = "bound"
+	HostAffinityStatusUnbound     = "unbound"
+	HostAffinityStatusAmbiguous   = "ambiguous"
+	HostAffinityStatusUnsupported = "unsupported"
+)
+
+// HostAffinityLookupRequest asks the host to observe the current affinity binding for a session.
+type HostAffinityLookupRequest struct {
+	// Provider identifies the model provider (e.g., "anthropic", "openai").
+	Provider string `json:"provider"`
+	// Model identifies the requested model.
+	Model string `json:"model"`
+	// SessionID identifies the client session.
+	SessionID string `json:"session_id"`
+}
+
+// HostAffinityLookupResponse describes the observed affinity binding state for a session.
+type HostAffinityLookupResponse struct {
+	// Status reports the observation outcome ("bound", "unbound", "ambiguous", "unsupported").
+	Status string `json:"status"`
+	// AuthIndex identifies the bound credential index usable with host.auth.get_runtime when Status is "bound".
+	AuthIndex string `json:"auth_index,omitempty"`
+	// ObservedAt reports the observation timestamp.
+	ObservedAt time.Time `json:"observed_at,omitempty"`
+	// Disabled reports whether the bound credential is known to be disabled.
+	Disabled bool `json:"disabled,omitempty"`
+	// Unavailable reports whether the bound credential is currently unavailable.
+	Unavailable bool `json:"unavailable,omitempty"`
+}
+
+// HTTPWireProfile configures transport-level wire representation for plugin HTTP requests.
+type HTTPWireProfile struct {
+	// HTTP1Only forces the transport to use HTTP/1.1 and disables HTTP/2 negotiation.
+	HTTP1Only bool `json:"http1_only,omitempty"`
+	// DisableAutoCompression prevents transparent decompression and automatic Accept-Encoding injection.
+	DisableAutoCompression bool `json:"disable_auto_compression,omitempty"`
+	// HeaderProfile defines desired header-name order and exact casing on the wire.
+	HeaderProfile []string `json:"header_profile,omitempty"`
+}
+
 // HTTPRequest describes an upstream HTTP request issued through the host.
 type HTTPRequest struct {
 	// Method is the HTTP method.
@@ -784,6 +828,8 @@ type HTTPRequest struct {
 	Headers http.Header
 	// Body contains the raw request body.
 	Body []byte
+	// WireProfile specifies optional outbound HTTP wire profile settings.
+	WireProfile *HTTPWireProfile `json:"wire_profile,omitempty"`
 }
 
 // HTTPResponse describes a non-streaming host HTTP response.
@@ -1110,6 +1156,11 @@ type StreamChunkInterceptRequest struct {
 	Body        []byte
 	// HistoryChunks contains a bounded recent history of chunks already delivered downstream.
 	// The host currently retains at most 64 chunks and 1 MiB total history bytes.
+	// Always preserved on header-init (ChunkIndex == StreamChunkHeaderInitIndex) when non-empty.
+	// On payload chunks (ChunkIndex >= 0):
+	//   - schema_version >= 5: omitted (nil) to avoid per-chunk cloning and serialization
+	//   - schema_version < 5: populated as a fresh clone each call (legacy compatibility)
+	// Callers must treat these slices as read-only; hosts clone before delivery to keep snapshots isolated.
 	HistoryChunks [][]byte
 	// ChunkIndex starts at 0 for payload chunks. StreamChunkHeaderInitIndex marks the header-only initialization call.
 	ChunkIndex int
@@ -1334,6 +1385,8 @@ type ManagementResponse struct {
 	// Headers contains response headers.
 	Headers http.Header
 	// Body contains the raw response body.
+	// On schema_version >= 6, JSON bodies are returned without HTML entity escaping.
+	// On schema_version < 6, JSON response string values are HTML-escaped for legacy compatibility.
 	Body []byte
 }
 
@@ -1341,6 +1394,8 @@ type ManagementResponse struct {
 type UsageRecord struct {
 	// Provider identifies the upstream provider.
 	Provider string
+	// BaseURL is the upstream base URL configured for the request/credential when available.
+	BaseURL string
 	// ExecutorType identifies the executor implementation.
 	ExecutorType string
 	// Model is the model used for the request.
@@ -1349,6 +1404,10 @@ type UsageRecord struct {
 	Alias string
 	// APIKey is the client API key identifier when available.
 	APIKey string
+	// SessionID identifies the session when present.
+	SessionID string
+	// ParentSessionID identifies the parent session in a hierarchy or fork.
+	ParentSessionID string
 	// AuthID identifies the selected credential.
 	AuthID string
 	// AuthIndex identifies the credential index when applicable.
