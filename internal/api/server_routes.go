@@ -689,7 +689,13 @@ func (s *Server) handleHomeCodexClientModels(c *gin.Context, clientVersion strin
 	if clientVersion == "cpa" {
 		webSearchCapabilityForModel = homeWebSearchCapabilityForModel(entries)
 	}
-	s.writeModelListResponse(c, "openai", codexmodels.BuildResponseForClientWithCPACapabilities(models, nil, webSearchCapabilityForModel, s.cfg.Codex.OptimizeMultiAgentV2, clientVersion))
+	payload := codexmodels.BuildResponseForClientWithCPACapabilities(models, nil, webSearchCapabilityForModel, s.cfg.Codex.OptimizeMultiAgentV2, clientVersion)
+	body, errMarshal := codexmodels.MarshalCompact(payload)
+	if errMarshal != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": errMarshal.Error()})
+		return
+	}
+	s.writeModelListResponse(c, "openai", body)
 }
 
 func homeWebSearchCapabilityForModel(entries []homeModelEntry) codexmodels.WebSearchCapabilityForModelFunc {
@@ -712,6 +718,12 @@ func formatHomeCodexModel(entry homeModelEntry) map[string]any {
 	}
 	if entry.ownedBy != "" {
 		model["owned_by"] = entry.ownedBy
+	}
+	for _, p := range entry.providers {
+		if strings.EqualFold(p, "devin") {
+			model["type"] = "devin"
+			break
+		}
 	}
 	if entry.displayName != "" {
 		model["display_name"] = entry.displayName

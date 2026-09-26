@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"sort"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -824,6 +826,8 @@ func (m *Manager) MarkResult(ctx context.Context, result Result) {
 					if isModelSupportResultError(result.Error) {
 						if disableCooling {
 							state.NextRetryAfter = time.Time{}
+						} else if result.RetryAfter != nil && *result.RetryAfter > 0 {
+							state.NextRetryAfter = now.Add(*result.RetryAfter)
 						} else {
 							next := now.Add(12 * time.Hour)
 							state.NextRetryAfter = next
@@ -859,13 +863,22 @@ func (m *Manager) MarkResult(ctx context.Context, result Result) {
 						case 404:
 							if disableCooling {
 								state.NextRetryAfter = time.Time{}
+							} else if result.RetryAfter != nil && *result.RetryAfter > 0 {
+								state.NextRetryAfter = now.Add(*result.RetryAfter)
 							} else {
 								next := now.Add(12 * time.Hour)
 								state.NextRetryAfter = next
 							}
 						case 429:
 							var next time.Time
+							var credentialNext time.Time
 							backoffLevel := state.Quota.BackoffLevel
+							if result.CredentialScope {
+								backoffLevel = 0
+								if auth.Quota.Exceeded && auth.Quota.Reason == "credential_quota" {
+									backoffLevel = auth.Quota.BackoffLevel
+								}
+							}
 							if !disableCooling {
 								if result.RetryAfter != nil {
 									cooldown := *result.RetryAfter
@@ -874,8 +887,18 @@ func (m *Manager) MarkResult(ctx context.Context, result Result) {
 									}
 									next = now.Add(cooldown).Round(0)
 								} else {
-									next, backoffLevel = quotaCooldownAfterFailure(state.Quota, now)
+									quotaForFailure := state.Quota
+									if result.CredentialScope {
+										if auth.Quota.Exceeded && auth.Quota.Reason == "credential_quota" {
+											quotaForFailure = auth.Quota
+										} else {
+											quotaForFailure.NextRecoverAt = time.Time{}
+											quotaForFailure.BackoffLevel = 0
+										}
+									}
+									next, backoffLevel = quotaCooldownAfterFailure(quotaForFailure, now)
 								}
+								credentialNext = next
 								if state.Quota.Exceeded && state.Quota.NextRecoverAt.After(next) {
 									next = state.Quota.NextRecoverAt
 								}
@@ -892,7 +915,7 @@ func (m *Manager) MarkResult(ctx context.Context, result Result) {
 									if otherState != nil && otherState != state {
 										otherState.Unavailable = true
 										otherState.Status = StatusError
-										otherQuotaNext := next
+										otherQuotaNext := credentialNext
 										if otherState.Quota.Exceeded && otherState.Quota.NextRecoverAt.After(otherQuotaNext) {
 											otherQuotaNext = otherState.Quota.NextRecoverAt
 										}
@@ -912,13 +935,15 @@ func (m *Manager) MarkResult(ctx context.Context, result Result) {
 									}
 								}
 								auth.Unavailable = true
-								auth.Quota.Exceeded = true
-								auth.Quota.Reason = "credential_quota"
-								authNext := next
-								if auth.Quota.NextRecoverAt.After(authNext) {
+								authNext := credentialNext
+								if auth.Quota.Exceeded && auth.Quota.Reason == "credential_quota" &&
+									auth.Quota.NextRecoverAt.After(authNext) {
 									authNext = auth.Quota.NextRecoverAt
 								}
+								auth.Quota.Exceeded = true
+								auth.Quota.Reason = "credential_quota"
 								auth.Quota.NextRecoverAt = authNext
+								auth.Quota.BackoffLevel = backoffLevel
 								auth.NextRetryAfter = authNext
 							}
 						case 408, 500, 502, 503, 504, 520, 521, 522, 523, 524, 525, 526:
@@ -1037,6 +1062,7 @@ func (m *Manager) reportHomeResult(ctx context.Context, result Result, auth *Aut
 	}
 	m.hook.OnResult(ctx, result)
 	m.publishErrorEvent(result, snapshot)
+	m.updateSessionAffinity(result)
 }
 
 func (m *Manager) recordAvailabilityNeutralResult(ctx context.Context, result Result) {
@@ -1470,6 +1496,10 @@ func resultErrorFromError(err error) *Error {
 		if resultErr.Code == "" || resultErr.Code == connectionLifecycleErrorCode {
 			resultErr.Code = connectionLifecycleErrorCode
 		}
+	case isTransientTransportError(err):
+		if resultErr.Code == "" || resultErr.Code == transientTransportErrorCode {
+			resultErr.Code = transientTransportErrorCode
+		}
 	}
 	return resultErr
 }
@@ -1481,7 +1511,7 @@ func shouldSkipCredentialCooldown(err *Error) bool {
 	if err != nil && err.Code == ErrorCodeForceCooldown {
 		return false
 	}
-	return isRequestScopedResultError(err) || isConnectionLifecycleResultError(err)
+	return isRequestScopedResultError(err) || isConnectionLifecycleResultError(err) || isTransientTransportResultError(err)
 }
 
 // isConnectionLifecycleError reports transport/session lifecycle failures that must
@@ -1546,6 +1576,95 @@ func isConnectionLifecycleMessage(message string) bool {
 	return false
 }
 
+// isTransientTransportError reports pre-HTTP dial/TLS/DNS/reset failures that
+// should retry under request-retry without cooling the selected credential.
+func isTransientTransportError(err error) bool {
+	if err == nil {
+		return false
+	}
+	// HTTP-status failures stay on the credential/status retry path.
+	if statusCodeFromError(err) != 0 {
+		return false
+	}
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return false
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) && dnsErr != nil && (dnsErr.IsTimeout || dnsErr.IsTemporary || dnsErr.Timeout()) {
+		return true
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr != nil && netErr.Timeout() {
+		return true
+	}
+	if isTransientSyscallError(err) {
+		return true
+	}
+	var opErr *net.OpError
+	if errors.As(err, &opErr) && opErr != nil {
+		return true
+	}
+	return isTransientTransportMessage(err.Error())
+}
+
+func isTransientTransportResultError(err *Error) bool {
+	if err == nil {
+		return false
+	}
+	if err.Code == transientTransportErrorCode {
+		return true
+	}
+	if statusCodeFromResult(err) != 0 {
+		return false
+	}
+	return isTransientTransportMessage(err.Message)
+}
+
+func isTransientSyscallError(err error) bool {
+	var errno syscall.Errno
+	if !errors.As(err, &errno) {
+		return false
+	}
+	switch errno {
+	case syscall.ECONNREFUSED, syscall.ECONNRESET, syscall.ECONNABORTED,
+		syscall.ETIMEDOUT, syscall.EHOSTUNREACH, syscall.ENETUNREACH, syscall.EPIPE:
+		return true
+	default:
+		return false
+	}
+}
+
+func isTransientTransportMessage(message string) bool {
+	lower := strings.ToLower(strings.TrimSpace(message))
+	if lower == "" {
+		return false
+	}
+	switch {
+	case strings.Contains(lower, "tls: tls handshake"),
+		strings.Contains(lower, "tls handshake timeout"),
+		strings.Contains(lower, "wsarecv"),
+		strings.Contains(lower, "wsasend"),
+		strings.Contains(lower, "a connection attempt failed"),
+		strings.Contains(lower, "connection refused"),
+		strings.Contains(lower, "connection reset"),
+		strings.Contains(lower, "i/o timeout"),
+		strings.Contains(lower, "no such host"),
+		strings.Contains(lower, "server misbehaving"),
+		strings.Contains(lower, "network is unreachable"),
+		strings.Contains(lower, "no route to host"),
+		strings.Contains(lower, "broken pipe"),
+		strings.Contains(lower, "connection aborted"),
+		strings.Contains(lower, "use of closed network connection"),
+		strings.Contains(lower, "unexpected eof"):
+		return true
+	default:
+		return false
+	}
+}
+
 func isUnauthorizedError(err error) bool {
 	if err == nil {
 		return false
@@ -1566,6 +1685,12 @@ func hasUnauthorizedAuthFailure(auth *Auth) bool {
 		return true
 	}
 	return false
+}
+
+// HasUnauthorizedAuthFailure reports whether the auth has a terminal unauthorized error
+// with no pending refresh scheduled.
+func HasUnauthorizedAuthFailure(auth *Auth) bool {
+	return hasUnauthorizedAuthFailure(auth)
 }
 
 func refreshErrorFromError(err error) *Error {
@@ -2111,6 +2236,8 @@ func applyAuthFailureState(auth *Auth, resultErr *Error, retryAfter *time.Durati
 			auth.StatusMessage = "not_found"
 			if disableCooling {
 				auth.NextRetryAfter = time.Time{}
+			} else if retryAfter != nil && *retryAfter > 0 {
+				auth.NextRetryAfter = now.Add(*retryAfter)
 			} else {
 				auth.NextRetryAfter = now.Add(12 * time.Hour)
 			}

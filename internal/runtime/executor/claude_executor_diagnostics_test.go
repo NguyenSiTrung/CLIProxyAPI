@@ -64,7 +64,7 @@ func TestClaudeExecutorDiagnosticsAdvancesAfterSuccessfulResponse(t *testing.T) 
 	testID := uuid.NewString()
 	auth := &cliproxyauth.Auth{
 		ID:         "diagnostics-live-path-" + testID,
-		Attributes: map[string]string{"api_key": "sk-ant-oat-diagnostics-live-path"},
+		Attributes: map[string]string{"api_key": "sk-ant-oat-diagnostics-live-path", "cloak_mode": "always"},
 		Metadata: map[string]any{
 			"account_uuid":                        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
 			claudeauth.ClaudeDeviceIDsMetadataKey: deviceIDs,
@@ -134,7 +134,7 @@ func TestClaudeExecutorContinuityAdvancesRequestIDAndPromptIDInBillingHeader(t *
 	testID := uuid.NewString()
 	auth := &cliproxyauth.Auth{
 		ID:         "continuity-test-" + testID,
-		Attributes: map[string]string{"api_key": "sk-ant-oat-continuity-test"},
+		Attributes: map[string]string{"api_key": "sk-ant-oat-continuity-test", "cloak_mode": "always"},
 		Metadata: map[string]any{
 			"account_uuid":                        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
 			claudeauth.ClaudeDeviceIDsMetadataKey: deviceIDs,
@@ -193,7 +193,7 @@ func TestClaudeExecutorContinuityAdvancesRequestIDAndPromptIDInBillingHeader(t *
 
 	// Verify Turn 1:
 	h1 := capturedBillingHeaders[0]
-	if !strings.Contains(h1, "cc_version=2.1.258.") || !strings.Contains(h1, "cc_entrypoint=cli;") || !strings.Contains(h1, "cch=") {
+	if !strings.Contains(h1, "cc_version=2.1.280.") || !strings.Contains(h1, "cc_entrypoint=cli;") || !strings.Contains(h1, "cch=") {
 		t.Fatalf("h1 invalid: %s", h1)
 	}
 	if strings.Contains(h1, "cc_prev_req=") {
