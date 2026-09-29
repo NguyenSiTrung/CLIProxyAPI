@@ -836,11 +836,6 @@ oauth:
       # Experimental full-duplex Codex Responses WebSocket steering (default: false).
       # Keeps one upstream account/model per socket; accepted input is never replayed.
       response-steering: false
-      # When true, and routing.strategy is fill-first or routing.session-affinity is true,
-      # remap Codex prompt_cache_key and installation identity per selected auth.
-      # Some superstitious users believe request tracking identifiers can be used
-      # as evidence for TOS enforcement bans; this option only satisfies those odd concerns.
-      identity-confuse: false
       # Disable forcing the official Codex User-Agent and Originator headers on HTTP/SSE and WebSocket requests.
       disable-codex-cloaking: false
       # Hold back the frames that carry nothing the client has seen - the handshake (response.created,

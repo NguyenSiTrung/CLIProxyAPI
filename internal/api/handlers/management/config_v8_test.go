@@ -175,6 +175,62 @@ func TestConfigV8CommentsUnknownLegacySectionsOnWrite(t *testing.T) {
 	}
 }
 
+func TestConfigV8CommentsUnknownNestedFieldsOnWrite(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	path := filepath.Join(t.TempDir(), "config.yaml")
+	raw := "server: {port: 8317}\noauth: {providers: {codex: {disable-codex-cloaking: true, retired-setting: false}}}\n"
+	if err := os.WriteFile(path, []byte(raw), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.LoadConfig(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := &Handler{cfg: cfg, configFilePath: path}
+	router := gin.New()
+	router.GET("/v8/management/config", h.ConfigV8)
+	router.PATCH("/v8/management/config", h.ConfigV8)
+	router.PUT("/v8/management/config/*path", h.ConfigV8)
+	router.DELETE("/v8/management/config/*path", h.ConfigV8)
+	request := func(method, url, body string, status int) {
+		t.Helper()
+		recorder := httptest.NewRecorder()
+		router.ServeHTTP(recorder, httptest.NewRequest(method, url, strings.NewReader(body)))
+		if recorder.Code != status {
+			t.Fatalf("%s %s: status=%d body=%s", method, url, recorder.Code, recorder.Body.String())
+		}
+	}
+	request(http.MethodGet, "/v8/management/config", "", http.StatusOK)
+	if saved, errRead := os.ReadFile(path); errRead != nil || string(saved) != raw {
+		t.Fatalf("GET changed existing config: %v", errRead)
+	}
+	request(http.MethodPatch, "/v8/management/config", `{"server":{"port":8318}}`, http.StatusOK)
+	saved, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = config.ValidateV8Config(saved); err != nil {
+		t.Fatalf("saved config is invalid: %v\n%s", err, saved)
+	}
+	if strings.Count(string(saved), "# oauth.providers.codex.retired-setting: false") != 1 {
+		t.Fatalf("existing unknown field was not preserved as a comment: %s", saved)
+	}
+	loaded, err := config.LoadConfig(path)
+	if err != nil || loaded.Port != 8318 || !loaded.Codex.DisableCodexCloaking {
+		t.Fatalf("unrelated write changed known settings: cfg=%+v error=%v", loaded, err)
+	}
+	request(http.MethodPut, "/v8/management/config/oauth/providers/codex/new-setting", `true`, http.StatusBadRequest)
+	unchanged, err := os.ReadFile(path)
+	if err != nil || string(unchanged) != string(saved) {
+		t.Fatalf("invalid new setting changed the config: %v", err)
+	}
+	request(http.MethodDelete, "/v8/management/config/oauth/providers/codex/disable-codex-cloaking", "", http.StatusOK)
+	saved, err = os.ReadFile(path)
+	if err != nil || strings.Count(string(saved), "# oauth.providers.codex.retired-setting: false") != 1 {
+		t.Fatalf("deleting the neighboring setting lost the archived comment: %v\n%s", err, saved)
+	}
+}
+
 func TestV8NestedWriteMigratesOnlyOnSuccess(t *testing.T) {
 	for _, tc := range []struct {
 		name, body string
@@ -319,7 +375,7 @@ func TestConfigV8DeleteLastField(t *testing.T) {
 		{"websocket", "ws-auth: false\n", "oauth/providers/aistudio/ws-auth", func(cfg *config.Config) bool { return cfg.WebsocketAuth }},
 		{"debug", "debug: true\n", "observability/logs/debug", func(cfg *config.Config) bool { return !cfg.Debug }},
 		{"sibling", "routing: {strategy: fill-first, retry: {request-retry: 3}}\n", "routing/retry/request-retry", func(cfg *config.Config) bool { return cfg.RequestRetry == 0 && cfg.Routing.Strategy == "fill-first" }},
-		{"provider", "oauth: {providers: {codex: {identity-confuse: true}}}\n", "oauth/providers/codex/identity-confuse", func(cfg *config.Config) bool { return !cfg.Codex.IdentityConfuse }},
+		{"provider", "oauth: {providers: {codex: {disable-codex-cloaking: true}}}\n", "oauth/providers/codex/disable-codex-cloaking", func(cfg *config.Config) bool { return !cfg.Codex.DisableCodexCloaking }},
 		{"excluded models", "oauth: {excluded-models: {codex: [blocked-model]}}\n", "oauth/excluded-models", func(cfg *config.Config) bool { return len(cfg.OAuthExcludedModels) == 0 }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
