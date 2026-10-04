@@ -158,6 +158,7 @@ type Manager struct {
 	syncedVersion             atomic.Uint64
 	auths                     map[string]*Auth
 	authEpochs                map[string]uint64
+	authChangeWatchers        map[string]map[chan struct{}]struct{}
 	scheduler                 *authScheduler
 	// pluginScheduler runs outside m.mu before falling back to native selection.
 	pluginScheduler PluginScheduler
@@ -198,6 +199,8 @@ type Manager struct {
 	// Auto refresh state
 	refreshCancel context.CancelFunc
 	refreshLoop   *authAutoRefreshLoop
+	// refreshJobs retains queued and running jobs across loop restarts under m.mu.
+	refreshJobs map[string]*authRefreshJob
 
 	requestPrepareLocks sync.Map
 	// refreshLocks serializes credential refresh per auth ID so concurrent
