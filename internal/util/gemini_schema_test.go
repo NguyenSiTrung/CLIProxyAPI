@@ -2972,3 +2972,166 @@ func TestSanitizeArrayItems_PreservesItemsForUppercaseArrayType(t *testing.T) {
 		})
 	}
 }
+
+// TestCleanJSONSchema_EnforcesObjectTypeForProperties_Issue6394 tests issue 6394:
+// When a property defines nested properties/required (e.g. through a union type like ["string", "object"],
+// merged anyOf branches, or missing type), Gemini requires type to be OBJECT.
+// Properties or required must never be emitted on a non-OBJECT type node.
+func TestCleanJSONSchema_EnforcesObjectTypeForProperties_Issue6394(t *testing.T) {
+	cleaners := map[string]func(string) string{
+		"Gemini":              CleanJSONSchemaForGemini,
+		"GeminiJSONSchema":    CleanJSONSchemaForGeminiJSONSchema,
+		"AntigravityTool":     func(s string) string { return CleanJSONSchemaForAntigravityTool(s, false) },
+		"AntigravityResponse": CleanJSONSchemaForAntigravityResponse,
+	}
+
+	t.Run("TypeArrayWithPropertiesPrefersObject", func(t *testing.T) {
+		input := `{"type":"object","properties":{"requestBody":{"type":"object","properties":{"delivery":{"type":"object","properties":{"endpoint":{"type":["string","object"],"properties":{"traces":{"type":"string"}},"required":["traces"]}},"required":["endpoint"]}},"required":["delivery"]}},"required":["requestBody"]}`
+
+		for name, clean := range cleaners {
+			t.Run(name, func(t *testing.T) {
+				got := clean(input)
+				parsed := gjson.Parse(got)
+
+				endpointType := parsed.Get("properties.requestBody.properties.delivery.properties.endpoint.type").String()
+				if !strings.EqualFold(endpointType, "object") {
+					t.Fatalf("[%s] endpoint type = %q, want object; cleaned: %s", name, endpointType, got)
+				}
+				if !parsed.Get("properties.requestBody.properties.delivery.properties.endpoint.properties.traces").Exists() {
+					t.Fatalf("[%s] endpoint.properties.traces missing; cleaned: %s", name, got)
+				}
+			})
+		}
+	})
+
+	t.Run("AnyOfUnionMergedIntoNodeWithoutTypeEnsuresObject", func(t *testing.T) {
+		input := `{"type":"object","properties":{"endpoint":{"properties":{"traces":{"type":"string"}},"required":["traces"],"anyOf":[{"type":"string"},{"type":"object","properties":{"other":{"type":"string"}}}]}}}`
+
+		for name, clean := range cleaners {
+			t.Run(name, func(t *testing.T) {
+				got := clean(input)
+				parsed := gjson.Parse(got)
+
+				endpointType := parsed.Get("properties.endpoint.type").String()
+				if !strings.EqualFold(endpointType, "object") {
+					t.Fatalf("[%s] endpoint type = %q, want object; cleaned: %s", name, endpointType, got)
+				}
+				if !parsed.Get("properties.endpoint.properties.traces").Exists() {
+					t.Fatalf("[%s] endpoint.properties.traces missing; cleaned: %s", name, got)
+				}
+			})
+		}
+	})
+
+	t.Run("PrimitiveTypeWithPropertiesPromotedToObject", func(t *testing.T) {
+		input := `{"type":"object","properties":{"endpoint":{"type":"string","properties":{"traces":{"type":"string"}},"required":["traces"]}}}`
+
+		for name, clean := range cleaners {
+			t.Run(name, func(t *testing.T) {
+				got := clean(input)
+				parsed := gjson.Parse(got)
+
+				endpointType := parsed.Get("properties.endpoint.type").String()
+				if !strings.EqualFold(endpointType, "object") {
+					t.Fatalf("[%s] endpoint type = %q, want object; cleaned: %s", name, endpointType, got)
+				}
+			})
+		}
+	})
+}
+
+// TestCleanJSONSchema_RemovesDependentKeywords_Issue6539 covers Issue #6539:
+// JSON Schema keywords dependentRequired, dependentSchemas, and dependencies are rejected by
+// the Gemini/Antigravity backend with 400 INVALID_ARGUMENT ("Unknown name \"dependentRequired\" ... Cannot find field")
+// and must be stripped while preserving legitimate tool properties with those names.
+func TestCleanJSONSchema_RemovesDependentKeywords_Issue6539(t *testing.T) {
+	input := `{
+		"type": "object",
+		"properties": {
+			"baseline_url": {"type": "string"},
+			"candidate_url": {"type": "string"},
+			"options": {
+				"type": "object",
+				"properties": {
+					"threshold": {"type": "number"},
+					"diff_color": {"type": "string"}
+				},
+				"dependentRequired": {
+					"threshold": ["diff_color"]
+				},
+				"dependentSchemas": {
+					"threshold": {
+						"properties": {
+							"diff_color": {"type": "string"}
+						}
+					}
+				},
+				"dependencies": {
+					"threshold": ["diff_color"]
+				}
+			},
+			"dependentRequired": {
+				"type": "string",
+				"description": "Legitimate property named dependentRequired"
+			},
+			"dependentSchemas": {
+				"type": "object",
+				"properties": {
+					"nested": {"type": "string"}
+				},
+				"dependentRequired": {
+					"nested": ["other"]
+				}
+			},
+			"dependencies": {
+				"type": "string",
+				"description": "Legitimate property named dependencies"
+			}
+		},
+		"dependentRequired": {
+			"baseline_url": ["candidate_url"]
+		},
+		"dependentSchemas": {
+			"baseline_url": {
+				"required": ["candidate_url"]
+			}
+		},
+		"dependencies": {
+			"baseline_url": ["candidate_url"]
+		}
+	}`
+
+	cleaners := map[string]func(string) string{
+		"Antigravity":         CleanJSONSchemaForAntigravity,
+		"AntigravityTool":     func(s string) string { return CleanJSONSchemaForAntigravityTool(s, false) },
+		"AntigravityResponse": CleanJSONSchemaForAntigravityResponse,
+		"Gemini":              CleanJSONSchemaForGemini,
+		"GeminiJSONSchema":    CleanJSONSchemaForGeminiJSONSchema,
+	}
+
+	for name, clean := range cleaners {
+		t.Run(name, func(t *testing.T) {
+			got := clean(input)
+			parsed := gjson.Parse(got)
+
+			for _, kw := range []string{"dependentRequired", "dependentSchemas", "dependencies"} {
+				if parsed.Get(kw).Exists() {
+					t.Errorf("[%s] root %q was not removed: %s", name, kw, got)
+				}
+				if parsed.Get("properties.options." + kw).Exists() {
+					t.Errorf("[%s] nested properties.options.%s was not removed: %s", name, kw, got)
+				}
+			}
+
+			if parsed.Get("properties.dependentSchemas.dependentRequired").Exists() {
+				t.Errorf("[%s] properties.dependentSchemas.dependentRequired was not removed: %s", name, got)
+			}
+
+			for _, prop := range []string{"dependentRequired", "dependentSchemas", "dependencies"} {
+				if !parsed.Get("properties." + prop).Exists() {
+					t.Errorf("[%s] legitimate property %q was removed: %s", name, prop, got)
+				}
+			}
+		})
+	}
+}
