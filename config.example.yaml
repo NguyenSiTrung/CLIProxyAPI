@@ -34,6 +34,15 @@ server:
   # Default is 0 (disabled / no limit).
   max-request-body-bytes: 0
 
+  # Negotiated compression of downstream HTTP responses (including SSE streams).
+  # Responses are compressed only when the client advertises zstd or gzip in
+  # Accept-Encoding; WebSocket upgrades are never wrapped.
+  response-compression:
+    # Default: true.
+    enabled: true
+    # Non-streaming responses smaller than this many bytes are sent uncompressed.
+    min-bytes: 1024
+
   # Global token for GitHub requests (for example, release and asset downloads).
   # A non-empty config token takes precedence over the GITHUB_TOKEN environment variable.
   # Leave empty to use GITHUB_TOKEN, or unauthenticated requests if neither is set.
@@ -58,6 +67,9 @@ server:
 
   # Enable local network mDNS / DNS-SD service discovery (RFC 6762 / RFC 6763).
   # When enabled, broadcasts _ai-gateway._tcp with API protocol subtypes on the local network.
+  # TXT records follow draft-su-ai-gateway-discovery-00:
+  #   txtvers, path, tls, auth, protocols, auth_type, product, id, role
+  # The TXT protocols list mirrors the advertised subtypes. Management endpoints are never advertised.
   # NOTE for Docker users: Link-local multicast (224.0.0.251) cannot cross default NAT bridge networks.
   # To broadcast across the physical LAN, run the container with host networking (--net=host / network_mode: host).
   discovery:
@@ -70,12 +82,12 @@ server:
     #   - "_messages"
     #   - "_generate-content"
     #   - "_interactions"
+    #   # Optional extended subtypes: _completions, _responses-ws, _realtime, _images,
+    #   # _videos, _audio, _count-tokens, _search
     # interfaces:
     #   include: []                     # White-listed interfaces (empty: auto-detect physical interfaces)
     #   exclude: []                     # Additional interface patterns to exclude
-    # auth-required: true               # Advertise that credentials are required
-
-    # advertise-management: false      # Advertise management availability
+    # auth-required: true               # Advertise auth=1 (credentials required)
 
 # Management API settings
 management:
@@ -164,7 +176,11 @@ routing:
   session-affinity-ttl: "1h"
   # When true (default), subagents (child sessions with parent references) inherit and bind
   # to the parent's upstream credential across all providers (Claude, Codex, Antigravity, Gemini),
-  # maximizing Prompt/KV Cache reuse and minimizing TTFT.
+  # for the same model, maximizing Prompt/KV Cache reuse and minimizing TTFT.
+  # Guardian reviews (X-Openai-Subagent: guardian) may inherit across models from the
+  # parent's most recent selection on the same real provider, if that credential is eligible.
+  # This includes mixed-provider pools; result-driven TTL refreshes do not reorder selections.
+  # Existing child bindings take precedence. Parent lookups do not extend the parent's TTL.
   # When false, subagents are distributed across the credential pool via the fallback selector
   # for maximum parallel concurrency.
   # Ignored when routing.session-affinity is false.
@@ -325,6 +341,12 @@ client:
     # Default false. Applies to both OAuth and API-key credentials across providers.
     # Legacy provider paths migrate here; this path wins conflicts, including explicit false.
     optimize-multi-agent-v2: false
+    # Cache upstream web search results per session so replayed Codex web_search_call items
+    # that omit results still retain search results in later turns.
+    web-search-result-cache:
+      enabled: false
+      ttl: "24h"
+      limit: 1024
 
 # Shared upstream behavior applies to OAuth and API-key credentials.
 upstream:
@@ -332,6 +354,17 @@ upstream:
     # Experimental full-duplex Codex Responses WebSocket steering (default: false).
     # Keeps one upstream account/model per socket; accepted input is never replayed.
     response-steering: false
+    # Compress request bodies sent to the ChatGPT Codex backend with zstd,
+    # mirroring the official Codex client. Applies only to OAuth credentials
+    # targeting https://chatgpt.com/backend-api/codex (API-key credentials,
+    # custom base URLs, and SIWC requests are never compressed). A 400/415
+    # rejection is retried once with an uncompressed body. Default: false.
+    upstream-request-compression: false
+    # Request bodies smaller than this many bytes are sent uncompressed.
+    upstream-request-compression-min-bytes: 1024
+    # Enable permessage-deflate compression on Codex WebSocket connections
+    # (upstream and downstream) after negotiation. Default: true.
+    websocket-compression: true
     # Disable forcing the official Codex User-Agent and Originator headers on HTTP/SSE and WebSocket requests.
     disable-codex-cloaking: false
     # Hold back the frames that carry nothing the client has seen - the handshake (response.created,
@@ -449,13 +482,14 @@ upstream:
     #
     # Shared Claude CLI fingerprint defaults. Update only after measuring a new Claude Code release.
     # Unconfirmed clients use this CLI baseline. Verified native Claude Code CLI, sdk-cli,
-    # and VSCode requests preserve their measured entrypoint when the Claude Code version is a
+    # sdk-ts, and VSCode requests preserve their measured entrypoint when the Claude Code version is a
     # patch release in the configured major/minor line at or above this baseline. Older versions
     # and newer major/minor lines fall back to the baseline until measured. In legacy mode,
     # timeout is a fallback and
     # verified native OS/arch values remain client-supplied. When stabilize-device-profile is
     # enabled, OS/arch are pinned to the values below and cached profiles remain constrained to
-    # the same exact software baseline rather than learning newer client versions.
+    # the same exact software baseline rather than learning newer client versions (unless the
+    # credential resolves to cloak_mode: never, which preserves the confirmed caller's headers).
     # header-defaults:
     #   user-agent: "claude-cli/2.1.280 (external, cli)"
     #   package-version: "0.112.1"
@@ -722,7 +756,7 @@ upstream:
 #           cloak:                         # optional: explicitly enable request cloaking for non-Claude-Code clients
 #             mode: "auto"                 # "auto" (default inside this block): cloak only when client is not Claude Code
 #                                          # "always": cloak every unconfirmed client; confirmed native Claude Code still passes through
-#                                          # "never": never apply cloaking
+#                                          # "never" / "uncloak": never apply cloaking; on non-CLI API keys, also strip incoming Claude Code identity/billing attribution
 #             # This "cloak" block applies to this api-keys.claude key entry only. For Claude OAuth
 #             # credentials, set the same options in the auth/token JSON file via "cloak_mode" /
 #             # "cloak_strict_mode" / "cloak_sensitive_words" / "cloak_cache_user_id".

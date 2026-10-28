@@ -32,22 +32,23 @@ func TestUsageQueuePluginPayloadIncludesStableFieldsAndSuccess(t *testing.T) {
 
 		plugin := &usageQueuePlugin{}
 		plugin.HandleUsage(ctx, coreusage.Record{
-			Provider:            "openai",
-			ExecutorType:        "KimiExecutor",
-			Model:               "gpt-5.4",
-			Alias:               "client-gpt",
-			APIKey:              "test-key",
-			AuthIndex:           "0",
-			AccessTokenSHA256:   "token-version-hash",
-			AuthType:            "apikey",
-			Source:              "user@example.com",
-			ReasoningEffort:     "medium",
-			ServiceTier:         "auto",
-			ResponseServiceTier: "default",
-			ResponseModel:       "gpt-5.6-luna",
-			Generate:            coreusage.GenerateFlag(true),
-			RequestedAt:         time.Date(2026, 4, 25, 0, 0, 0, 0, time.UTC),
-			Latency:             1500 * time.Millisecond,
+			Provider:             "openai",
+			ExecutorType:         "KimiExecutor",
+			Model:                "gpt-5.4",
+			Alias:                "client-gpt",
+			APIKey:               "test-key",
+			AuthIndex:            "0",
+			AccessTokenSHA256:    "token-version-hash",
+			AuthType:             "apikey",
+			Source:               "user@example.com",
+			ReasoningEffort:      "medium",
+			ServiceTier:          "auto",
+			EffectiveServiceTier: "priority",
+			ResponseServiceTier:  "default",
+			ResponseModel:        "gpt-5.6-luna",
+			Generate:             coreusage.GenerateFlag(true),
+			RequestedAt:          time.Date(2026, 4, 25, 0, 0, 0, 0, time.UTC),
+			Latency:              1500 * time.Millisecond,
 			Detail: coreusage.Detail{
 				InputTokens:  10,
 				OutputTokens: 20,
@@ -73,6 +74,7 @@ func TestUsageQueuePluginPayloadIncludesStableFieldsAndSuccess(t *testing.T) {
 		requireStringField(t, payload, "user_agent", "test-client/1.0")
 		requireStringField(t, payload, "reasoning_effort", "medium")
 		requireStringField(t, payload, "service_tier", "auto")
+		requireStringField(t, payload, "effective_service_tier", "priority")
 		requireMissingField(t, payload, "request_service_tier")
 		requireStringField(t, payload, "response_service_tier", "default")
 		requireStringField(t, payload, "response_model", "gpt-5.6-luna")
@@ -223,6 +225,7 @@ func TestUsageQueuePluginEmitsSingleCanonicalAutoTier(t *testing.T) {
 
 		payload := popSinglePayload(t)
 		requireStringField(t, payload, "service_tier", "auto")
+		requireMissingField(t, payload, "effective_service_tier")
 		requireMissingField(t, payload, "request_service_tier")
 	})
 }
@@ -860,5 +863,47 @@ func TestUsageQueuePluginPayloadDistinguishesNativeKey(t *testing.T) {
 			requireBoolField(t, payload, "is_native_key", false)
 			requireMissingField(t, payload, "access_provider")
 		})
+	})
+}
+
+func TestUsageQueuePluginEmitsFailCode(t *testing.T) {
+	withEnabledQueue(t, func() {
+		ginCtx := newTestGinContext(t, http.MethodPost, "/v1/chat/completions", http.StatusOK)
+		ctx := context.WithValue(context.Background(), "gin", ginCtx)
+
+		plugin := &usageQueuePlugin{}
+		plugin.HandleUsage(ctx, coreusage.Record{
+			Provider:    "gemini",
+			Model:       "gemini-3.1-pro-preview",
+			AuthIndex:   "0",
+			AuthType:    "apikey",
+			RequestedAt: time.Date(2026, 4, 25, 0, 0, 0, 0, time.UTC),
+			Failed:      true,
+			Fail: coreusage.Failure{
+				StatusCode: http.StatusBadGateway,
+				Body:       "upstream stream closed before finishReason",
+				Code:       coreusage.FailureStreamTruncatedCode,
+			},
+		})
+
+		payload := popSinglePayload(t)
+		raw, ok := payload["fail"]
+		if !ok {
+			t.Fatal("payload missing fail")
+		}
+		var got struct {
+			StatusCode int    `json:"status_code"`
+			Body       string `json:"body"`
+			Code       string `json:"code"`
+		}
+		if errUnmarshal := json.Unmarshal(raw, &got); errUnmarshal != nil {
+			t.Fatalf("unmarshal fail: %v", errUnmarshal)
+		}
+		if got.Code != coreusage.FailureStreamTruncatedCode {
+			t.Fatalf("fail.code = %q, want %q", got.Code, coreusage.FailureStreamTruncatedCode)
+		}
+		if got.StatusCode != http.StatusBadGateway {
+			t.Fatalf("fail.status_code = %d, want %d", got.StatusCode, http.StatusBadGateway)
+		}
 	})
 }

@@ -25,6 +25,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/runtime/executor/helps"
 	cliproxyauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	cliproxyexecutor "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/executor"
+	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/session"
 	sdktranslator "github.com/router-for-me/CLIProxyAPI/v8/sdk/translator"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -1286,6 +1287,226 @@ func TestClaudeExecutor_ConfirmedVSCodeOAuthPreservesToolNames(t *testing.T) {
 	}
 }
 
+func TestClaudeExecutor_ConfirmedSDKTSAgentSDKRequestPassesThroughWithRealProfile(t *testing.T) {
+	helps.ResetClaudeDeviceProfileCache()
+	var seenBody []byte
+	var seenHeaders http.Header
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seenBody, _ = io.ReadAll(r.Body)
+		seenHeaders = r.Header.Clone()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"msg_1","type":"message","model":"claude-sonnet-5-5","role":"assistant","content":[{"type":"text","text":"ok"}],"usage":{"input_tokens":1,"output_tokens":1}}`))
+	}))
+	defer server.Close()
+
+	const sessionID = "33333333-4444-4555-8666-777777777777"
+	const userID = `{"account_uuid":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","device_id":"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc","session_id":"33333333-4444-4555-8666-777777777777"}`
+	const sdkTSUA = "claude-cli/2.1.304 (external, sdk-ts, agent-sdk/0.3.276)"
+	const billingHeader = "x-anthropic-billing-header: cc_version=2.1.304.179; cc_entrypoint=sdk-ts;"
+	payload := []byte(`{"model":"claude-sonnet-5-5","max_tokens":1024,"system":[{"type":"text","text":` + fmt.Sprintf("%q", billingHeader) + `},{"type":"text","text":"You are Claude Code, Anthropic's official CLI for Claude, running within the Claude Agent SDK.","cache_control":{"type":"ephemeral","ttl":"1h"}},{"type":"text","text":"t3-code-system-prompt","cache_control":{"type":"ephemeral","ttl":"1h"}}],"tools":[{"name":"Agent","description":"subagent","input_schema":{"type":"object"}},{"name":"Bash","description":"shell","input_schema":{"type":"object"}}],"messages":[{"role":"user","content":[{"type":"text","text":"hello"}]}],"metadata":{"user_id":` + fmt.Sprintf("%q", userID) + `},"thinking":{"type":"adaptive","display":"summarized"},"output_config":{"effort":"low"}}`)
+	incoming := http.Header{
+		"User-Agent":     {sdkTSUA},
+		"X-App":          {"cli"},
+		"Anthropic-Beta": {"claude-code-20250219,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,per-turn-control-2026-07-01,mid-conversation-tool-changes-2026-07-01,inline-tools-2026-09-15,advisor-tool-2026-03-01,advanced-tool-use-2025-11-20,effort-2025-11-24,dangerous-tool-use-2026-09-03,afk-mode-2026-01-31,extended-cache-ttl-2025-04-11"},
+		"Anthropic-Dangerous-Direct-Browser-Access": {"true"},
+		"X-Claude-Code-Session-Id":                  {sessionID},
+		"X-Stainless-Package-Version":               {"0.128.0"},
+		"X-Stainless-Runtime-Version":               {"v26.3.0"},
+		"X-Stainless-Os":                            {"MacOS"},
+		"X-Stainless-Arch":                          {"arm64"},
+	}
+	deviceIDs := []string{"0000000000000000000000000000000000000000000000000000000000000000"}
+	executor := NewClaudeExecutor(&config.Config{})
+	auth := &cliproxyauth.Auth{
+		ID: "auth-sdk-ts-oauth",
+		Attributes: map[string]string{
+			"api_key":  "sk-ant-oat-native-sdk-ts",
+			"base_url": server.URL,
+		},
+		Metadata: map[string]any{
+			"account_uuid":      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+			"claude_device_ids": deviceIDs,
+		},
+	}
+
+	_, errExecute := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+		Model:   "claude-sonnet-5-5",
+		Payload: payload,
+	}, cliproxyexecutor.Options{
+		SourceFormat:    sdktranslator.FormatClaude,
+		OriginalRequest: payload,
+		Headers:         incoming,
+	})
+	if errExecute != nil {
+		t.Fatalf("Execute() error = %v", errExecute)
+	}
+
+	assertClaudeFingerprint(t, seenHeaders, sdkTSUA, "0.128.0", "v26.3.0", "MacOS", "arm64")
+	if got := gjson.GetBytes(seenBody, "system.#").Int(); got != 3 {
+		t.Fatalf("system block count = %d, want 3: %s", got, seenBody)
+	}
+	if got := gjson.GetBytes(seenBody, "system.0.text").String(); !strings.HasPrefix(got, "x-anthropic-billing-header: cc_version=2.1.304.179; cc_entrypoint=sdk-ts; cch=") {
+		t.Fatalf("system.0.text = %q, want sdk-ts billing header with signed cch", got)
+	}
+	if got := gjson.GetBytes(seenBody, "system.1.text").String(); got != "You are Claude Code, Anthropic's official CLI for Claude, running within the Claude Agent SDK." {
+		t.Fatalf("system.1.text = %q, want Agent SDK CLI identity preserved", got)
+	}
+	if got := gjson.GetBytes(seenBody, "system.2.text").String(); got != "t3-code-system-prompt" {
+		t.Fatalf("system.2.text = %q, want caller system prompt preserved", got)
+	}
+	if got := gjson.GetBytes(seenBody, "tools.0.name").String(); got != "Agent" {
+		t.Fatalf("tools.0.name = %q, want Agent preserved", got)
+	}
+	if got := gjson.GetBytes(seenBody, "tools.1.name").String(); got != "Bash" {
+		t.Fatalf("tools.1.name = %q, want Bash preserved", got)
+	}
+	if got := gjson.GetBytes(seenBody, "messages.#").Int(); got != 1 {
+		t.Fatalf("messages.# = %d, want 1 (no relocated system turn)", got)
+	}
+	if got := gjson.GetBytes(seenBody, "messages.0.content.#").Int(); got != 1 {
+		t.Fatalf("messages.0.content.# = %d, want 1 (no currentDate pin injected)", got)
+	}
+}
+
+func TestClaudeExecutor_CloakModeNeverPreservesConfirmedShapeClaudeCodeCallerHeaders(t *testing.T) {
+	helps.ResetClaudeDeviceProfileCache()
+	var seenBody []byte
+	var seenHeaders http.Header
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seenBody, _ = io.ReadAll(r.Body)
+		seenHeaders = r.Header.Clone()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"msg_1","type":"message","model":"claude-haiku-5-5","role":"assistant","content":[{"type":"text","text":"ok"}],"usage":{"input_tokens":1,"output_tokens":1}}`))
+	}))
+	defer server.Close()
+
+	const sessionID = "44444444-5555-4666-8777-888888888888"
+	const userID = `{"account_uuid":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","device_id":"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd","session_id":"44444444-5555-4666-8777-888888888888"}`
+	const callerUA = "claude-cli/2.1.304 (external, sdk-py, agent-sdk/0.3.276)"
+	payload := []byte(`{"model":"claude-haiku-5-5","max_tokens":1024,"system":[{"type":"text","text":"x-anthropic-billing-header: cc_version=2.1.304.c80; cc_entrypoint=sdk-py"},{"type":"text","text":"You are a Claude agent, built on Anthropic's Claude Agent SDK."},{"type":"text","text":"You are naming a coding session."}],"tools":[],"messages":[{"role":"user","content":[{"type":"text","text":"name session"}]}],"metadata":{"user_id":` + fmt.Sprintf("%q", userID) + `}}`)
+	incoming := http.Header{
+		"User-Agent":     {callerUA},
+		"X-App":          {"cli"},
+		"Anthropic-Beta": {"interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,structured-outputs-2025-12-15"},
+		"Anthropic-Dangerous-Direct-Browser-Access": {"true"},
+		"X-Claude-Code-Session-Id":                  {sessionID},
+		"X-Stainless-Package-Version":               {"0.128.0"},
+		"X-Stainless-Runtime-Version":               {"v26.3.0"},
+		"X-Stainless-Os":                            {"MacOS"},
+		"X-Stainless-Arch":                          {"arm64"},
+	}
+	deviceIDs := []string{"0000000000000000000000000000000000000000000000000000000000000000"}
+	executor := NewClaudeExecutor(&config.Config{})
+	auth := &cliproxyauth.Auth{
+		ID: "auth-cloak-never-oauth",
+		Attributes: map[string]string{
+			"api_key":  "sk-ant-oat-cloak-never",
+			"base_url": server.URL,
+		},
+		Metadata: map[string]any{
+			"account_uuid":      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+			"claude_device_ids": deviceIDs,
+			"cloak_mode":        "never",
+		},
+	}
+
+	_, errExecute := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+		Model:   "claude-haiku-5-5",
+		Payload: payload,
+	}, cliproxyexecutor.Options{
+		SourceFormat:    sdktranslator.FormatClaude,
+		OriginalRequest: payload,
+		Headers:         incoming,
+	})
+	if errExecute != nil {
+		t.Fatalf("Execute() error = %v", errExecute)
+	}
+
+	assertClaudeFingerprint(t, seenHeaders, callerUA, "0.128.0", "v26.3.0", "MacOS", "arm64")
+	if bytes.Contains(seenBody, []byte(`"cache_control"`)) {
+		t.Fatalf("cloak_mode: never confirmed-shape helper unexpectedly injected cache_control: %s", seenBody)
+	}
+}
+
+func TestClaudeExecutor_CloakModeNeverUsesConfiguredHeaderDefaultsBaseline(t *testing.T) {
+	helps.ResetClaudeDeviceProfileCache()
+	var seenHeaders http.Header
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seenHeaders = r.Header.Clone()
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"msg_1","type":"message","model":"claude-sonnet-5-5","role":"assistant","content":[{"type":"text","text":"ok"}],"usage":{"input_tokens":1,"output_tokens":1}}`))
+	}))
+	defer server.Close()
+
+	const sessionID = "55555555-6666-4777-8888-999999999999"
+	const userID = `{"account_uuid":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","device_id":"eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee","session_id":"55555555-6666-4777-8888-999999999999"}`
+	const callerUA = "claude-cli/2.2.5 (external, cli)"
+	payload := []byte(`{"model":"claude-sonnet-5-5","max_tokens":1024,"system":[{"type":"text","text":"x-anthropic-billing-header: cc_version=2.2.5.179; cc_entrypoint=cli;"},{"type":"text","text":"You are Claude Code, Anthropic's official CLI for Claude."}],"tools":[],"messages":[{"role":"user","content":[{"type":"text","text":"hello"}]}],"metadata":{"user_id":` + fmt.Sprintf("%q", userID) + `}}`)
+	cfg := &config.Config{
+		ClaudeHeaderDefaults: config.ClaudeHeaderDefaults{
+			UserAgent:      "claude-cli/2.2.0 (external, cli)",
+			PackageVersion: "0.95.0",
+			RuntimeVersion: "v26.4.0",
+			OS:             "MacOS",
+			Arch:           "arm64",
+		},
+	}
+	deviceIDs := []string{"0000000000000000000000000000000000000000000000000000000000000000"}
+	executor := NewClaudeExecutor(cfg)
+	auth := &cliproxyauth.Auth{
+		ID: "auth-cloak-never-configured-baseline",
+		Attributes: map[string]string{
+			"api_key":  "sk-ant-oat-cloak-never-cfg",
+			"base_url": server.URL,
+		},
+		Metadata: map[string]any{
+			"account_uuid":      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+			"claude_device_ids": deviceIDs,
+			"cloak_mode":        "never",
+		},
+	}
+
+	incomingPlausible := http.Header{
+		"User-Agent":     {callerUA},
+		"X-App":          {"cli"},
+		"Anthropic-Beta": {"claude-code-20250219,interleaved-thinking-2025-05-14"},
+		"Anthropic-Dangerous-Direct-Browser-Access": {"true"},
+		"X-Claude-Code-Session-Id":                  {sessionID},
+		"X-Stainless-Package-Version":               {"0.128.0"},
+		"X-Stainless-Runtime-Version":               {"v26.5.0"},
+		"X-Stainless-Os":                            {"MacOS"},
+		"X-Stainless-Arch":                          {"arm64"},
+	}
+	_, errExecute := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+		Model:   "claude-sonnet-5-5",
+		Payload: payload,
+	}, cliproxyexecutor.Options{
+		SourceFormat:    sdktranslator.FormatClaude,
+		OriginalRequest: payload,
+		Headers:         incomingPlausible,
+	})
+	if errExecute != nil {
+		t.Fatalf("Execute() plausible headers error = %v", errExecute)
+	}
+	assertClaudeFingerprint(t, seenHeaders, callerUA, "0.128.0", "v26.5.0", "MacOS", "arm64")
+
+	incomingFallback := incomingPlausible.Clone()
+	incomingFallback.Set("X-Stainless-Package-Version", "0.80.0")
+	incomingFallback.Del("X-Stainless-Runtime-Version")
+	_, errExecute = executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+		Model:   "claude-sonnet-5-5",
+		Payload: payload,
+	}, cliproxyexecutor.Options{
+		SourceFormat:    sdktranslator.FormatClaude,
+		OriginalRequest: payload,
+		Headers:         incomingFallback,
+	})
+	if errExecute != nil {
+		t.Fatalf("Execute() fallback headers error = %v", errExecute)
+	}
+	assertClaudeFingerprint(t, seenHeaders, callerUA, "0.95.0", "v26.4.0", "MacOS", "arm64")
+}
+
 func TestClaudeDeviceProfileStabilizationEnabled_DefaultFalse(t *testing.T) {
 	if helps.ClaudeDeviceProfileStabilizationEnabled(nil) {
 		t.Fatal("expected nil config to default to disabled stabilization")
@@ -1664,6 +1885,26 @@ func TestShouldSanitizeClaudeMessagesForUpstream_OnlyClaudeFamily(t *testing.T) 
 				t.Errorf("shouldSanitizeClaudeMessagesForUpstream(%q) = %v, want %v", tc.model, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestSanitizeClaudeMessagesForClaudeUpstream_RestoresCommentaryMarkerForNonClaudeModel(t *testing.T) {
+	body := []byte(`{"model":"kimi-k2.5","messages":[{"role":"assistant","content":[{"type":"thinking","thinking":"COMMENTARY_SENTINEL","signature":"cpa:commentary:v1"},{"type":"thinking","thinking":"reason","signature":"skip_thought_signature_validator"},{"type":"text","text":"FINAL_SENTINEL"}]}]}`)
+
+	out := sanitizeClaudeMessagesForClaudeUpstreamWithDebug(context.Background(), body, "kimi-k2.5")
+	content := gjson.GetBytes(out, "messages.0.content")
+	if len(content.Array()) != 3 {
+		t.Fatalf("expected 3 content blocks after marker restore: %s", out)
+	}
+	first := content.Get("0")
+	if first.Get("type").String() != "text" || first.Get("text").String() != "COMMENTARY_SENTINEL" || first.Get("signature").Exists() {
+		t.Fatalf("commentary marker should become a plain text block for non-Claude models: %s", out)
+	}
+	if got := content.Get("1.signature").String(); got != "skip_thought_signature_validator" {
+		t.Fatalf("non-marker opaque signature must pass through untouched for non-Claude models, got %q: %s", got, out)
+	}
+	if got := content.Get("2.text").String(); got != "FINAL_SENTINEL" {
+		t.Fatalf("final text = %q, want FINAL_SENTINEL: %s", got, out)
 	}
 }
 
@@ -7952,6 +8193,145 @@ func TestResolveClaudeMCPAliasOptions(t *testing.T) {
 	otherCtx := context.WithValue(context.Background(), "gin", otherGinCtx)
 	if otherSecret := resolveClaudeMCPAliasOptions(otherCtx).secret; otherSecret == firstSecret {
 		t.Fatalf("different downstream callers shared alias secret %q", firstSecret)
+	}
+
+	replayMeta := map[string]any{
+		cliproxyexecutor.CallerScopeMetadataKey: session.CallerScope("downstream-caller-one"),
+	}
+	if replaySecret := resolveClaudeMCPAliasOptions(context.Background(), replayMeta).secret; replaySecret != firstSecret {
+		t.Fatalf("replay caller_scope alias secret = %q, want original caller secret %q", replaySecret, firstSecret)
+	}
+}
+
+func TestClaudeExecutor_CallerScopeMetadataReproducesOAuthMCPToolAliases(t *testing.T) {
+	var seenBodies [][]byte
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		seenBodies = append(seenBodies, body)
+		if strings.Contains(r.URL.Path, "/count_tokens") {
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"input_tokens":42}`))
+			return
+		}
+		if gjson.GetBytes(body, "stream").Bool() {
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, _ = w.Write([]byte("event: message_start\ndata: {\"type\":\"message_start\",\"message\":{\"id\":\"msg_stream_1\",\"type\":\"message\",\"role\":\"assistant\",\"model\":\"claude-sonnet-4-5\",\"content\":[],\"usage\":{\"input_tokens\":10,\"output_tokens\":1}}}\n\nevent: message_stop\ndata: {\"type\":\"message_stop\"}\n\n"))
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"msg_exec_1","type":"message","model":"claude-sonnet-4-5","role":"assistant","content":[{"type":"text","text":"ok"}],"usage":{"input_tokens":10,"output_tokens":1}}`))
+	}))
+	defer server.Close()
+
+	executor := NewClaudeExecutor(&config.Config{})
+	auth := &cliproxyauth.Auth{
+		ID:       "claude-oauth-caller-scope-replay",
+		Metadata: claudeOAuthTestMetadata(),
+		Attributes: map[string]string{
+			"api_key":  "sk-ant-oat-caller-scope-test",
+			"base_url": server.URL,
+		},
+	}
+	payload := []byte(`{"model":"claude-sonnet-4-5","tools":[{"name":"read_file","input_schema":{"type":"object"}},{"name":"run_bash","input_schema":{"type":"object"}}],"tool_choice":{"type":"tool","name":"read_file"},"messages":[{"role":"user","content":"warm cache"}]}`)
+
+	gin.SetMode(gin.TestMode)
+	ginCtx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ginCtx.Set("userApiKey", "sk-downstream-pi-caller")
+	callerCtx := context.WithValue(context.Background(), "gin", ginCtx)
+	callerScope := session.CallerScope("sk-downstream-pi-caller")
+
+	// 1. Original HTTP stream request with gin context.
+	streamRes, errStream := executor.ExecuteStream(callerCtx, auth, cliproxyexecutor.Request{
+		Model:   "claude-sonnet-4-5",
+		Payload: payload,
+	}, cliproxyexecutor.Options{
+		SourceFormat: sdktranslator.FormatClaude,
+		Stream:       true,
+		Metadata: map[string]any{
+			cliproxyexecutor.CallerScopeMetadataKey: callerScope,
+		},
+	})
+	if errStream != nil {
+		t.Fatalf("original ExecuteStream() error = %v", errStream)
+	}
+	for range streamRes.Chunks {
+	}
+
+	// 2. Plugin replay stream request on background context (no gin.Context) with CallerScope metadata.
+	replayStreamRes, errReplayStream := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+		Model:   "claude-sonnet-4-5",
+		Payload: payload,
+	}, cliproxyexecutor.Options{
+		SourceFormat: sdktranslator.FormatClaude,
+		Stream:       true,
+		Metadata: map[string]any{
+			cliproxyexecutor.CallerScopeMetadataKey: callerScope,
+		},
+	})
+	if errReplayStream != nil {
+		t.Fatalf("replay ExecuteStream() error = %v", errReplayStream)
+	}
+	for range replayStreamRes.Chunks {
+	}
+
+	// 3. Plugin replay non-stream Execute on background context with CallerScope metadata.
+	if _, errExec := executor.Execute(context.Background(), auth, cliproxyexecutor.Request{
+		Model:   "claude-sonnet-4-5",
+		Payload: payload,
+	}, cliproxyexecutor.Options{
+		SourceFormat: sdktranslator.FormatClaude,
+		Metadata: map[string]any{
+			cliproxyexecutor.CallerScopeMetadataKey: callerScope,
+		},
+	}); errExec != nil {
+		t.Fatalf("replay Execute() error = %v", errExec)
+	}
+
+	// 4. Plugin replay countTokensUpstream on background context with CallerScope metadata.
+	if _, errCount := executor.countTokensUpstream(context.Background(), auth, cliproxyexecutor.Request{
+		Model:   "claude-sonnet-4-5",
+		Payload: payload,
+	}, cliproxyexecutor.Options{
+		SourceFormat: sdktranslator.FormatClaude,
+		Metadata: map[string]any{
+			cliproxyexecutor.CallerScopeMetadataKey: callerScope,
+		},
+	}); errCount != nil {
+		t.Fatalf("replay CountTokens() error = %v", errCount)
+	}
+
+	// 5. Unscoped background request (default caller fallback).
+	defaultStreamRes, errDefaultStream := executor.ExecuteStream(context.Background(), auth, cliproxyexecutor.Request{
+		Model:   "claude-sonnet-4-5",
+		Payload: payload,
+	}, cliproxyexecutor.Options{
+		SourceFormat: sdktranslator.FormatClaude,
+		Stream:       true,
+	})
+	if errDefaultStream != nil {
+		t.Fatalf("default ExecuteStream() error = %v", errDefaultStream)
+	}
+	for range defaultStreamRes.Chunks {
+	}
+
+	if len(seenBodies) != 5 {
+		t.Fatalf("seenBodies len = %d, want 5", len(seenBodies))
+	}
+	origTool0 := gjson.GetBytes(seenBodies[0], "tools.0.name").String()
+	origTool1 := gjson.GetBytes(seenBodies[0], "tools.1.name").String()
+	origChoice := gjson.GetBytes(seenBodies[0], "tool_choice.name").String()
+	if !helps.IsClaudeMCPToolName(origTool0) || !helps.IsClaudeMCPToolName(origTool1) || origChoice != origTool0 {
+		t.Fatalf("unexpected original MCP tool names: tool0=%q tool1=%q choice=%q", origTool0, origTool1, origChoice)
+	}
+	for idx, label := range []string{"replay_stream", "replay_execute", "replay_count_tokens"} {
+		body := seenBodies[idx+1]
+		if got0, got1 := gjson.GetBytes(body, "tools.0.name").String(), gjson.GetBytes(body, "tools.1.name").String(); got0 != origTool0 || got1 != origTool1 {
+			t.Fatalf("%s tools = (%q, %q), want (%q, %q)", label, got0, got1, origTool0, origTool1)
+		}
+	}
+	defaultTool0 := gjson.GetBytes(seenBodies[4], "tools.0.name").String()
+	if defaultTool0 == origTool0 {
+		t.Fatalf("default caller tool0 %q matched scoped caller tool0", defaultTool0)
 	}
 }
 
