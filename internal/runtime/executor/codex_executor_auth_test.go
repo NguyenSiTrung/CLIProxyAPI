@@ -3,8 +3,8 @@ package executor
 import (
 	"context"
 	"crypto/tls"
-	"encoding/base64"
 	"encoding/json"
+	"github.com/MoeForge/moego/base64"
 	"io"
 	"net"
 	"net/http"
@@ -746,7 +746,10 @@ func TestCodexExecutorUseSIWCExecuteAndStream(t *testing.T) {
 	if got := gotHeaders.Get("User-Agent"); got != codexSIWCUserAgent(&customCfg) {
 		t.Fatalf("custom User-Agent = %q, want %q", got, codexSIWCUserAgent(&customCfg))
 	}
-	for _, forbidden := range []string{"max_output_tokens", "temperature", "prompt_cache_retention", "prompt_cache_options", "instructions", "tools"} {
+	if got := gotBody["max_output_tokens"]; got != float64(1024) {
+		t.Fatalf("max_output_tokens = %v, want 1024", got)
+	}
+	for _, forbidden := range []string{"temperature", "prompt_cache_retention", "prompt_cache_options", "instructions", "tools"} {
 		if _, exists := gotBody[forbidden]; exists {
 			t.Fatalf("field %q should be omitted in SIWC mode, got %#v", forbidden, gotBody[forbidden])
 		}
@@ -781,7 +784,10 @@ func TestCodexExecutorUseSIWCExecuteAndStream(t *testing.T) {
 	if gotBody["service_tier"] != "priority" {
 		t.Fatalf("expected user payload rule to set service_tier=priority after SIWC body cleanup, got %v", gotBody["service_tier"])
 	}
-	for _, forbidden := range []string{"max_output_tokens", "temperature", "prompt_cache_retention", "prompt_cache_options", "instructions", "tools"} {
+	if got := gotBody["max_output_tokens"]; got != float64(1024) {
+		t.Fatalf("ExecuteStream max_output_tokens = %v, want 1024", got)
+	}
+	for _, forbidden := range []string{"temperature", "prompt_cache_retention", "prompt_cache_options", "instructions", "tools"} {
 		if _, exists := gotBody[forbidden]; exists {
 			t.Fatalf("ExecuteStream field %q should be omitted in SIWC mode, got %#v", forbidden, gotBody[forbidden])
 		}
@@ -905,7 +911,10 @@ func TestCodexWebsocketsExecutorUseSIWCExecuteAndStream(t *testing.T) {
 	if gotFrame["type"] != "response.create" || gotFrame["store"] != false || gotFrame["service_tier"] != "priority" {
 		t.Fatalf("unexpected SIWC WebSocket frame: %#v", gotFrame)
 	}
-	for _, forbidden := range []string{"stream", "background", "max_output_tokens", "temperature", "prompt_cache_retention", "prompt_cache_options", "instructions", "tools"} {
+	if got := gotFrame["max_output_tokens"]; got != float64(1024) {
+		t.Fatalf("WebSocket max_output_tokens = %v, want 1024", got)
+	}
+	for _, forbidden := range []string{"stream", "background", "temperature", "prompt_cache_retention", "prompt_cache_options", "instructions", "tools"} {
 		if _, exists := gotFrame[forbidden]; exists {
 			t.Fatalf("field %q should be omitted in SIWC WebSocket frame: %#v", forbidden, gotFrame)
 		}
@@ -928,7 +937,10 @@ func TestCodexWebsocketsExecutorUseSIWCExecuteAndStream(t *testing.T) {
 	if gotFrame["type"] != "response.create" || gotFrame["store"] != false || gotFrame["service_tier"] != "priority" {
 		t.Fatalf("unexpected SIWC WebSocket stream frame: %#v", gotFrame)
 	}
-	for _, forbidden := range []string{"stream", "background", "max_output_tokens", "temperature", "prompt_cache_retention", "prompt_cache_options", "instructions", "tools"} {
+	if got := gotFrame["max_output_tokens"]; got != float64(1024) {
+		t.Fatalf("WebSocket ExecuteStream max_output_tokens = %v, want 1024", got)
+	}
+	for _, forbidden := range []string{"stream", "background", "temperature", "prompt_cache_retention", "prompt_cache_options", "instructions", "tools"} {
 		if _, exists := gotFrame[forbidden]; exists {
 			t.Fatalf("ExecuteStream field %q should be omitted in SIWC WebSocket frame: %#v", forbidden, gotFrame)
 		}
@@ -1619,5 +1631,42 @@ func TestCodexExecutorCodexClientIgnoresUseSIWC(t *testing.T) {
 				t.Fatal("expected Codex client request to fail when outer non-SIWC access_token is missing")
 			}
 		})
+	}
+}
+
+func TestCodexExecutorForceRefreshRejectedRefreshTokenWithoutDiskRotation_Issue7135(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	tmpDir := t.TempDir()
+	diskPath := tmpDir + "/codex-dead.json"
+	diskData := map[string]any{
+		"type":          "codex",
+		"access_token":  "revoked-access-token",
+		"refresh_token": "revoked-refresh-token",
+		"expired":       now.Add(2 * time.Hour).Format(time.RFC3339),
+	}
+	if errWrite := codexauth.WriteJSONFileAtomic(diskPath, diskData); errWrite != nil {
+		t.Fatalf("WriteJSONFileAtomic: %v", errWrite)
+	}
+
+	executor := NewCodexExecutor(&config.Config{AuthDir: tmpDir})
+	auth := &cliproxyauth.Auth{
+		ID:                   "codex-dead.json",
+		FileName:             "codex-dead.json",
+		Provider:             "codex",
+		Status:               cliproxyauth.StatusError,
+		Unavailable:          true,
+		RequiresSignIn:       true,
+		RejectedAccessToken:  "revoked-access-token",
+		RejectedRefreshToken: "revoked-refresh-token",
+		StatusMessage:        "unauthorized (refresh token invalid)",
+		RefreshError:         &cliproxyauth.Error{Code: "refresh_token_reused", Message: "refresh token was already used", HTTPStatus: http.StatusUnauthorized},
+		Attributes:           map[string]string{cliproxyauth.AttributePath: diskPath, cliproxyauth.AttributeSource: diskPath},
+		Metadata:             cloneSIWCMap(diskData),
+	}
+
+	// Forced refresh when disk file has NOT rotated and refresh_token matches RejectedRefreshToken must fail.
+	_, errRefresh := executor.Refresh(cliproxyauth.WithForceRefresh(context.Background()), auth.Clone())
+	if errRefresh == nil {
+		t.Fatal("expected forced Refresh on unchanged rejected refresh_token without disk rotation to return an error, got nil")
 	}
 }
