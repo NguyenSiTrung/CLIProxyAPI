@@ -38,6 +38,9 @@ func (e *CodexWebsocketsExecutor) ExecuteStream(ctx context.Context, auth *clipr
 	if err != nil {
 		return nil, err
 	}
+	if prepared.upstreamModel != "" && prepared.upstreamModel != baseModel {
+		reporter.SetUpstreamModel(prepared.upstreamModel)
+	}
 	from := prepared.from
 	responseFormat := prepared.responseFormat
 	to := prepared.to
@@ -844,6 +847,7 @@ type codexWebsocketPrepared struct {
 	preserveNativeOutput bool
 	originalPayload      []byte
 	clientBody           []byte
+	upstreamModel        string
 	wsURL                string
 	wsHeaders            http.Header
 	useSIWC              bool
@@ -887,6 +891,7 @@ func (e *CodexWebsocketsExecutor) prepareCodexWebsocketStream(ctx context.Contex
 	}
 	originalTranslated = helps.SetStringIfDifferent(originalTranslated, "model", baseModel)
 	doc := ojson.NewDoc(body)
+	normalizeCodexOutputBudgetDoc(doc)
 	helps.SetStringIfDifferentDoc(doc, "model", baseModel)
 
 	if err = helps.ApplyRequestThinkingDoc(doc, req, opts, from.String(), to.String(), e.Identifier(), updatesChanged); err != nil {
@@ -895,13 +900,20 @@ func (e *CodexWebsocketsExecutor) prepareCodexWebsocketStream(ctx context.Contex
 
 	instructionsResult := ojson.GetBytesNoCopy(req.Payload, "instructions")
 	hasExplicitInstructions := instructionsResult.Exists() && strings.TrimSpace(instructionsResult.String()) != ""
-	ctx = helps.WithPayloadFinalizer(ctx, helps.NewPayloadFinalizer(e.cfg, "codex-websockets", baseModel, to.String(), "", originalTranslated, req, opts))
+	ctx = helps.WithPayloadFinalizer(ctx, helps.NewPayloadFinalizer(e.cfg, "codex-websockets", baseModel, to.String(), "", originalTranslated, req, opts, auth))
 	helps.SetStringIfDifferentDoc(doc, "model", baseModel)
 	ensureWebSearchToolForHistoryDoc(doc, opts.Headers)
 	if !useSIWC {
 		normalizeCodexInstructionsDoc(doc, preserveNativeOutput)
 		if e.cfg == nil || e.cfg.DisableImageGeneration == config.DisableImageGenerationOff {
-			ensureImageGenerationToolDoc(doc, baseModel, auth, opts.Headers)
+			checkModel := req.Model
+			if strings.TrimSpace(checkModel) == "" {
+				checkModel = baseModel
+			}
+			ensureImageGenerationToolDoc(doc, checkModel, auth, opts.Headers)
+			if !codexAuthUsesAPIKey(auth) {
+				normalizeCodexImageGenerationToolsDoc(doc)
+			}
 		}
 	}
 	normalizeCodexWebsocketParallelToolCallsDoc(doc, opts.Headers)
@@ -930,9 +942,13 @@ func (e *CodexWebsocketsExecutor) prepareCodexWebsocketStream(ctx context.Contex
 	}
 	helps.FinalizePayloadDoc(ctx, doc)
 	body = doc.Bytes()
+	upstreamModel := strings.TrimSpace(doc.Get("model").String())
 	wsHeaders = applyCodexWebsocketHeaders(ctx, wsHeaders, auth, apiKey, e.cfg, preserveNativeOutput, opts.Headers)
-	applyCodexRoutingHint(ctx, wsHeaders, auth, baseModel, body, opts.Headers)
-	applyModelHeaderOverrides(wsHeaders, baseModel)
+	applyCodexRoutingHint(ctx, wsHeaders, auth, upstreamModel, body, opts.Headers)
+	applyModelHeaderOverrides(wsHeaders, upstreamModel)
+	if errValidate := helps.ValidateCodexHostedImageGenerationDoc(doc, wsHeaders, e.cfg, !useSIWC && !codexAuthUsesAPIKey(auth)); errValidate != nil {
+		return nil, errValidate
+	}
 
 	return &codexWebsocketPrepared{
 		from:                 from,
@@ -941,6 +957,7 @@ func (e *CodexWebsocketsExecutor) prepareCodexWebsocketStream(ctx context.Contex
 		preserveNativeOutput: preserveNativeOutput,
 		originalPayload:      originalPayload,
 		clientBody:           body,
+		upstreamModel:        upstreamModel,
 		wsURL:                wsURL,
 		wsHeaders:            wsHeaders,
 		useSIWC:              useSIWC,

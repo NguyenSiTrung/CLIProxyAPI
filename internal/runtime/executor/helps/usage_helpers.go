@@ -32,6 +32,7 @@ type UsageReporter struct {
 	requestID            string
 	traceID              string
 	selectionID          string
+	homeSelection        *usage.HomeSelection
 	provider             string
 	baseURL              string
 	executorType         string
@@ -131,6 +132,7 @@ func NewUsageReporter(ctx context.Context, provider, model string, auth *cliprox
 		requestID:       uuid.NewString(),
 		traceID:         traceID,
 		selectionID:     usage.SelectionIDFromContext(ctx),
+		homeSelection:   usage.HomeSelectionFromContext(ctx),
 		provider:        provider,
 		baseURL:         baseURL,
 		model:           model,
@@ -542,6 +544,13 @@ func (r *UsageReporter) buildAdditionalModelRecord(model string, detail usage.De
 	}
 	rec := r.buildRecordForModel(model, detail, false, usage.Failure{})
 	rec.RequestID = uuid.NewString()
+	if rec.HomeSelection != nil {
+		// Split billing details do not represent another scheduled request.
+		// Mark them separately without changing the primary usage metadata.
+		selection := *rec.HomeSelection
+		selection.Additional = true
+		rec.HomeSelection = &selection
+	}
 	return rec, true
 }
 
@@ -680,6 +689,7 @@ func (r *UsageReporter) buildRecordForModel(model string, detail usage.Detail, f
 		RequestID:            r.requestID,
 		TraceID:              r.traceID,
 		SelectionID:          r.selectionID,
+		HomeSelection:        r.homeSelection,
 		Provider:             r.provider,
 		BaseURL:              r.baseURL,
 		ExecutorType:         r.executorType,
@@ -732,6 +742,8 @@ func failFromErrors(errs ...error) usage.Failure {
 		}
 		if truncatedErr, ok := errors.AsType[cliproxyexecutor.StreamTruncatedError](err); ok && truncatedErr != nil && truncatedErr.IsStreamTruncated() {
 			fail.Code = usage.FailureStreamTruncatedCode
+		} else if requestErr, ok := errors.AsType[cliproxyexecutor.RequestScopedError](err); ok && requestErr != nil && requestErr.IsRequestScoped() {
+			fail.Code = usage.FailureRequestScopedCode
 		}
 		return fail
 	}
@@ -1168,6 +1180,8 @@ func (b *StreamUsageBuffer) observeGeminiFamilyStream(line []byte, allowResponse
 			{&detail.VideoInputTokens, update.VideoInputTokens},
 			{&detail.FileInputTokens, update.FileInputTokens},
 			{&detail.CachedTextTokens, update.CachedTextTokens},
+			{&detail.CachedImageTokens, update.CachedImageTokens},
+			{&detail.CachedAudioTokens, update.CachedAudioTokens},
 			{&detail.TextOutputTokens, update.TextOutputTokens},
 			{&detail.ImageOutputTokens, update.ImageOutputTokens},
 			{&detail.AudioOutputTokens, update.AudioOutputTokens},
@@ -1768,6 +1782,7 @@ func hasStructuredUsageDetail(d usage.Detail) bool {
 		d.CacheCreation1hTokens != nil || d.CacheCreation12hTokens != nil ||
 		d.TextInputTokens != nil || d.ImageInputTokens != nil || d.AudioInputTokens != nil ||
 		d.VideoInputTokens != nil || d.FileInputTokens != nil || d.CachedTextTokens != nil ||
+		d.CachedImageTokens != nil || d.CachedAudioTokens != nil ||
 		d.TextOutputTokens != nil || d.ImageOutputTokens != nil || d.AudioOutputTokens != nil ||
 		d.AcceptedPredictionTokens != nil || d.RejectedPredictionTokens != nil ||
 		d.Speed != "" || d.InferenceGeo != ""
@@ -1890,14 +1905,34 @@ func parseOpenAIStyleUsageNode(usageNode ojson.Result) usage.Detail {
 				if v.Type == ojson.Number && detail.FileInputTokens == nil {
 					detail.FileInputTokens = usage.Int64Ptr(v.Int())
 				}
-			case "cached_prompt_text_tokens":
+			case "cached_prompt_text_tokens", "cached_text_tokens":
 				if v.Type == ojson.Number && detail.CachedTextTokens == nil {
 					detail.CachedTextTokens = usage.Int64Ptr(v.Int())
 				}
+			case "cached_image_tokens":
+				if v.Type == ojson.Number && detail.CachedImageTokens == nil {
+					detail.CachedImageTokens = usage.Int64Ptr(v.Int())
+				}
+			case "cached_audio_tokens":
+				if v.Type == ojson.Number && detail.CachedAudioTokens == nil {
+					detail.CachedAudioTokens = usage.Int64Ptr(v.Int())
+				}
 			case "cached_tokens_details":
-				if detail.CachedTextTokens == nil && v.IsObject() {
-					if tv := v.Get("text_tokens"); tv.Type == ojson.Number {
-						detail.CachedTextTokens = usage.Int64Ptr(tv.Int())
+				if v.IsObject() {
+					if detail.CachedTextTokens == nil {
+						if tv := v.Get("text_tokens"); tv.Type == ojson.Number {
+							detail.CachedTextTokens = usage.Int64Ptr(tv.Int())
+						}
+					}
+					if detail.CachedImageTokens == nil {
+						if iv := v.Get("image_tokens"); iv.Type == ojson.Number {
+							detail.CachedImageTokens = usage.Int64Ptr(iv.Int())
+						}
+					}
+					if detail.CachedAudioTokens == nil {
+						if av := v.Get("audio_tokens"); av.Type == ojson.Number {
+							detail.CachedAudioTokens = usage.Int64Ptr(av.Int())
+						}
 					}
 				}
 			}
@@ -3316,16 +3351,29 @@ func parseGeminiFamilyUsageDetail(node ojson.Result) usage.Detail {
 		}
 	}
 	if cacheDetails.Exists() {
-		var cachedText int64
-		var hasCachedText bool
+		var cachedText, cachedImg, cachedAudio int64
+		var hasCachedText, hasCachedImg, hasCachedAudio bool
 		parseModalityList(cacheDetails, func(mod string, cnt int64) {
-			if mod == "TEXT" {
+			switch mod {
+			case "TEXT":
 				cachedText += cnt
 				hasCachedText = true
+			case "IMAGE":
+				cachedImg += cnt
+				hasCachedImg = true
+			case "AUDIO":
+				cachedAudio += cnt
+				hasCachedAudio = true
 			}
 		})
 		if hasCachedText {
 			detail.CachedTextTokens = usage.Int64Ptr(cachedText)
+		}
+		if hasCachedImg {
+			detail.CachedImageTokens = usage.Int64Ptr(cachedImg)
+		}
+		if hasCachedAudio {
+			detail.CachedAudioTokens = usage.Int64Ptr(cachedAudio)
 		}
 	}
 	if candDetails.Exists() {
@@ -3625,6 +3673,86 @@ func parseInteractionsUsageDetail(node ojson.Result) usage.Detail {
 		detail.ReasoningTokens,
 		detail.TotalTokens,
 	)
+	parseInteractionsModalities := func(arr ojson.Result, target func(mod string, cnt int64)) {
+		if !arr.Exists() || !arr.IsArray() {
+			return
+		}
+		arr.ForEach(func(_, entry ojson.Result) bool {
+			mod := strings.ToUpper(strings.TrimSpace(entry.Get("modality").String()))
+			if mod == "" {
+				return true
+			}
+			cntNode := firstExistingUsageNode(entry, "tokens", "tokenCount", "token_count")
+			if cntNode.Type == ojson.Number {
+				target(mod, cntNode.Int())
+			}
+			return true
+		})
+	}
+	if inMod := firstExistingUsageNode(node, "input_tokens_by_modality", "inputTokensByModality"); inMod.Exists() {
+		var textIn, imgIn, audioIn, videoIn, docIn int64
+		var hasTextIn, hasImgIn, hasAudioIn, hasVideoIn, hasDocIn bool
+		parseInteractionsModalities(inMod, func(mod string, cnt int64) {
+			switch mod {
+			case "TEXT":
+				textIn += cnt
+				hasTextIn = true
+			case "IMAGE":
+				imgIn += cnt
+				hasImgIn = true
+			case "AUDIO":
+				audioIn += cnt
+				hasAudioIn = true
+			case "VIDEO":
+				videoIn += cnt
+				hasVideoIn = true
+			case "DOCUMENT", "FILE":
+				docIn += cnt
+				hasDocIn = true
+			}
+		})
+		if hasTextIn {
+			detail.TextInputTokens = usage.Int64Ptr(textIn)
+		}
+		if hasImgIn {
+			detail.ImageInputTokens = usage.Int64Ptr(imgIn)
+		}
+		if hasAudioIn {
+			detail.AudioInputTokens = usage.Int64Ptr(audioIn)
+		}
+		if hasVideoIn {
+			detail.VideoInputTokens = usage.Int64Ptr(videoIn)
+		}
+		if hasDocIn {
+			detail.FileInputTokens = usage.Int64Ptr(docIn)
+		}
+	}
+	if cacheMod := firstExistingUsageNode(node, "cached_tokens_by_modality", "cachedTokensByModality"); cacheMod.Exists() {
+		var cachedText, cachedImg, cachedAudio int64
+		var hasCachedText, hasCachedImg, hasCachedAudio bool
+		parseInteractionsModalities(cacheMod, func(mod string, cnt int64) {
+			switch mod {
+			case "TEXT":
+				cachedText += cnt
+				hasCachedText = true
+			case "IMAGE":
+				cachedImg += cnt
+				hasCachedImg = true
+			case "AUDIO":
+				cachedAudio += cnt
+				hasCachedAudio = true
+			}
+		})
+		if hasCachedText {
+			detail.CachedTextTokens = usage.Int64Ptr(cachedText)
+		}
+		if hasCachedImg {
+			detail.CachedImageTokens = usage.Int64Ptr(cachedImg)
+		}
+		if hasCachedAudio {
+			detail.CachedAudioTokens = usage.Int64Ptr(cachedAudio)
+		}
+	}
 	return detail
 }
 
